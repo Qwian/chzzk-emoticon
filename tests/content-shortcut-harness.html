@@ -43,25 +43,42 @@
     <script>
       const editor = document.querySelector("#editor");
 
-      function press(code, key) {
-        const event = new KeyboardEvent("keydown", { code, key, bubbles: true, cancelable: true });
+      function press(code, key, options = {}) {
+        const event = new KeyboardEvent("keydown", {
+          code,
+          key,
+          bubbles: true,
+          cancelable: true,
+          repeat: options.repeat || false,
+          isComposing: options.isComposing || false
+        });
         Object.defineProperty(event, "getModifierState", {
           value: (name) => name === "CapsLock"
         });
         window.dispatchEvent(event);
+        return event;
       }
 
       window.setTimeout(() => {
         editor.focus();
-        press("KeyW", "w");
-        const ignoredUnmappedKey = editor.childNodes.length === 0;
-        press("KeyQ", "q");
+        const unmapped = press("KeyW", "w");
+        const first = press("KeyQ", "q");
+        const duringBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
 
         window.setTimeout(() => {
-          const image = editor.querySelector("img");
-          const passed = ignoredUnmappedKey && image?.alt === "{:dynamic_test:}";
-          document.body.dataset.result = passed ? "pass" : "fail";
-          document.querySelector("#result").textContent = passed ? "pass" : "fail";
+          const afterBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
+          window.setTimeout(() => {
+            const images = [...editor.querySelectorAll("img")];
+            const passed =
+              !unmapped.defaultPrevented &&
+              first.defaultPrevented &&
+              duringBusy.defaultPrevented &&
+              afterBusy.defaultPrevented &&
+              images.length === 2 &&
+              images.every((image) => image.alt === "{:dynamic_test:}");
+            document.body.dataset.result = passed ? "pass" : "fail";
+            document.querySelector("#result").textContent = passed ? "pass" : "fail";
+          }, 20);
         }, 20);
       }, 20);
     </script>

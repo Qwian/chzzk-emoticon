@@ -311,10 +311,7 @@
   window.addEventListener("keydown", async (event) => {
     const shortcut = settings.shortcuts.find(({ code }) => code === event.code);
     if (
-      busy ||
       !settings.enabled ||
-      (event.repeat && settings.sendImmediately) ||
-      event.isComposing ||
       event.ctrlKey ||
       event.altKey ||
       event.metaKey ||
@@ -328,8 +325,12 @@
     const input = findFocusedChatInput();
     if (!input) return;
 
+    // Always consume a mapped physical key before checking async/IME state.
+    // Otherwise rapid repeats can leak into the Korean IME while an emote is inserting.
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (busy || (event.repeat && settings.sendImmediately)) return;
+
     busy = true;
     try {
       await handleShortcut(input, mapping);
