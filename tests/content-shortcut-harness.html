@@ -43,9 +43,18 @@
     <script src="../content.js"></script>
     <script>
       const editor = document.querySelector("#editor");
-      if (new URLSearchParams(location.search).has("replace")) {
+      const testParams = new URLSearchParams(location.search);
+      const replacementDelay = testParams.has("delayreplace") ? 40 : 0;
+      if (testParams.has("replace")) {
         editor.addEventListener("blur", () => {
           editor.replaceWith(editor.cloneNode(true));
+        }, { once: true });
+      } else if (replacementDelay) {
+        editor.addEventListener("blur", () => {
+          const replacement = editor.cloneNode(true);
+          const container = editor.parentNode;
+          editor.remove();
+          window.setTimeout(() => container.prepend(replacement), replacementDelay);
         }, { once: true });
       }
       const observedDebug = [];
@@ -140,7 +149,7 @@
             document.body.dataset.result = passed ? "pass" : "fail";
             document.querySelector("#result").textContent = passed ? "pass" : "fail";
           }, 20);
-        }, 20);
+        }, 20 + replacementDelay);
       }, 20);
     </script>
   </body>

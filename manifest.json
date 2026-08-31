@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "치지직 Caps Lock 이모티콘",
   "description": "Caps Lock이 켜진 동안 원하는 키로 치지직 채팅 이모티콘을 빠르게 입력합니다.",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "permissions": ["storage"],
   "action": {
     "default_title": "치지직 이모티콘 설정",

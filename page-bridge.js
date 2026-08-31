@@ -92,15 +92,28 @@
 
   function suspendEditorForIme(editor, code, repeat) {
     const range = captureSelectionRange(editor);
+    const resumeStarted = performance.now();
     editor.blur();
     debug("editor-suspended", null, { code, repeat });
 
-    window.setTimeout(() => {
-      const currentEditor = editor.isConnected
+    function resumeEditor() {
+      const currentEditor = editor.isConnected && editor.isContentEditable
         ? editor
-        : document.querySelector("#aside-chatting pre[contenteditable='true']");
+        : document.querySelector(
+            "#aside-chatting pre[contenteditable='true'], " +
+            "#aside-chatting [contenteditable='true'], " +
+            "#aside-chatting [role='textbox']"
+          );
       if (!(currentEditor instanceof HTMLElement)) {
-        debug("editor-resume-failed", null, { code, repeat });
+        if (performance.now() - resumeStarted < 500) {
+          window.setTimeout(resumeEditor, 16);
+          return;
+        }
+        debug("editor-resume-failed", null, {
+          code,
+          repeat,
+          waitMs: Math.round(performance.now() - resumeStarted)
+        });
         return;
       }
       currentEditor.focus({ preventScroll: true });
@@ -109,10 +122,13 @@
       debug("editor-resumed", null, {
         code,
         repeat,
-        replaced: currentEditor !== editor
+        replaced: currentEditor !== editor,
+        waitMs: Math.round(performance.now() - resumeStarted)
       });
       dispatchShortcut(code, repeat);
-    }, 0);
+    }
+
+    window.setTimeout(resumeEditor, 0);
   }
 
   function observeImeInput(event) {

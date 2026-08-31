@@ -45,5 +45,5 @@ Then verify on a logged-in CHZZK live page:
 - Native CHZZK emote behavior depends on the current picker DOM and cannot be fully verified while logged out.
 - `page-bridge.js` must stay in the MAIN world because CHZZK keeps emoji ID-to-image state on the page's `window` object.
 - Mapped-key suppression must stay in the document-start MAIN-world bridge; a later isolated-world keydown handler can allow Korean IME composition input to leak through.
-- Windows Korean IME reports letter shortcuts with `KeyboardEvent.key === "Process"`; keep the one-task blur/refocus isolation for that path so non-cancelable composition does not start against inserted emote images. Do not toggle `contenteditable`, because CHZZK may replace the React editor node and lose focus.
+- Windows Korean IME reports letter shortcuts with `KeyboardEvent.key === "Process"`; keep the blur/refocus isolation for that path so non-cancelable composition does not start against inserted emote images. Do not toggle `contenteditable`, and keep retrying replacement-editor discovery because CHZZK may recreate the React editor asynchronously after blur.
 - Do not replace physical-key `KeyboardEvent.code` mappings with layout-dependent `KeyboardEvent.key` mappings.
