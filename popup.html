@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>치지직 이모티콘 설정</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">CHZZK QUICK EMOTE</p>
+          <h1>Caps Lock 이모티콘</h1>
+        </div>
+        <label class="switch" title="확장 프로그램 켜기/끄기">
+          <input id="enabled" type="checkbox" />
+          <span></span>
+        </label>
+      </header>
+
+      <p class="intro">
+        Caps Lock을 켠 뒤 아래 키를 누르면 치지직 채팅창에 등록한 항목이 들어갑니다.
+      </p>
+
+      <section id="mapping-list" aria-label="키 매핑"></section>
+
+      <label class="send-option">
+        <input id="send-immediately" type="checkbox" />
+        <span>입력 후 바로 전송</span>
+      </label>
+
+      <p id="status" role="status" aria-live="polite"></p>
+      <p class="footnote">
+        치지직 전용 이모티콘은 라이브 채팅에서 로그인한 뒤 등록하세요.
+      </p>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
