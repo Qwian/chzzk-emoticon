@@ -67,7 +67,7 @@
   document.addEventListener(DEBUG_EVENT, (event) => {
     if (!settings.diagnostics || !event.detail) return;
     diagnosticLog.push(event.detail);
-    diagnosticLog = diagnosticLog.slice(-120);
+    diagnosticLog = diagnosticLog.slice(-300);
     window.clearTimeout(diagnosticSaveTimer);
     diagnosticSaveTimer = window.setTimeout(() => {
       chrome.storage.local.set({ diagnosticLog });

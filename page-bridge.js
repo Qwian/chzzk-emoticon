@@ -72,7 +72,11 @@
 
   function observeImeInput(event) {
     const guard = imeGuard;
-    if (guard && event.target === guard.editor) debug("input-seen", event);
+    if (
+      guard &&
+      event.target === guard.editor &&
+      !event.inputType?.startsWith("delete")
+    ) debug("input-seen", event);
   }
 
   document.addEventListener(CONFIG_EVENT, (event) => {
@@ -117,7 +121,11 @@
 
   for (const type of ["compositionstart", "compositionupdate", "compositionend", "beforeinput"]) {
     window.addEventListener(type, (event) => {
-      if (imeGuard && event.target === imeGuard.editor) debug(type, event);
+      if (
+        imeGuard &&
+        event.target === imeGuard.editor &&
+        !event.inputType?.startsWith("delete")
+      ) debug(type, event);
     }, true);
   }
 
