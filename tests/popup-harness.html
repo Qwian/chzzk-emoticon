@@ -18,10 +18,6 @@
       <p class="intro">왼쪽 키 버튼을 눌러 단축키를 지정하세요.</p>
       <section id="mapping-list" aria-label="키 매핑"></section>
       <button id="add-shortcut" type="button">+ 키 추가</button>
-      <label class="send-option">
-        <input id="send-immediately" type="checkbox" />
-        <span>입력 후 바로 전송</span>
-      </label>
       <p id="status" role="status"></p>
       <details id="diagnostics-panel" class="diagnostics">
         <summary>입력 진단</summary>
@@ -53,13 +49,13 @@
       window.savedSettings = new URLSearchParams(location.search).has("legacy")
         ? {
             enabled: true,
-            sendImmediately: false,
+            sendImmediately: true,
             mappings: {
               Minus: { type: "native", code: "{:legacy_emote:}", imageUrl: icon },
               Equal: { type: "text", value: "기존 매핑" }
             }
           }
-        : { enabled: true, sendImmediately: false, shortcuts };
+        : { enabled: true, shortcuts };
       let storageChangeListener;
       window.savedDiagnosticLog = [];
       window.chrome = {
@@ -74,6 +70,9 @@
                 window.savedDiagnosticLog = values.diagnosticLog;
               }
               if (Object.hasOwn(values, "settings")) {
+                document.body.dataset.savedHasSendImmediately = String(
+                  Object.hasOwn(values.settings, "sendImmediately")
+                );
                 const oldValue = window.savedSettings;
                 window.savedSettings = values.settings;
                 storageChangeListener?.(

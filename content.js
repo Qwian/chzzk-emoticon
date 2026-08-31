@@ -10,7 +10,6 @@
 
   const DEFAULT_SETTINGS = {
     enabled: true,
-    sendImmediately: false,
     diagnostics: false,
     shortcuts: []
   };
@@ -50,8 +49,8 @@
         }));
 
     return {
-      ...DEFAULT_SETTINGS,
-      ...value,
+      enabled: value?.enabled ?? DEFAULT_SETTINGS.enabled,
+      diagnostics: value?.diagnostics ?? DEFAULT_SETTINGS.diagnostics,
       shortcuts
     };
   }
@@ -250,37 +249,6 @@
     return false;
   }
 
-  async function sendIfEnabled(input) {
-    if (!settings.sendImmediately) return;
-    await new Promise((resolve) => window.setTimeout(resolve, 80));
-
-    const nearbySendButton = input.closest("form, section, aside, [class*='chat']")
-      ?.querySelector("button:not([disabled])");
-    const sendButton = nearbySendButton?.textContent?.trim() === "채팅"
-      ? nearbySendButton
-      : [...document.querySelectorAll("button:not([disabled])")].find(
-          (button) => button.textContent?.trim() === "채팅"
-        );
-    if (sendButton) {
-      sendButton.click();
-      return;
-    }
-
-    input.focus();
-    input.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "Enter",
-      code: "Enter",
-      bubbles: true,
-      cancelable: true
-    }));
-    input.dispatchEvent(new KeyboardEvent("keyup", {
-      key: "Enter",
-      code: "Enter",
-      bubbles: true,
-      cancelable: true
-    }));
-  }
-
   function nativeCode(mapping) {
     return [mapping.code, mapping.alt, mapping.label].find(
       (value) => EMOTE_CODE_PATTERN.test(value || "")
@@ -333,7 +301,6 @@
       return;
     }
     input.focus();
-    await sendIfEnabled(input);
   }
 
   async function handleShortcut(input, mapping) {
@@ -341,7 +308,6 @@
       await insertNativeEmote(input, mapping);
     } else if (mapping.type === "text" && mapping.value) {
       insertText(input, mapping.value);
-      await sendIfEnabled(input);
     }
   }
 
@@ -354,7 +320,7 @@
     const input = findFocusedChatInput();
     if (!input) return;
 
-    if (busy || (event.detail?.repeat && settings.sendImmediately)) return;
+    if (busy) return;
 
     busy = true;
     try {

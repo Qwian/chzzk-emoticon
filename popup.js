@@ -24,13 +24,11 @@ const BLOCKED_CODES = new Set([
 
 const DEFAULT_SETTINGS = {
   enabled: true,
-  sendImmediately: false,
   diagnostics: false,
   shortcuts: []
 };
 
 const enabledInput = document.querySelector("#enabled");
-const sendInput = document.querySelector("#send-immediately");
 const list = document.querySelector("#mapping-list");
 const addButton = document.querySelector("#add-shortcut");
 const status = document.querySelector("#status");
@@ -59,7 +57,6 @@ function normalizeSettings(stored = {}) {
 
   return {
     enabled: stored.enabled ?? DEFAULT_SETTINGS.enabled,
-    sendImmediately: stored.sendImmediately ?? DEFAULT_SETTINGS.sendImmediately,
     diagnostics: stored.diagnostics ?? DEFAULT_SETTINGS.diagnostics,
     shortcuts: shortcuts.map((shortcut) => ({
       id: shortcut.id || createId(),
@@ -287,7 +284,6 @@ function applyStoredSettings(stored, message = "") {
   document.removeEventListener("keydown", captureKey, true);
   settings = next;
   enabledInput.checked = settings.enabled;
-  sendInput.checked = settings.sendImmediately;
   diagnosticsInput.checked = settings.diagnostics;
   diagnosticsPanel.open = settings.diagnostics;
   renderMappings();
@@ -297,12 +293,14 @@ function applyStoredSettings(stored, message = "") {
 async function initialize() {
   const stored = await chrome.storage.local.get(["settings", "diagnosticLog"]);
   settings = normalizeSettings(stored.settings);
-  if (stored.settings?.mappings && !Array.isArray(stored.settings.shortcuts)) {
+  if (
+    (stored.settings?.mappings && !Array.isArray(stored.settings.shortcuts)) ||
+    Object.hasOwn(stored.settings || {}, "sendImmediately")
+  ) {
     await saveSettings();
   }
 
   enabledInput.checked = settings.enabled;
-  sendInput.checked = settings.sendImmediately;
   diagnosticsInput.checked = settings.diagnostics;
   diagnosticsPanel.open = settings.diagnostics;
   diagnosticLog.value = (stored.diagnosticLog || []).map((entry) => JSON.stringify(entry)).join("\n");
@@ -312,12 +310,6 @@ async function initialize() {
     settings.enabled = enabledInput.checked;
     await saveSettings();
     setStatus(settings.enabled ? "단축키를 켰습니다." : "단축키를 껐습니다.");
-  });
-
-  sendInput.addEventListener("change", async () => {
-    settings.sendImmediately = sendInput.checked;
-    await saveSettings();
-    setStatus("전송 설정을 저장했습니다.");
   });
 
   diagnosticsInput.addEventListener("change", async () => {
