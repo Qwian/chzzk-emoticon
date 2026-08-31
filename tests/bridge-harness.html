@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>CHZZK emote bridge harness</title>
+  </head>
+  <body data-result="pending">
+    <aside id="aside-chatting">
+      <pre id="editor" contenteditable="true"></pre>
+    </aside>
+    <script src="../page-bridge.js"></script>
+    <script>
+      const editor = document.querySelector("#editor");
+      const code = "{:test_emote:}";
+      const imageUrl = "https://ssl.pstatic.net/test-emote.png";
+
+      editor.addEventListener("input", () => {
+        let value = editor.innerHTML;
+        Object.entries(window.__workingEmoticon || {}).forEach(([id, src]) => {
+          const image = [...editor.querySelectorAll("img")].find((item) => item.src === src);
+          if (image) value = value.replace(image.outerHTML, `{:${id}:}`);
+        });
+        editor.dataset.modelValue = value;
+      });
+
+      editor.focus();
+      document.dispatchEvent(new CustomEvent("chzzk-caps-emote:insert", {
+        detail: { requestId: "harness", code, imageUrl }
+      }));
+
+      const image = editor.querySelector("img");
+      const passed = image?.alt === code && editor.dataset.modelValue === code;
+      document.body.dataset.result = passed ? "pass" : "fail";
+    </script>
+  </body>
+</html>

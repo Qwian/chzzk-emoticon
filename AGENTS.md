@@ -10,6 +10,7 @@ Run JavaScript syntax checks with the bundled Node executable:
 
 ```powershell
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check content.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check page-bridge.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check popup.js
 Get-Content -LiteralPath 'manifest.json' -Raw | ConvertFrom-Json
 ```
@@ -23,7 +24,7 @@ Then verify on a logged-in CHZZK live page:
 
 ## Definition of done
 
-- Both JavaScript syntax checks pass and `manifest.json` parses.
+- All JavaScript syntax checks pass and `manifest.json` parses.
 - The unpacked extension loads without a manifest error.
 - Text and native-emote mappings work on a real logged-in CHZZK live chat.
 - No console error or unintended key interception is observed.
@@ -32,4 +33,5 @@ Then verify on a logged-in CHZZK live page:
 
 - `node` is not on PATH in this workspace; use the bundled executable above.
 - Native CHZZK emote behavior depends on the current picker DOM and cannot be fully verified while logged out.
+- `page-bridge.js` must stay in the MAIN world because CHZZK keeps emoji ID-to-image state on the page's `window` object.
 - Do not replace physical-key `KeyboardEvent.code` mappings with layout-dependent `KeyboardEvent.key` mappings.

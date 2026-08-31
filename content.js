@@ -14,7 +14,13 @@
     mappings: {}
   };
 
+  const INSERT_EVENT = "chzzk-caps-emote:insert";
+  const RESULT_EVENT = "chzzk-caps-emote:result";
+  const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
+
   const CHAT_INPUT_SELECTORS = [
+    "#aside-chatting pre[contenteditable='true']",
+    "#aside-chatting [contenteditable='true']",
     "textarea[placeholder*='채팅']",
     "textarea[aria-label*='채팅']",
     "[contenteditable='true'][data-placeholder*='채팅']",
@@ -178,38 +184,24 @@
       ""
     ).trim();
     const alt = (image?.alt || "").trim();
-    const src = normalizedSource(image?.currentSrc || image?.src || "");
+    const imageUrl = image?.currentSrc || image?.src || "";
+    const src = normalizedSource(imageUrl);
+    const code = [alt, label].find((value) => EMOTE_CODE_PATTERN.test(value)) || "";
 
-    if (!label && !alt && !src) return null;
-    if (label === "이모티콘") return null;
+    if (!code || !imageUrl) return null;
 
-    return { type: "native", label, alt, src };
+    return { type: "native", label: code, alt, code, imageUrl, src };
   }
 
-  function scoreCandidate(candidate, mapping) {
-    const fingerprint = fingerprintFromElement(candidate);
-    if (!fingerprint) return 0;
-
-    let score = 0;
-    if (mapping.src && fingerprint.src === mapping.src) score += 8;
-    if (mapping.alt && fingerprint.alt === mapping.alt) score += 4;
-    if (mapping.label && fingerprint.label === mapping.label) score += 4;
-    if (mapping.label && fingerprint.label.includes(mapping.label)) score += 1;
-    return score;
-  }
-
-  async function waitForNativeEmote(mapping, timeout = 2500) {
+  async function waitForChatValueChange(valueBefore, timeout = 600) {
     const started = performance.now();
     while (performance.now() - started < timeout) {
-      const candidates = [...document.querySelectorAll("button, [role='button']")];
-      const ranked = candidates
-        .map((candidate) => ({ candidate, score: scoreCandidate(candidate, mapping) }))
-        .filter(({ score }) => score > 0)
-        .sort((a, b) => b.score - a.score);
-      if (ranked[0]) return ranked[0].candidate;
-      await new Promise((resolve) => window.setTimeout(resolve, 80));
+      const input = findChatInput();
+      const value = input?.innerHTML ?? input?.value ?? "";
+      if (value !== valueBefore) return true;
+      await new Promise((resolve) => window.setTimeout(resolve, 40));
     }
-    return null;
+    return false;
   }
 
   async function sendIfEnabled(input) {
@@ -243,22 +235,57 @@
     }));
   }
 
+  function nativeCode(mapping) {
+    return [mapping.code, mapping.alt, mapping.label].find(
+      (value) => EMOTE_CODE_PATTERN.test(value || "")
+    ) || "";
+  }
+
+  function nativeImageUrl(mapping) {
+    if (mapping.imageUrl) return mapping.imageUrl;
+    if (!mapping.src) return "";
+    return /^https:\/\//i.test(mapping.src)
+      ? mapping.src
+      : `https://${mapping.src}`;
+  }
+
+  function requestDirectInsertion(mapping) {
+    const code = nativeCode(mapping);
+    const imageUrl = nativeImageUrl(mapping);
+    if (!code || !imageUrl) {
+      return Promise.resolve({
+        ok: false,
+        message: "이 매핑은 구버전 형식입니다. 이모티콘을 다시 등록해주세요."
+      });
+    }
+
+    const requestId = crypto.randomUUID();
+    return new Promise((resolve) => {
+      const timeout = window.setTimeout(() => {
+        document.removeEventListener(RESULT_EVENT, onResult);
+        resolve({ ok: false, message: "치지직 입력 브리지에 연결하지 못했습니다." });
+      }, 800);
+
+      function onResult(event) {
+        if (event.detail?.requestId !== requestId) return;
+        window.clearTimeout(timeout);
+        document.removeEventListener(RESULT_EVENT, onResult);
+        resolve(event.detail);
+      }
+
+      document.addEventListener(RESULT_EVENT, onResult);
+      document.dispatchEvent(new CustomEvent(INSERT_EVENT, {
+        detail: { requestId, code, imageUrl }
+      }));
+    });
+  }
+
   async function insertNativeEmote(input, mapping) {
-    const pickerButton = findEmotePickerButton();
-    if (!pickerButton) {
-      showToast("치지직 이모티콘 버튼을 찾지 못했습니다.", "error");
+    const result = await requestDirectInsertion(mapping);
+    if (!result.ok) {
+      showToast(result.message || "이모티콘을 입력하지 못했습니다.", "error");
       return;
     }
-
-    pickerButton.click();
-    const emoteButton = await waitForNativeEmote(mapping);
-    if (!emoteButton) {
-      showToast("등록한 이모티콘을 현재 선택창에서 찾지 못했습니다.", "error");
-      return;
-    }
-
-    emoteButton.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 30));
     input.focus();
     await sendIfEnabled(input);
   }
@@ -306,11 +333,19 @@
     const fingerprint = fingerprintFromElement(event.target);
     if (!fingerprint) return;
 
-    const next = mergeSettings(settings);
-    next.mappings[capture.code] = fingerprint;
-    await chrome.storage.local.set({ settings: next });
-    showToast(`${capture.key} 키에 ${fingerprint.label || fingerprint.alt || "이모티콘"} 등록 완료`);
+    const currentCapture = capture;
     capture = null;
+    const inputBefore = findChatInput();
+    const valueBefore = inputBefore?.innerHTML ?? inputBefore?.value ?? "";
+    if (!(await waitForChatValueChange(valueBefore))) {
+      showToast("사용할 수 없거나 잠긴 이모티콘은 등록할 수 없습니다.", "error");
+      return;
+    }
+
+    const next = mergeSettings(settings);
+    next.mappings[currentCapture.code] = fingerprint;
+    await chrome.storage.local.set({ settings: next });
+    showToast(`${currentCapture.key} 키에 ${fingerprint.code} 등록 완료`);
   }, true);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

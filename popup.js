@@ -30,7 +30,7 @@ async function saveSettings() {
 }
 
 function nativeDescription(mapping) {
-  return mapping?.label || mapping?.alt || "치지직 이모티콘";
+  return mapping?.code || mapping?.alt || mapping?.label || "치지직 이모티콘";
 }
 
 function createMappingRow(definition) {
