@@ -43,28 +43,26 @@
     <script src="../content.js"></script>
     <script>
       const editor = document.querySelector("#editor");
-      const testParams = new URLSearchParams(location.search);
-      const replacementDelay = testParams.has("delayreplace") ? 40 : 0;
-      if (testParams.has("replace")) {
-        editor.addEventListener("blur", () => {
-          editor.replaceWith(editor.cloneNode(true));
-        }, { once: true });
-      } else if (replacementDelay) {
-        editor.addEventListener("blur", () => {
-          const replacement = editor.cloneNode(true);
-          const container = editor.parentNode;
-          editor.remove();
-          window.setTimeout(() => container.prepend(replacement), replacementDelay);
-        }, { once: true });
-      }
       const observedDebug = [];
       document.addEventListener("chzzk-caps-emote:debug", (event) => {
         observedDebug.push(event.detail);
       });
       let siteKeydownCount = 0;
+      let siteCompositionInputCount = 0;
+      let siteCompositionEventCount = 0;
       window.addEventListener("keydown", () => {
         siteKeydownCount += 1;
       }, true);
+      document.addEventListener("input", (event) => {
+        if (event.inputType === "insertCompositionText") {
+          siteCompositionInputCount += 1;
+        }
+      });
+      for (const type of ["compositionstart", "compositionupdate", "compositionend"]) {
+        document.addEventListener(type, () => {
+          siteCompositionEventCount += 1;
+        });
+      }
 
       function press(code, key, options = {}) {
         const event = new KeyboardEvent("keydown", {
@@ -83,6 +81,16 @@
       }
 
       function emitImeText() {
+        editor.dispatchEvent(new CompositionEvent("compositionstart", {
+          bubbles: true,
+          cancelable: false,
+          data: ""
+        }));
+        editor.dispatchEvent(new CompositionEvent("compositionupdate", {
+          bubbles: true,
+          cancelable: false,
+          data: "ㅂ"
+        }));
         const beforeInput = new InputEvent("beforeinput", {
           bubbles: true,
           cancelable: false,
@@ -100,7 +108,26 @@
           isComposing: true
         });
         editor.dispatchEvent(input);
+        editor.dispatchEvent(new CompositionEvent("compositionend", {
+          bubbles: true,
+          cancelable: false,
+          data: ""
+        }));
         return { beforeInput, input };
+      }
+
+      function emitImeObjectReplacement() {
+        const image = editor.querySelector("img:last-of-type");
+        if (!image) return;
+        const objectText = document.createTextNode("\uFFFC");
+        image.replaceWith(objectText);
+        editor.dispatchEvent(new InputEvent("input", {
+          bubbles: true,
+          cancelable: false,
+          inputType: "insertCompositionText",
+          data: "\uFFFC",
+          isComposing: true
+        }));
       }
 
       function emitDeleteNoise() {
@@ -118,13 +145,13 @@
         editor.focus();
         const unmapped = press("KeyW", "w");
         const first = press("KeyQ", "Process");
-        const firstImeStarted = editor.isContentEditable && document.activeElement === editor;
-        if (firstImeStarted) emitImeText();
+        const firstKeptFocus = document.activeElement === editor;
+        emitImeText();
 
         window.setTimeout(() => {
           const repeated = press("KeyQ", "Process", { repeat: true });
-          const repeatedImeStarted = editor.isContentEditable && document.activeElement === editor;
-          if (repeatedImeStarted) emitImeText();
+          const repeatedKeptFocus = document.activeElement === editor;
+          emitImeObjectReplacement();
           emitDeleteNoise();
           window.setTimeout(() => {
             const finalEditor = document.querySelector("#editor");
@@ -134,22 +161,24 @@
               !unmapped.defaultPrevented &&
               first.defaultPrevented &&
               repeated.defaultPrevented &&
-              !firstImeStarted &&
-              !repeatedImeStarted &&
+              firstKeptFocus &&
+              repeatedKeptFocus &&
               siteKeydownCount === 1 &&
+              siteCompositionInputCount === 0 &&
+              siteCompositionEventCount === 0 &&
               images.length === 2 &&
               finalEditor.textContent === "기존" &&
               document.activeElement === finalEditor &&
               debugTypes.includes("keydown-blocked") &&
-              debugTypes.includes("editor-suspended") &&
-              debugTypes.includes("editor-resumed") &&
-              !debugTypes.includes("compositionstart") &&
+              debugTypes.includes("beforeinput-blocked") &&
+              debugTypes.includes("ime-mutations-rolled-back") &&
+              !debugTypes.includes("editor-suspended") &&
               !observedDebug.some(({ inputType }) => inputType === "deleteContentBackward") &&
               images.every((image) => image.alt === "{:dynamic_test:}");
             document.body.dataset.result = passed ? "pass" : "fail";
             document.querySelector("#result").textContent = passed ? "pass" : "fail";
           }, 20);
-        }, 20 + replacementDelay);
+        }, 20);
       }, 20);
     </script>
   </body>

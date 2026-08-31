@@ -63,11 +63,42 @@
   }
 
   function armImeGuard(editor, code) {
-    imeGuard = {
+    if (imeGuard?.cleanupTimer) window.clearTimeout(imeGuard.cleanupTimer);
+    imeGuard?.observer?.disconnect();
+    const pendingMutations = [];
+    const observer = new MutationObserver((records) => {
+      pendingMutations.push(...records);
+    });
+    observer.observe(editor, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      characterDataOldValue: true
+    });
+    const guard = {
       editor,
       code,
-      expiresAt: performance.now() + 300
+      expiresAt: performance.now() + 300,
+      observer,
+      pendingMutations,
+      safeRange: captureSelectionRange(editor)
     };
+    imeGuard = guard;
+    scheduleGuardCleanup(guard);
+  }
+
+  function scheduleGuardCleanup(guard) {
+    window.clearTimeout(guard.cleanupTimer);
+    const delay = Math.max(0, guard.expiresAt - performance.now()) + 20;
+    guard.cleanupTimer = window.setTimeout(() => {
+      if (imeGuard !== guard) return;
+      if (performance.now() <= guard.expiresAt) {
+        scheduleGuardCleanup(guard);
+        return;
+      }
+      guard.observer.disconnect();
+      imeGuard = null;
+    }, delay);
   }
 
   function captureSelectionRange(editor) {
@@ -90,54 +121,82 @@
     }));
   }
 
-  function suspendEditorForIme(editor, code, repeat) {
-    const range = captureSelectionRange(editor);
-    const resumeStarted = performance.now();
-    editor.blur();
-    debug("editor-suspended", null, { code, repeat });
-
-    function resumeEditor() {
-      const currentEditor = editor.isConnected && editor.isContentEditable
-        ? editor
-        : document.querySelector(
-            "#aside-chatting pre[contenteditable='true'], " +
-            "#aside-chatting [contenteditable='true'], " +
-            "#aside-chatting [role='textbox']"
-          );
-      if (!(currentEditor instanceof HTMLElement)) {
-        if (performance.now() - resumeStarted < 500) {
-          window.setTimeout(resumeEditor, 16);
-          return;
-        }
-        debug("editor-resume-failed", null, {
-          code,
-          repeat,
-          waitMs: Math.round(performance.now() - resumeStarted)
-        });
-        return;
-      }
-      currentEditor.focus({ preventScroll: true });
-      if (currentEditor === editor) restoreSelectionRange(currentEditor, range);
-      imeGuard.editor = currentEditor;
-      debug("editor-resumed", null, {
-        code,
-        repeat,
-        replaced: currentEditor !== editor,
-        waitMs: Math.round(performance.now() - resumeStarted)
-      });
-      dispatchShortcut(code, repeat);
-    }
-
-    window.setTimeout(resumeEditor, 0);
+  function observeGuard(guard) {
+    guard.observer.observe(guard.editor, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      characterDataOldValue: true
+    });
   }
 
-  function observeImeInput(event) {
+  function markImeSafePoint(editor) {
     const guard = imeGuard;
-    if (
-      guard &&
-      event.target === guard.editor &&
-      !event.inputType?.startsWith("delete")
-    ) debug("input-seen", event);
+    if (!guard || guard.editor !== editor) return;
+    guard.pendingMutations.length = 0;
+    guard.observer.takeRecords();
+    guard.safeRange = captureSelectionRange(editor);
+  }
+
+  function isGuardedImeEvent(event) {
+    return Boolean(
+      imeGuard &&
+      performance.now() <= imeGuard.expiresAt &&
+      event.target === imeGuard.editor &&
+      (
+        event.type.startsWith("composition") ||
+        event.isComposing ||
+        event.inputType === "insertCompositionText"
+      )
+    );
+  }
+
+  function restoreRemovedNodes(record) {
+    let anchor = record.nextSibling?.parentNode === record.target
+      ? record.nextSibling
+      : null;
+    if (!anchor && record.previousSibling?.parentNode === record.target) {
+      anchor = record.previousSibling.nextSibling;
+    }
+    for (const node of record.removedNodes) {
+      record.target.insertBefore(node, anchor);
+    }
+  }
+
+  function rollbackImeMutations(event) {
+    const guard = imeGuard;
+    const records = [...guard.pendingMutations, ...guard.observer.takeRecords()];
+    guard.pendingMutations.length = 0;
+    guard.observer.disconnect();
+
+    for (const record of records.reverse()) {
+      if (record.type === "characterData") {
+        record.target.data = record.oldValue ?? "";
+        continue;
+      }
+      for (const node of [...record.addedNodes].reverse()) {
+        if (node.parentNode === record.target) node.remove();
+      }
+      restoreRemovedNodes(record);
+    }
+
+    observeGuard(guard);
+    restoreSelectionRange(guard.editor, guard.safeRange);
+    debug("ime-mutations-rolled-back", event, { mutationCount: records.length });
+  }
+
+  function observeInput(event) {
+    const guard = imeGuard;
+    if (!guard || event.target !== guard.editor || event.inputType?.startsWith("delete")) return;
+
+    if (isGuardedImeEvent(event)) {
+      event.stopImmediatePropagation();
+      rollbackImeMutations(event);
+      return;
+    }
+
+    markImeSafePoint(guard.editor);
+    debug("input-seen", event);
   }
 
   document.addEventListener(CONFIG_EVENT, (event) => {
@@ -168,10 +227,6 @@
     event.stopImmediatePropagation();
     armImeGuard(editor, event.code);
     debug("keydown-blocked", event, { repeat: event.repeat });
-    if (event.key === "Process") {
-      suspendEditorForIme(editor, event.code, event.repeat);
-      return;
-    }
     dispatchShortcut(event.code, event.repeat);
   }, true);
 
@@ -179,20 +234,20 @@
     if (imeGuard?.code === event.code) {
       debug("keyup", event);
       imeGuard.expiresAt = performance.now() + 80;
+      scheduleGuardCleanup(imeGuard);
     }
   }, true);
 
   for (const type of ["compositionstart", "compositionupdate", "compositionend", "beforeinput"]) {
     window.addEventListener(type, (event) => {
-      if (
-        imeGuard &&
-        event.target === imeGuard.editor &&
-        !event.inputType?.startsWith("delete")
-      ) debug(type, event);
+      if (!isGuardedImeEvent(event)) return;
+      if (event.cancelable) event.preventDefault();
+      event.stopImmediatePropagation();
+      debug(`${type}-blocked`, event);
     }, true);
   }
 
-  window.addEventListener("input", observeImeInput, true);
+  window.addEventListener("input", observeInput, true);
 
   document.addEventListener(INSERT_EVENT, (event) => {
     const { requestId, code, imageUrl } = event.detail || {};
@@ -241,6 +296,7 @@
       data: null
     }));
     moveCaretAfter(image);
+    markImeSafePoint(editor);
     respond(requestId, true);
   }, true);
 })();
