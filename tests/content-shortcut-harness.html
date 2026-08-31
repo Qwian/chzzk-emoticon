@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dynamic shortcut harness</title>
+    <style>
+      #editor { width: 320px; min-height: 40px; }
+    </style>
+  </head>
+  <body data-result="pending">
+    <aside id="aside-chatting">
+      <pre id="editor" contenteditable="true"></pre>
+    </aside>
+    <output id="result">pending</output>
+    <script>
+      const settings = {
+        enabled: true,
+        sendImmediately: false,
+        shortcuts: [{
+          id: "dynamic-q",
+          code: "KeyQ",
+          keyLabel: "Q",
+          mapping: {
+            type: "native",
+            code: "{:dynamic_test:}",
+            imageUrl: "https://ssl.pstatic.net/dynamic-test.png"
+          }
+        }]
+      };
+      window.chrome = {
+        storage: {
+          local: {
+            get: async () => ({ settings }),
+            set: async () => undefined
+          },
+          onChanged: { addListener: () => undefined }
+        },
+        runtime: { onMessage: { addListener: () => undefined } }
+      };
+    </script>
+    <script src="../page-bridge.js"></script>
+    <script src="../content.js"></script>
+    <script>
+      const editor = document.querySelector("#editor");
+
+      function press(code, key) {
+        const event = new KeyboardEvent("keydown", { code, key, bubbles: true, cancelable: true });
+        Object.defineProperty(event, "getModifierState", {
+          value: (name) => name === "CapsLock"
+        });
+        window.dispatchEvent(event);
+      }
+
+      window.setTimeout(() => {
+        editor.focus();
+        press("KeyW", "w");
+        const ignoredUnmappedKey = editor.childNodes.length === 0;
+        press("KeyQ", "q");
+
+        window.setTimeout(() => {
+          const image = editor.querySelector("img");
+          const passed = ignoredUnmappedKey && image?.alt === "{:dynamic_test:}";
+          document.body.dataset.result = passed ? "pass" : "fail";
+          document.querySelector("#result").textContent = passed ? "pass" : "fail";
+        }, 20);
+      }, 20);
+    </script>
+  </body>
+</html>

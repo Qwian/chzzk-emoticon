@@ -100,6 +100,22 @@ h1 {
 #mapping-list {
   display: grid;
   gap: 8px;
+  max-height: 288px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: #4a5650 transparent;
+  scrollbar-width: thin;
+}
+
+#mapping-list:empty::before {
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  border: 1px dashed #343c38;
+  border-radius: 10px;
+  color: #717a75;
+  content: "등록된 단축키가 없습니다";
+  font-size: 12px;
 }
 
 .mapping-row {
@@ -109,7 +125,7 @@ h1 {
   gap: 7px;
 }
 
-kbd {
+.key-button {
   display: grid;
   width: 34px;
   height: 34px;
@@ -119,7 +135,21 @@ kbd {
   border-radius: 8px;
   background: #1d2320;
   color: #fff;
-  font: 700 16px/1 ui-monospace, monospace;
+  padding: 0;
+  font: 700 13px/1 ui-monospace, monospace;
+  overflow: hidden;
+}
+
+.key-button.recording {
+  border-color: #00ffa3;
+  color: #00ffa3;
+  animation: key-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes key-pulse {
+  to {
+    box-shadow: 0 0 0 3px rgba(0, 255, 163, 0.14);
+  }
 }
 
 .mapping-input {
@@ -140,6 +170,35 @@ kbd {
 
 .mapping-input[data-native="true"] {
   color: #00ffa3;
+}
+
+.native-preview {
+  display: flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 1px solid #343c38;
+  border-radius: 8px;
+  background: #171b19;
+  padding: 3px 10px;
+  overflow: hidden;
+}
+
+.native-preview img {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.native-preview span {
+  overflow: hidden;
+  color: #8f9994;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 button {
@@ -168,6 +227,15 @@ button:hover {
   padding: 0;
   color: #808985;
   font-size: 16px;
+}
+
+#add-shortcut {
+  width: 100%;
+  margin-top: 10px;
+  border-style: dashed;
+  color: #00ffa3;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .send-option {

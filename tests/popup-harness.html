@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Popup harness</title>
+    <link rel="stylesheet" href="../popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">CHZZK QUICK EMOTE</p>
+          <h1>Caps Lock 이모티콘</h1>
+        </div>
+        <label class="switch"><input id="enabled" type="checkbox" /><span></span></label>
+      </header>
+      <p class="intro">왼쪽 키 버튼을 눌러 단축키를 지정하세요.</p>
+      <section id="mapping-list" aria-label="키 매핑"></section>
+      <button id="add-shortcut" type="button">+ 키 추가</button>
+      <label class="send-option">
+        <input id="send-immediately" type="checkbox" />
+        <span>입력 후 바로 전송</span>
+      </label>
+      <p id="status" role="status"></p>
+      <p class="footnote">팝업 UI 테스트</p>
+    </main>
+    <script>
+      const icon = "data:image/svg+xml," + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" rx="8" fill="#00ffa3"/><circle cx="11" cy="13" r="2"/><circle cx="21" cy="13" r="2"/><path d="M9 21c4 3 10 3 14 0" fill="none" stroke="#111" stroke-width="2"/></svg>'
+      );
+      const shortcuts = Array.from({ length: 12 }, (_, index) => ({
+        id: `test-${index}`,
+        code: `Key${String.fromCharCode(65 + index)}`,
+        keyLabel: String.fromCharCode(65 + index),
+        mapping: index === 0
+          ? { type: "native", code: "{:test_emote:}", imageUrl: icon }
+          : { type: "text", value: `테스트 ${index + 1}` }
+      }));
+      window.savedSettings = new URLSearchParams(location.search).has("legacy")
+        ? {
+            enabled: true,
+            sendImmediately: false,
+            mappings: {
+              Minus: { type: "native", code: "{:legacy_emote:}", imageUrl: icon },
+              Equal: { type: "text", value: "기존 매핑" }
+            }
+          }
+        : { enabled: true, sendImmediately: false, shortcuts };
+      window.chrome = {
+        storage: {
+          local: {
+            get: async () => ({ settings: window.savedSettings }),
+            set: async ({ settings }) => { window.savedSettings = settings; }
+          }
+        },
+        tabs: {
+          query: async () => [{ id: 1 }],
+          sendMessage: async () => ({ ok: true })
+        }
+      };
+    </script>
+    <script src="../popup.js"></script>
+  </body>
+</html>

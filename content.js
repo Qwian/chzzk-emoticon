@@ -1,17 +1,17 @@
 (() => {
-  const KEY_CODES = new Set([
-    "Minus",
-    "Equal",
-    "BracketLeft",
-    "BracketRight",
-    "Semicolon",
-    "Quote"
-  ]);
+  const LEGACY_KEY_LABELS = {
+    Minus: "-",
+    Equal: "=",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Semicolon: ";",
+    Quote: "'"
+  };
 
   const DEFAULT_SETTINGS = {
     enabled: true,
     sendImmediately: false,
-    mappings: {}
+    shortcuts: []
   };
 
   const INSERT_EVENT = "chzzk-caps-emote:insert";
@@ -33,10 +33,19 @@
   let busy = false;
 
   function mergeSettings(value) {
+    const shortcuts = Array.isArray(value?.shortcuts)
+      ? value.shortcuts
+      : Object.entries(value?.mappings || {}).map(([code, mapping]) => ({
+          id: `legacy-${code}`,
+          code,
+          keyLabel: LEGACY_KEY_LABELS[code] || code,
+          mapping
+        }));
+
     return {
       ...DEFAULT_SETTINGS,
       ...value,
-      mappings: { ...DEFAULT_SETTINGS.mappings, ...value?.mappings }
+      shortcuts
     };
   }
 
@@ -300,6 +309,7 @@
   }
 
   window.addEventListener("keydown", async (event) => {
+    const shortcut = settings.shortcuts.find(({ code }) => code === event.code);
     if (
       busy ||
       !settings.enabled ||
@@ -309,10 +319,10 @@
       event.altKey ||
       event.metaKey ||
       !event.getModifierState("CapsLock") ||
-      !KEY_CODES.has(event.code)
+      !shortcut
     ) return;
 
-    const mapping = settings.mappings[event.code];
+    const mapping = shortcut.mapping;
     if (!mapping) return;
 
     const input = findFocusedChatInput();
@@ -343,7 +353,17 @@
     }
 
     const next = mergeSettings(settings);
-    next.mappings[currentCapture.code] = fingerprint;
+    const shortcutIndex = next.shortcuts.findIndex(({ id, code }) =>
+      currentCapture.shortcutId ? id === currentCapture.shortcutId : code === currentCapture.code
+    );
+    if (shortcutIndex < 0) {
+      showToast("등록할 단축키를 찾지 못했습니다. 팝업에서 다시 시도하세요.", "error");
+      return;
+    }
+    next.shortcuts[shortcutIndex] = {
+      ...next.shortcuts[shortcutIndex],
+      mapping: fingerprint
+    };
     await chrome.storage.local.set({ settings: next });
     showToast(`${currentCapture.key} 키에 ${fingerprint.code} 등록 완료`);
   }, true);
@@ -370,7 +390,11 @@
       return undefined;
     }
 
-    capture = { code: message.code, key: message.key };
+    capture = {
+      shortcutId: message.shortcutId,
+      code: message.code,
+      key: message.key
+    };
     pickerButton.click();
     showToast(`이제 ${message.key} 키에 등록할 이모티콘을 클릭하세요.`);
     sendResponse({ ok: true });

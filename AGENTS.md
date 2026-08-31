@@ -15,6 +15,16 @@ Run JavaScript syntax checks with the bundled Node executable:
 Get-Content -LiteralPath 'manifest.json' -Raw | ConvertFrom-Json
 ```
 
+For local browser harnesses, serve the repository root and open the files under `tests/`:
+
+```powershell
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m http.server 8765 --bind 127.0.0.1
+```
+
+- `tests/bridge-harness.html` verifies direct native-emote insertion.
+- `tests/content-shortcut-harness.html` verifies dynamic shortcut dispatch.
+- `tests/popup-harness.html` verifies the icon preview and bounded scrolling UI; add `?legacy` to verify old mapping migration.
+
 Then verify on a logged-in CHZZK live page:
 
 1. Save a text mapping and confirm Caps Lock plus its physical key inserts it into chat.
