@@ -9,7 +9,7 @@
   </head>
   <body data-result="pending">
     <aside id="aside-chatting">
-      <pre id="editor" contenteditable="true"></pre>
+      <pre id="editor" contenteditable="true">기존</pre>
     </aside>
     <output id="result">pending</output>
     <script>
@@ -64,16 +64,24 @@
       }
 
       function emitImeText() {
-        const event = new InputEvent("beforeinput", {
+        const beforeInput = new InputEvent("beforeinput", {
           bubbles: true,
-          cancelable: true,
+          cancelable: false,
           inputType: "insertCompositionText",
           data: "ㅂ",
           isComposing: true
         });
-        editor.dispatchEvent(event);
-        if (!event.defaultPrevented) editor.append("ㅂ");
-        return event;
+        editor.dispatchEvent(beforeInput);
+        editor.append("ㅂ");
+        const input = new InputEvent("input", {
+          bubbles: true,
+          cancelable: false,
+          inputType: "insertCompositionText",
+          data: "ㅂ",
+          isComposing: true
+        });
+        editor.dispatchEvent(input);
+        return { beforeInput, input };
       }
 
       window.setTimeout(() => {
@@ -81,7 +89,7 @@
         const unmapped = press("KeyW", "w");
         const first = press("KeyQ", "q");
         const duringBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
-        const imeDuringBusy = duringBusy.defaultPrevented ? null : emitImeText();
+        emitImeText();
 
         window.setTimeout(() => {
           const afterBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
@@ -91,10 +99,10 @@
               !unmapped.defaultPrevented &&
               first.defaultPrevented &&
               duringBusy.defaultPrevented &&
-              imeDuringBusy === null &&
               afterBusy.defaultPrevented &&
               siteKeydownCount === 1 &&
               images.length === 2 &&
+              editor.textContent === "기존" &&
               images.every((image) => image.alt === "{:dynamic_test:}");
             document.body.dataset.result = passed ? "pass" : "fail";
             document.querySelector("#result").textContent = passed ? "pass" : "fail";
