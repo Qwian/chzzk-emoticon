@@ -17,16 +17,27 @@
         enabled: true,
         sendImmediately: false,
         diagnostics: true,
-        shortcuts: [{
-          id: "dynamic-q",
-          code: "KeyQ",
-          keyLabel: "Q",
-          mapping: {
-            type: "native",
-            code: "{:dynamic_test:}",
-            imageUrl: "https://ssl.pstatic.net/dynamic-test.png"
+        shortcuts: [
+          {
+            id: "dynamic-q",
+            code: "KeyQ",
+            keyLabel: "Q",
+            mapping: {
+              type: "native",
+              code: "{:dynamic_test:}",
+              imageUrl: "https://ssl.pstatic.net/dynamic-test.png"
+            }
+          },
+          {
+            id: "dynamic-t",
+            code: "KeyT",
+            keyLabel: "T",
+            mapping: {
+              type: "text",
+              value: "테스트"
+            }
           }
-        }]
+        ]
       };
       window.chrome = {
         storage: {
@@ -130,6 +141,30 @@
         }));
       }
 
+      function emitReclassifiedImeText(data) {
+        editor.append(data);
+        editor.dispatchEvent(new InputEvent("input", {
+          bubbles: true,
+          cancelable: false,
+          inputType: "insertText",
+          data,
+          isComposing: false
+        }));
+      }
+
+      function emitReclassifiedImeObject() {
+        const image = editor.querySelector("img:last-of-type");
+        if (!image) return;
+        image.replaceWith(document.createTextNode("\uFFFC"));
+        editor.dispatchEvent(new InputEvent("input", {
+          bubbles: true,
+          cancelable: false,
+          inputType: "insertText",
+          data: "\uFFFC",
+          isComposing: false
+        }));
+      }
+
       function emitDeleteNoise() {
         for (const type of ["beforeinput", "input"]) {
           editor.dispatchEvent(new InputEvent(type, {
@@ -147,36 +182,42 @@
         const first = press("KeyQ", "Process");
         const firstKeptFocus = document.activeElement === editor;
         emitImeText();
+        emitReclassifiedImeText("ㅂ");
 
         window.setTimeout(() => {
           const repeated = press("KeyQ", "Process", { repeat: true });
           const repeatedKeptFocus = document.activeElement === editor;
           emitImeObjectReplacement();
-          emitDeleteNoise();
+          emitReclassifiedImeObject();
           window.setTimeout(() => {
-            const finalEditor = document.querySelector("#editor");
-            const images = [...finalEditor.querySelectorAll("img")];
-            const debugTypes = observedDebug.map(({ type }) => type);
-            const passed =
-              !unmapped.defaultPrevented &&
-              first.defaultPrevented &&
-              repeated.defaultPrevented &&
-              firstKeptFocus &&
-              repeatedKeptFocus &&
-              siteKeydownCount === 1 &&
-              siteCompositionInputCount === 0 &&
-              siteCompositionEventCount === 0 &&
-              images.length === 2 &&
-              finalEditor.textContent === "기존" &&
-              document.activeElement === finalEditor &&
-              debugTypes.includes("keydown-blocked") &&
-              debugTypes.includes("beforeinput-blocked") &&
-              debugTypes.includes("ime-mutations-rolled-back") &&
-              !debugTypes.includes("editor-suspended") &&
-              !observedDebug.some(({ inputType }) => inputType === "deleteContentBackward") &&
-              images.every((image) => image.alt === "{:dynamic_test:}");
-            document.body.dataset.result = passed ? "pass" : "fail";
-            document.querySelector("#result").textContent = passed ? "pass" : "fail";
+            const textMapping = press("KeyT", "Process");
+            emitDeleteNoise();
+            window.setTimeout(() => {
+              const finalEditor = document.querySelector("#editor");
+              const images = [...finalEditor.querySelectorAll("img")];
+              const debugTypes = observedDebug.map(({ type }) => type);
+              const passed =
+                !unmapped.defaultPrevented &&
+                first.defaultPrevented &&
+                repeated.defaultPrevented &&
+                textMapping.defaultPrevented &&
+                firstKeptFocus &&
+                repeatedKeptFocus &&
+                siteKeydownCount === 1 &&
+                siteCompositionInputCount === 0 &&
+                siteCompositionEventCount === 0 &&
+                images.length === 2 &&
+                finalEditor.textContent === "기존테스트" &&
+                document.activeElement === finalEditor &&
+                debugTypes.includes("keydown-blocked") &&
+                debugTypes.includes("beforeinput-blocked") &&
+                debugTypes.includes("ime-mutations-rolled-back") &&
+                !debugTypes.includes("editor-suspended") &&
+                !observedDebug.some(({ inputType }) => inputType === "deleteContentBackward") &&
+                images.every((image) => image.alt === "{:dynamic_test:}");
+              document.body.dataset.result = passed ? "pass" : "fail";
+              document.querySelector("#result").textContent = passed ? "pass" : "fail";
+            }, 20);
           }, 20);
         }, 20);
       }, 20);

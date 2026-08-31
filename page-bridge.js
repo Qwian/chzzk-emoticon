@@ -7,10 +7,12 @@
   const CONFIG_EVENT = "chzzk-caps-emote:config";
   const SHORTCUT_EVENT = "chzzk-caps-emote:shortcut";
   const DEBUG_EVENT = "chzzk-caps-emote:debug";
+  const EXTENSION_INPUT_EVENT = "chzzk-caps-emote:extension-input";
   const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
   let shortcutCodes = new Set();
   let imeGuard = null;
   let diagnosticsEnabled = false;
+  let extensionInputDepth = 0;
 
   function debug(type, event = null, extra = {}) {
     if (!diagnosticsEnabled) return;
@@ -79,6 +81,7 @@
       editor,
       code,
       expiresAt: performance.now() + 300,
+      reclassifiedInputUntil: performance.now() + 24,
       observer,
       pendingMutations,
       safeRange: captureSelectionRange(editor)
@@ -151,6 +154,18 @@
     );
   }
 
+  function isReclassifiedImeInput(event) {
+    return Boolean(
+      imeGuard &&
+      extensionInputDepth === 0 &&
+      performance.now() <= imeGuard.reclassifiedInputUntil &&
+      event.target === imeGuard.editor &&
+      event.inputType === "insertText" &&
+      typeof event.data === "string" &&
+      event.data.length > 0
+    );
+  }
+
   function restoreRemovedNodes(record) {
     let anchor = record.nextSibling?.parentNode === record.target
       ? record.nextSibling
@@ -189,7 +204,7 @@
     const guard = imeGuard;
     if (!guard || event.target !== guard.editor || event.inputType?.startsWith("delete")) return;
 
-    if (isGuardedImeEvent(event)) {
+    if (isGuardedImeEvent(event) || isReclassifiedImeInput(event)) {
       event.stopImmediatePropagation();
       rollbackImeMutations(event);
       return;
@@ -205,6 +220,12 @@
       codes.filter((code) => typeof code === "string" && code.length <= 64)
     );
     diagnosticsEnabled = Boolean(event.detail?.diagnostics);
+  }, true);
+
+  document.addEventListener(EXTENSION_INPUT_EVENT, (event) => {
+    extensionInputDepth = event.detail?.active
+      ? extensionInputDepth + 1
+      : Math.max(0, extensionInputDepth - 1);
   }, true);
 
   window.addEventListener("keydown", (event) => {

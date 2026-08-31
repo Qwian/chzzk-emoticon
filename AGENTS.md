@@ -46,4 +46,5 @@ Then verify on a logged-in CHZZK live page:
 - `page-bridge.js` must stay in the MAIN world because CHZZK keeps emoji ID-to-image state on the page's `window` object.
 - Mapped-key suppression must stay in the document-start MAIN-world bridge; a later isolated-world keydown handler can allow Korean IME composition input to leak through.
 - Windows Korean IME reports letter shortcuts with `KeyboardEvent.key === "Process"` and can emit non-cancelable composition input after a prevented keydown. Do not blur or toggle `contenteditable`: CHZZK may remove the editor on blur. Keep focus, stop guarded composition events in the MAIN world, and roll back only the DOM mutations made by leaked composition input.
+- Under fast repeats, Windows IME can reclassify a second leaked Korean character or U+FFFC object marker as ordinary `insertText` 2-6 ms after the blocked keydown. Guard that narrow post-keydown window, but mark extension-originated text insertion explicitly so user-configured text mappings are not rolled back.
 - Do not replace physical-key `KeyboardEvent.code` mappings with layout-dependent `KeyboardEvent.key` mappings.

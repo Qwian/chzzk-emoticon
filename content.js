@@ -20,6 +20,7 @@
   const CONFIG_EVENT = "chzzk-caps-emote:config";
   const SHORTCUT_EVENT = "chzzk-caps-emote:shortcut";
   const DEBUG_EVENT = "chzzk-caps-emote:debug";
+  const EXTENSION_INPUT_EVENT = "chzzk-caps-emote:extension-input";
   const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
 
   const CHAT_INPUT_SELECTORS = [
@@ -153,38 +154,47 @@
   }
 
   function insertText(input, text) {
-    input.focus();
+    document.dispatchEvent(new CustomEvent(EXTENSION_INPUT_EVENT, {
+      detail: { active: true }
+    }));
+    try {
+      input.focus();
 
-    if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
-      const start = input.selectionStart ?? input.value.length;
-      const end = input.selectionEnd ?? input.value.length;
-      const nextValue = `${input.value.slice(0, start)}${text}${input.value.slice(end)}`;
-      const prototype = input instanceof HTMLTextAreaElement
-        ? HTMLTextAreaElement.prototype
-        : HTMLInputElement.prototype;
-      const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-      setter?.call(input, nextValue);
+      if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        const nextValue = `${input.value.slice(0, start)}${text}${input.value.slice(end)}`;
+        const prototype = input instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+        setter?.call(input, nextValue);
+        input.dispatchEvent(new InputEvent("input", {
+          bubbles: true,
+          inputType: "insertText",
+          data: text
+        }));
+        input.setSelectionRange(start + text.length, start + text.length);
+        return;
+      }
+
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(input);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand("insertText", false, text);
       input.dispatchEvent(new InputEvent("input", {
         bubbles: true,
         inputType: "insertText",
         data: text
       }));
-      input.setSelectionRange(start + text.length, start + text.length);
-      return;
+    } finally {
+      document.dispatchEvent(new CustomEvent(EXTENSION_INPUT_EVENT, {
+        detail: { active: false }
+      }));
     }
-
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(input);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    document.execCommand("insertText", false, text);
-    input.dispatchEvent(new InputEvent("input", {
-      bubbles: true,
-      inputType: "insertText",
-      data: text
-    }));
   }
 
   function findEmotePickerButton() {
