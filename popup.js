@@ -38,6 +38,7 @@ const diagnosticsInput = document.querySelector("#diagnostics-enabled");
 const diagnosticLog = document.querySelector("#diagnostic-log");
 const refreshDiagnosticsButton = document.querySelector("#refresh-diagnostics");
 const clearDiagnosticsButton = document.querySelector("#clear-diagnostics");
+const diagnosticsPanel = document.querySelector("#diagnostics-panel");
 
 let settings = DEFAULT_SETTINGS;
 let recordingId = null;
@@ -77,6 +78,26 @@ function setStatus(message, isError = false) {
 async function saveSettings() {
   const { mappings: _legacyMappings, ...currentSettings } = settings;
   await chrome.storage.local.set({ settings: currentSettings });
+}
+
+async function syncDiagnosticsWithActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    setStatus("활성 치지직 탭을 찾지 못했습니다.", true);
+    return false;
+  }
+
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "SYNC_DIAGNOSTICS"
+    });
+    if (!response?.ok) throw new Error("No diagnostic response");
+    setStatus(`치지직 진단 연결됨 (${response.version})`);
+    return true;
+  } catch {
+    setStatus("치지직 페이지를 새로고침한 뒤 진단을 다시 켜세요.", true);
+    return false;
+  }
 }
 
 function updateShortcut(id, update) {
@@ -268,6 +289,7 @@ function applyStoredSettings(stored, message = "") {
   enabledInput.checked = settings.enabled;
   sendInput.checked = settings.sendImmediately;
   diagnosticsInput.checked = settings.diagnostics;
+  diagnosticsPanel.open = settings.diagnostics;
   renderMappings();
   if (message) setStatus(message);
 }
@@ -282,6 +304,7 @@ async function initialize() {
   enabledInput.checked = settings.enabled;
   sendInput.checked = settings.sendImmediately;
   diagnosticsInput.checked = settings.diagnostics;
+  diagnosticsPanel.open = settings.diagnostics;
   diagnosticLog.value = (stored.diagnosticLog || []).map((entry) => JSON.stringify(entry)).join("\n");
   renderMappings();
 
@@ -304,7 +327,11 @@ async function initialize() {
       diagnosticLog.value = "";
     }
     await saveSettings();
-    setStatus(settings.diagnostics ? "진단 기록을 시작했습니다." : "진단 기록을 껐습니다.");
+    if (settings.diagnostics) {
+      await syncDiagnosticsWithActiveTab();
+    } else {
+      setStatus("진단 기록을 껐습니다.");
+    }
   });
 
   refreshDiagnosticsButton.addEventListener("click", async () => {
@@ -327,6 +354,8 @@ async function initialize() {
     await saveSettings();
     startRecording(shortcut.id);
   });
+
+  if (settings.diagnostics) await syncDiagnosticsWithActiveTab();
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {

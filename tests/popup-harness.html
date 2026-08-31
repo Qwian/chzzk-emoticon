@@ -23,7 +23,7 @@
         <span>입력 후 바로 전송</span>
       </label>
       <p id="status" role="status"></p>
-      <details class="diagnostics">
+      <details id="diagnostics-panel" class="diagnostics">
         <summary>입력 진단</summary>
         <label class="send-option">
           <input id="diagnostics-enabled" type="checkbox" />
@@ -89,7 +89,9 @@
         },
         tabs: {
           query: async () => [{ id: 1 }],
-          sendMessage: async () => ({ ok: true })
+          sendMessage: async (_tabId, message) => message.type === "SYNC_DIAGNOSTICS"
+            ? { ok: true, version: "test" }
+            : { ok: true }
         }
       };
       document.querySelector("#external-update").addEventListener("click", () => {

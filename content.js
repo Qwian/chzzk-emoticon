@@ -393,6 +393,19 @@
   }, true);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "SYNC_DIAGNOSTICS") {
+      chrome.storage.local.get("settings").then(({ settings: stored }) => {
+        settings = mergeSettings(stored);
+        publishShortcutConfig();
+        sendResponse({
+          ok: true,
+          version: chrome.runtime.getManifest().version,
+          diagnostics: settings.diagnostics
+        });
+      });
+      return true;
+    }
+
     if (message?.type !== "START_EMOTE_CAPTURE") return undefined;
 
     const chatInput = findChatInput();
