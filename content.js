@@ -85,6 +85,31 @@
     );
   }
 
+  function findFocusedChatInput() {
+    const active = document.activeElement;
+    if (!isEditable(active)) return null;
+
+    const hint = `${active.getAttribute("placeholder") || ""} ${active.getAttribute("aria-label") || ""} ${active.getAttribute("data-placeholder") || ""}`;
+    if (hint.includes("채팅")) return active;
+
+    const knownInput = findChatInput();
+    if (
+      knownInput &&
+      (active === knownInput || knownInput.contains(active) || active.contains(knownInput))
+    ) return active;
+
+    const chatContainer = active.closest(
+      "form, aside, [class*='chat'], [class*='Chat']"
+    );
+    if (!chatContainer) return null;
+
+    const hasEmoteButton = [...chatContainer.querySelectorAll("button")].some((button) => {
+      const name = `${button.getAttribute("aria-label") || ""} ${button.title || ""} ${button.textContent || ""}`.trim();
+      return name === "이모티콘";
+    });
+    return hasEmoteButton ? active : null;
+  }
+
   function insertText(input, text) {
     input.focus();
 
@@ -233,16 +258,12 @@
     }
 
     emoteButton.click();
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    input.focus();
     await sendIfEnabled(input);
   }
 
-  async function handleShortcut(mapping) {
-    const input = findChatInput();
-    if (!input) {
-      showToast("사용 가능한 치지직 채팅창을 찾지 못했습니다.", "error");
-      return;
-    }
-
+  async function handleShortcut(input, mapping) {
     if (mapping.type === "native") {
       await insertNativeEmote(input, mapping);
     } else if (mapping.type === "text" && mapping.value) {
@@ -255,7 +276,7 @@
     if (
       busy ||
       !settings.enabled ||
-      event.repeat ||
+      (event.repeat && settings.sendImmediately) ||
       event.isComposing ||
       event.ctrlKey ||
       event.altKey ||
@@ -267,14 +288,14 @@
     const mapping = settings.mappings[event.code];
     if (!mapping) return;
 
-    const input = findChatInput();
-    if (isEditable(document.activeElement) && document.activeElement !== input) return;
+    const input = findFocusedChatInput();
+    if (!input) return;
 
     event.preventDefault();
     event.stopImmediatePropagation();
     busy = true;
     try {
-      await handleShortcut(mapping);
+      await handleShortcut(input, mapping);
     } finally {
       busy = false;
     }
