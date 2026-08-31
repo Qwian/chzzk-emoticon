@@ -70,6 +70,44 @@
     };
   }
 
+  function captureSelectionRange(editor) {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return null;
+    const range = selection.getRangeAt(0);
+    return editor.contains(range.commonAncestorContainer) ? range.cloneRange() : null;
+  }
+
+  function restoreSelectionRange(editor, range) {
+    const selection = window.getSelection();
+    if (!selection || !range || !editor.contains(range.commonAncestorContainer)) return;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function dispatchShortcut(code, repeat) {
+    document.dispatchEvent(new CustomEvent(SHORTCUT_EVENT, {
+      detail: { code, repeat }
+    }));
+  }
+
+  function suspendEditorForIme(editor, code, repeat) {
+    const contentEditable = editor.getAttribute("contenteditable");
+    const range = captureSelectionRange(editor);
+    editor.setAttribute("contenteditable", "false");
+    editor.blur();
+    debug("editor-suspended", null, { code, repeat });
+
+    window.setTimeout(() => {
+      if (!editor.isConnected) return;
+      if (contentEditable === null) editor.removeAttribute("contenteditable");
+      else editor.setAttribute("contenteditable", contentEditable);
+      editor.focus({ preventScroll: true });
+      restoreSelectionRange(editor, range);
+      debug("editor-resumed", null, { code, repeat });
+      dispatchShortcut(code, repeat);
+    }, 0);
+  }
+
   function observeImeInput(event) {
     const guard = imeGuard;
     if (
@@ -107,9 +145,11 @@
     event.stopImmediatePropagation();
     armImeGuard(editor, event.code);
     debug("keydown-blocked", event, { repeat: event.repeat });
-    document.dispatchEvent(new CustomEvent(SHORTCUT_EVENT, {
-      detail: { code: event.code, repeat: event.repeat }
-    }));
+    if (event.key === "Process") {
+      suspendEditorForIme(editor, event.code, event.repeat);
+      return;
+    }
+    dispatchShortcut(event.code, event.repeat);
   }, true);
 
   window.addEventListener("keyup", (event) => {

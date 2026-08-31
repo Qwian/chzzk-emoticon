@@ -103,27 +103,31 @@
       window.setTimeout(() => {
         editor.focus();
         const unmapped = press("KeyW", "w");
-        const first = press("KeyQ", "q");
-        const duringBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
-        emitImeText();
-        emitDeleteNoise();
+        const first = press("KeyQ", "Process");
+        const firstImeStarted = editor.isContentEditable && document.activeElement === editor;
+        if (firstImeStarted) emitImeText();
 
         window.setTimeout(() => {
-          const afterBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
+          const repeated = press("KeyQ", "Process", { repeat: true });
+          const repeatedImeStarted = editor.isContentEditable && document.activeElement === editor;
+          if (repeatedImeStarted) emitImeText();
+          emitDeleteNoise();
           window.setTimeout(() => {
             const images = [...editor.querySelectorAll("img")];
             const debugTypes = observedDebug.map(({ type }) => type);
             const passed =
               !unmapped.defaultPrevented &&
               first.defaultPrevented &&
-              duringBusy.defaultPrevented &&
-              afterBusy.defaultPrevented &&
+              repeated.defaultPrevented &&
+              !firstImeStarted &&
+              !repeatedImeStarted &&
               siteKeydownCount === 1 &&
               images.length === 2 &&
-              editor.textContent === "기존ㅂ" &&
+              editor.textContent === "기존" &&
               debugTypes.includes("keydown-blocked") &&
-              debugTypes.includes("beforeinput") &&
-              debugTypes.includes("input-seen") &&
+              debugTypes.includes("editor-suspended") &&
+              debugTypes.includes("editor-resumed") &&
+              !debugTypes.includes("compositionstart") &&
               !observedDebug.some(({ inputType }) => inputType === "deleteContentBackward") &&
               images.every((image) => image.alt === "{:dynamic_test:}");
             document.body.dataset.result = passed ? "pass" : "fail";
