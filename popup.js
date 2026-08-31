@@ -25,6 +25,7 @@ const BLOCKED_CODES = new Set([
 const DEFAULT_SETTINGS = {
   enabled: true,
   sendImmediately: false,
+  diagnostics: false,
   shortcuts: []
 };
 
@@ -33,6 +34,10 @@ const sendInput = document.querySelector("#send-immediately");
 const list = document.querySelector("#mapping-list");
 const addButton = document.querySelector("#add-shortcut");
 const status = document.querySelector("#status");
+const diagnosticsInput = document.querySelector("#diagnostics-enabled");
+const diagnosticLog = document.querySelector("#diagnostic-log");
+const refreshDiagnosticsButton = document.querySelector("#refresh-diagnostics");
+const clearDiagnosticsButton = document.querySelector("#clear-diagnostics");
 
 let settings = DEFAULT_SETTINGS;
 let recordingId = null;
@@ -54,6 +59,7 @@ function normalizeSettings(stored = {}) {
   return {
     enabled: stored.enabled ?? DEFAULT_SETTINGS.enabled,
     sendImmediately: stored.sendImmediately ?? DEFAULT_SETTINGS.sendImmediately,
+    diagnostics: stored.diagnostics ?? DEFAULT_SETTINGS.diagnostics,
     shortcuts: shortcuts.map((shortcut) => ({
       id: shortcut.id || createId(),
       code: shortcut.code || "",
@@ -261,12 +267,13 @@ function applyStoredSettings(stored, message = "") {
   settings = next;
   enabledInput.checked = settings.enabled;
   sendInput.checked = settings.sendImmediately;
+  diagnosticsInput.checked = settings.diagnostics;
   renderMappings();
   if (message) setStatus(message);
 }
 
 async function initialize() {
-  const stored = await chrome.storage.local.get("settings");
+  const stored = await chrome.storage.local.get(["settings", "diagnosticLog"]);
   settings = normalizeSettings(stored.settings);
   if (stored.settings?.mappings && !Array.isArray(stored.settings.shortcuts)) {
     await saveSettings();
@@ -274,6 +281,8 @@ async function initialize() {
 
   enabledInput.checked = settings.enabled;
   sendInput.checked = settings.sendImmediately;
+  diagnosticsInput.checked = settings.diagnostics;
+  diagnosticLog.value = (stored.diagnosticLog || []).map((entry) => JSON.stringify(entry)).join("\n");
   renderMappings();
 
   enabledInput.addEventListener("change", async () => {
@@ -286,6 +295,30 @@ async function initialize() {
     settings.sendImmediately = sendInput.checked;
     await saveSettings();
     setStatus("전송 설정을 저장했습니다.");
+  });
+
+  diagnosticsInput.addEventListener("change", async () => {
+    settings.diagnostics = diagnosticsInput.checked;
+    if (settings.diagnostics) {
+      await chrome.storage.local.set({ diagnosticLog: [] });
+      diagnosticLog.value = "";
+    }
+    await saveSettings();
+    setStatus(settings.diagnostics ? "진단 기록을 시작했습니다." : "진단 기록을 껐습니다.");
+  });
+
+  refreshDiagnosticsButton.addEventListener("click", async () => {
+    const storedLog = await chrome.storage.local.get("diagnosticLog");
+    diagnosticLog.value = (storedLog.diagnosticLog || [])
+      .map((entry) => JSON.stringify(entry)).join("\n");
+    diagnosticLog.select();
+    setStatus("로그를 불러왔습니다. Ctrl+C로 복사하세요.");
+  });
+
+  clearDiagnosticsButton.addEventListener("click", async () => {
+    await chrome.storage.local.set({ diagnosticLog: [] });
+    diagnosticLog.value = "";
+    setStatus("진단 로그를 지웠습니다.");
   });
 
   addButton.addEventListener("click", async () => {

@@ -11,6 +11,7 @@
   const DEFAULT_SETTINGS = {
     enabled: true,
     sendImmediately: false,
+    diagnostics: false,
     shortcuts: []
   };
 
@@ -18,6 +19,7 @@
   const RESULT_EVENT = "chzzk-caps-emote:result";
   const CONFIG_EVENT = "chzzk-caps-emote:config";
   const SHORTCUT_EVENT = "chzzk-caps-emote:shortcut";
+  const DEBUG_EVENT = "chzzk-caps-emote:debug";
   const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
 
   const CHAT_INPUT_SELECTORS = [
@@ -33,6 +35,8 @@
   let settings = DEFAULT_SETTINGS;
   let capture = null;
   let busy = false;
+  let diagnosticLog = [];
+  let diagnosticSaveTimer = 0;
 
   function mergeSettings(value) {
     const shortcuts = Array.isArray(value?.shortcuts)
@@ -55,8 +59,20 @@
     const codes = settings.enabled
       ? settings.shortcuts.filter(({ code, mapping }) => code && mapping).map(({ code }) => code)
       : [];
-    document.dispatchEvent(new CustomEvent(CONFIG_EVENT, { detail: { codes } }));
+    document.dispatchEvent(new CustomEvent(CONFIG_EVENT, {
+      detail: { codes, diagnostics: settings.diagnostics }
+    }));
   }
+
+  document.addEventListener(DEBUG_EVENT, (event) => {
+    if (!settings.diagnostics || !event.detail) return;
+    diagnosticLog.push(event.detail);
+    diagnosticLog = diagnosticLog.slice(-120);
+    window.clearTimeout(diagnosticSaveTimer);
+    diagnosticSaveTimer = window.setTimeout(() => {
+      chrome.storage.local.set({ diagnosticLog });
+    }, 80);
+  }, true);
 
   chrome.storage.local.get("settings").then(({ settings: stored }) => {
     settings = mergeSettings(stored);

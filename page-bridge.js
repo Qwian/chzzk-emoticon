@@ -6,9 +6,33 @@
   const RESULT_EVENT = "chzzk-caps-emote:result";
   const CONFIG_EVENT = "chzzk-caps-emote:config";
   const SHORTCUT_EVENT = "chzzk-caps-emote:shortcut";
+  const DEBUG_EVENT = "chzzk-caps-emote:debug";
   const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
   let shortcutCodes = new Set();
   let imeGuard = null;
+  let diagnosticsEnabled = false;
+
+  function debug(type, event = null, extra = {}) {
+    if (!diagnosticsEnabled) return;
+    const editor = imeGuard?.editor;
+    document.dispatchEvent(new CustomEvent(DEBUG_EVENT, {
+      detail: {
+        t: Math.round(performance.now()),
+        type,
+        code: event?.code || "",
+        key: event?.key || "",
+        inputType: event?.inputType || "",
+        data: typeof event?.data === "string" ? event.data.slice(0, 16) : null,
+        composing: Boolean(event?.isComposing),
+        cancelable: Boolean(event?.cancelable),
+        prevented: Boolean(event?.defaultPrevented),
+        guardRemaining: imeGuard ? Math.round(imeGuard.expiresAt - performance.now()) : null,
+        textLength: editor?.textContent?.length ?? null,
+        childCount: editor?.childNodes?.length ?? null,
+        ...extra
+      }
+    }));
+  }
 
   function respond(requestId, ok, message = "") {
     document.dispatchEvent(new CustomEvent(RESULT_EVENT, {
@@ -38,81 +62,17 @@
     moveCaretAfter(node);
   }
 
-  function captureCaret(editor) {
-    const selection = window.getSelection();
-    const focusNode = selection?.focusNode;
-    if (!focusNode || !editor.contains(focusNode)) return null;
-
-    const path = [];
-    let node = focusNode;
-    while (node && node !== editor) {
-      const parent = node.parentNode;
-      if (!parent) return null;
-      path.unshift([...parent.childNodes].indexOf(node));
-      node = parent;
-    }
-    return { path, offset: selection.focusOffset };
-  }
-
-  function restoreCaret(editor, caret) {
-    let node = editor;
-    for (const index of caret?.path || []) {
-      node = node.childNodes[index];
-      if (!node) break;
-    }
-    if (!node) node = editor;
-
-    const maxOffset = node.nodeType === Node.TEXT_NODE
-      ? node.data.length
-      : node.childNodes.length;
-    const range = document.createRange();
-    range.setStart(node, Math.min(caret?.offset || 0, maxOffset));
-    range.collapse(true);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
-
   function armImeGuard(editor, code) {
     imeGuard = {
       editor,
       code,
-      safeHtml: editor.innerHTML,
-      caret: captureCaret(editor),
-      expiresAt: performance.now() + 300,
-      restoring: false
+      expiresAt: performance.now() + 300
     };
   }
 
-  function updateImeGuardSnapshot(editor) {
-    if (!imeGuard || imeGuard.editor !== editor) return;
-    imeGuard.safeHtml = editor.innerHTML;
-    imeGuard.caret = captureCaret(editor);
-  }
-
-  function restoreAfterLeakedImeInput(event) {
+  function observeImeInput(event) {
     const guard = imeGuard;
-    if (
-      !guard ||
-      performance.now() > guard.expiresAt ||
-      event.target !== guard.editor ||
-      (event.inputType !== "insertCompositionText" && !event.isComposing)
-    ) return;
-
-    event.stopImmediatePropagation();
-    if (guard.restoring) return;
-
-    guard.restoring = true;
-    try {
-      guard.editor.innerHTML = guard.safeHtml;
-      guard.editor.blur();
-      guard.editor.focus({ preventScroll: true });
-      guard.editor.innerHTML = guard.safeHtml;
-      restoreCaret(guard.editor, guard.caret);
-      guard.expiresAt = performance.now() + 80;
-    } finally {
-      guard.restoring = false;
-    }
+    if (guard && event.target === guard.editor) debug("input-seen", event);
   }
 
   document.addEventListener(CONFIG_EVENT, (event) => {
@@ -120,6 +80,7 @@
     shortcutCodes = new Set(
       codes.filter((code) => typeof code === "string" && code.length <= 64)
     );
+    diagnosticsEnabled = Boolean(event.detail?.diagnostics);
   }, true);
 
   window.addEventListener("keydown", (event) => {
@@ -141,6 +102,7 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     armImeGuard(editor, event.code);
+    debug("keydown-blocked", event, { repeat: event.repeat });
     document.dispatchEvent(new CustomEvent(SHORTCUT_EVENT, {
       detail: { code: event.code, repeat: event.repeat }
     }));
@@ -148,11 +110,18 @@
 
   window.addEventListener("keyup", (event) => {
     if (imeGuard?.code === event.code) {
+      debug("keyup", event);
       imeGuard.expiresAt = performance.now() + 80;
     }
   }, true);
 
-  window.addEventListener("input", restoreAfterLeakedImeInput, true);
+  for (const type of ["compositionstart", "compositionupdate", "compositionend", "beforeinput"]) {
+    window.addEventListener(type, (event) => {
+      if (imeGuard && event.target === imeGuard.editor) debug(type, event);
+    }, true);
+  }
+
+  window.addEventListener("input", observeImeInput, true);
 
   document.addEventListener(INSERT_EVENT, (event) => {
     const { requestId, code, imageUrl } = event.detail || {};
@@ -201,7 +170,6 @@
       data: null
     }));
     moveCaretAfter(image);
-    updateImeGuardSnapshot(editor);
     respond(requestId, true);
   }, true);
 })();

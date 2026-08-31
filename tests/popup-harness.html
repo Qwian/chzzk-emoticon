@@ -23,6 +23,18 @@
         <span>입력 후 바로 전송</span>
       </label>
       <p id="status" role="status"></p>
+      <details class="diagnostics">
+        <summary>입력 진단</summary>
+        <label class="send-option">
+          <input id="diagnostics-enabled" type="checkbox" />
+          <span>이벤트 기록 켜기</span>
+        </label>
+        <textarea id="diagnostic-log" readonly></textarea>
+        <div class="diagnostic-actions">
+          <button id="refresh-diagnostics" type="button">로그 새로고침</button>
+          <button id="clear-diagnostics" type="button">로그 지우기</button>
+        </div>
+      </details>
       <p class="footnote">팝업 UI 테스트</p>
       <button id="external-update" type="button">외부 등록 반영 테스트</button>
     </main>
@@ -49,17 +61,26 @@
           }
         : { enabled: true, sendImmediately: false, shortcuts };
       let storageChangeListener;
+      window.savedDiagnosticLog = [];
       window.chrome = {
         storage: {
           local: {
-            get: async () => ({ settings: window.savedSettings }),
-            set: async ({ settings }) => {
-              const oldValue = window.savedSettings;
-              window.savedSettings = settings;
-              storageChangeListener?.(
-                { settings: { oldValue, newValue: settings } },
-                "local"
-              );
+            get: async () => ({
+              settings: window.savedSettings,
+              diagnosticLog: window.savedDiagnosticLog
+            }),
+            set: async (values) => {
+              if (Object.hasOwn(values, "diagnosticLog")) {
+                window.savedDiagnosticLog = values.diagnosticLog;
+              }
+              if (Object.hasOwn(values, "settings")) {
+                const oldValue = window.savedSettings;
+                window.savedSettings = values.settings;
+                storageChangeListener?.(
+                  { settings: { oldValue, newValue: values.settings } },
+                  "local"
+                );
+              }
             }
           },
           onChanged: {

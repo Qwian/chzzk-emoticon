@@ -34,6 +34,19 @@
       </label>
 
       <p id="status" role="status" aria-live="polite"></p>
+
+      <details class="diagnostics">
+        <summary>입력 진단</summary>
+        <label class="send-option">
+          <input id="diagnostics-enabled" type="checkbox" />
+          <span>이벤트 기록 켜기</span>
+        </label>
+        <textarea id="diagnostic-log" readonly placeholder="진단을 켜고 문제를 재현하세요."></textarea>
+        <div class="diagnostic-actions">
+          <button id="refresh-diagnostics" type="button">로그 새로고침</button>
+          <button id="clear-diagnostics" type="button">로그 지우기</button>
+        </div>
+      </details>
       <p class="footnote">
         키를 더 만들 수 있으며 목록이 길어지면 이 영역 안에서 스크롤됩니다.
       </p>

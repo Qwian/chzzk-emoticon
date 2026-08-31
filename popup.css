@@ -262,6 +262,44 @@ button:hover {
   color: #ff7b87;
 }
 
+.diagnostics {
+  margin: 6px 0 12px;
+  color: #aeb7b2;
+  font-size: 11px;
+}
+
+.diagnostics summary {
+  cursor: pointer;
+}
+
+.diagnostics .send-option {
+  margin-top: 10px;
+}
+
+#diagnostic-log {
+  width: 100%;
+  height: 110px;
+  margin-top: 8px;
+  resize: vertical;
+  border: 1px solid #343c38;
+  border-radius: 8px;
+  background: #111513;
+  color: #cbd4cf;
+  padding: 8px;
+  font: 10px/1.4 ui-monospace, monospace;
+}
+
+.diagnostic-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.diagnostic-actions button {
+  font-size: 11px;
+}
+
 .footnote {
   padding-top: 10px;
   border-top: 1px solid #272e2b;

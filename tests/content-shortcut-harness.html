@@ -16,6 +16,7 @@
       const settings = {
         enabled: true,
         sendImmediately: false,
+        diagnostics: true,
         shortcuts: [{
           id: "dynamic-q",
           code: "KeyQ",
@@ -42,6 +43,10 @@
     <script src="../content.js"></script>
     <script>
       const editor = document.querySelector("#editor");
+      const observedDebug = [];
+      document.addEventListener("chzzk-caps-emote:debug", (event) => {
+        observedDebug.push(event.detail);
+      });
       let siteKeydownCount = 0;
       window.addEventListener("keydown", () => {
         siteKeydownCount += 1;
@@ -95,6 +100,7 @@
           const afterBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
           window.setTimeout(() => {
             const images = [...editor.querySelectorAll("img")];
+            const debugTypes = observedDebug.map(({ type }) => type);
             const passed =
               !unmapped.defaultPrevented &&
               first.defaultPrevented &&
@@ -102,7 +108,10 @@
               afterBusy.defaultPrevented &&
               siteKeydownCount === 1 &&
               images.length === 2 &&
-              editor.textContent === "기존" &&
+              editor.textContent === "기존ㅂ" &&
+              debugTypes.includes("keydown-blocked") &&
+              debugTypes.includes("beforeinput") &&
+              debugTypes.includes("input-seen") &&
               images.every((image) => image.alt === "{:dynamic_test:}");
             document.body.dataset.result = passed ? "pass" : "fail";
             document.querySelector("#result").textContent = passed ? "pass" : "fail";
