@@ -43,6 +43,11 @@
     <script src="../content.js"></script>
     <script>
       const editor = document.querySelector("#editor");
+      if (new URLSearchParams(location.search).has("replace")) {
+        editor.addEventListener("blur", () => {
+          editor.replaceWith(editor.cloneNode(true));
+        }, { once: true });
+      }
       const observedDebug = [];
       document.addEventListener("chzzk-caps-emote:debug", (event) => {
         observedDebug.push(event.detail);
@@ -113,7 +118,8 @@
           if (repeatedImeStarted) emitImeText();
           emitDeleteNoise();
           window.setTimeout(() => {
-            const images = [...editor.querySelectorAll("img")];
+            const finalEditor = document.querySelector("#editor");
+            const images = [...finalEditor.querySelectorAll("img")];
             const debugTypes = observedDebug.map(({ type }) => type);
             const passed =
               !unmapped.defaultPrevented &&
@@ -123,7 +129,8 @@
               !repeatedImeStarted &&
               siteKeydownCount === 1 &&
               images.length === 2 &&
-              editor.textContent === "기존" &&
+              finalEditor.textContent === "기존" &&
+              document.activeElement === finalEditor &&
               debugTypes.includes("keydown-blocked") &&
               debugTypes.includes("editor-suspended") &&
               debugTypes.includes("editor-resumed") &&

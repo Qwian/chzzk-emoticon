@@ -91,19 +91,26 @@
   }
 
   function suspendEditorForIme(editor, code, repeat) {
-    const contentEditable = editor.getAttribute("contenteditable");
     const range = captureSelectionRange(editor);
-    editor.setAttribute("contenteditable", "false");
     editor.blur();
     debug("editor-suspended", null, { code, repeat });
 
     window.setTimeout(() => {
-      if (!editor.isConnected) return;
-      if (contentEditable === null) editor.removeAttribute("contenteditable");
-      else editor.setAttribute("contenteditable", contentEditable);
-      editor.focus({ preventScroll: true });
-      restoreSelectionRange(editor, range);
-      debug("editor-resumed", null, { code, repeat });
+      const currentEditor = editor.isConnected
+        ? editor
+        : document.querySelector("#aside-chatting pre[contenteditable='true']");
+      if (!(currentEditor instanceof HTMLElement)) {
+        debug("editor-resume-failed", null, { code, repeat });
+        return;
+      }
+      currentEditor.focus({ preventScroll: true });
+      if (currentEditor === editor) restoreSelectionRange(currentEditor, range);
+      imeGuard.editor = currentEditor;
+      debug("editor-resumed", null, {
+        code,
+        repeat,
+        replaced: currentEditor !== editor
+      });
       dispatchShortcut(code, repeat);
     }, 0);
   }
