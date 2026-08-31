@@ -4,7 +4,10 @@
 
   const INSERT_EVENT = "chzzk-caps-emote:insert";
   const RESULT_EVENT = "chzzk-caps-emote:result";
+  const CONFIG_EVENT = "chzzk-caps-emote:config";
+  const SHORTCUT_EVENT = "chzzk-caps-emote:shortcut";
   const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
+  let shortcutCodes = new Set();
 
   function respond(requestId, ok, message = "") {
     document.dispatchEvent(new CustomEvent(RESULT_EVENT, {
@@ -33,6 +36,36 @@
     }
     moveCaretAfter(node);
   }
+
+  document.addEventListener(CONFIG_EVENT, (event) => {
+    const codes = Array.isArray(event.detail?.codes) ? event.detail.codes : [];
+    shortcutCodes = new Set(
+      codes.filter((code) => typeof code === "string" && code.length <= 64)
+    );
+  }, true);
+
+  window.addEventListener("keydown", (event) => {
+    if (
+      event.ctrlKey ||
+      event.altKey ||
+      event.metaKey ||
+      !event.getModifierState("CapsLock") ||
+      !shortcutCodes.has(event.code)
+    ) return;
+
+    const editor = document.activeElement;
+    if (
+      !(editor instanceof HTMLElement) ||
+      !editor.isContentEditable ||
+      !editor.closest("#aside-chatting")
+    ) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    document.dispatchEvent(new CustomEvent(SHORTCUT_EVENT, {
+      detail: { code: event.code, repeat: event.repeat }
+    }));
+  }, true);
 
   document.addEventListener(INSERT_EVENT, (event) => {
     const { requestId, code, imageUrl } = event.detail || {};

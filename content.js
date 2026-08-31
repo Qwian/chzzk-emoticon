@@ -16,6 +16,8 @@
 
   const INSERT_EVENT = "chzzk-caps-emote:insert";
   const RESULT_EVENT = "chzzk-caps-emote:result";
+  const CONFIG_EVENT = "chzzk-caps-emote:config";
+  const SHORTCUT_EVENT = "chzzk-caps-emote:shortcut";
   const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
 
   const CHAT_INPUT_SELECTORS = [
@@ -49,13 +51,22 @@
     };
   }
 
+  function publishShortcutConfig() {
+    const codes = settings.enabled
+      ? settings.shortcuts.filter(({ code, mapping }) => code && mapping).map(({ code }) => code)
+      : [];
+    document.dispatchEvent(new CustomEvent(CONFIG_EVENT, { detail: { codes } }));
+  }
+
   chrome.storage.local.get("settings").then(({ settings: stored }) => {
     settings = mergeSettings(stored);
+    publishShortcutConfig();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.settings) {
       settings = mergeSettings(changes.settings.newValue);
+      publishShortcutConfig();
     }
   });
 
@@ -308,28 +319,16 @@
     }
   }
 
-  window.addEventListener("keydown", async (event) => {
-    const shortcut = settings.shortcuts.find(({ code }) => code === event.code);
-    if (
-      !settings.enabled ||
-      event.ctrlKey ||
-      event.altKey ||
-      event.metaKey ||
-      !event.getModifierState("CapsLock") ||
-      !shortcut
-    ) return;
-
+  document.addEventListener(SHORTCUT_EVENT, async (event) => {
+    const shortcut = settings.shortcuts.find(({ code }) => code === event.detail?.code);
+    if (!settings.enabled || !shortcut) return;
     const mapping = shortcut.mapping;
     if (!mapping) return;
 
     const input = findFocusedChatInput();
     if (!input) return;
 
-    // Always consume a mapped physical key before checking async/IME state.
-    // Otherwise rapid repeats can leak into the Korean IME while an emote is inserting.
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (busy || (event.repeat && settings.sendImmediately)) return;
+    if (busy || (event.detail?.repeat && settings.sendImmediately)) return;
 
     busy = true;
     try {

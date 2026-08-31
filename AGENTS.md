@@ -44,4 +44,5 @@ Then verify on a logged-in CHZZK live page:
 - `node` is not on PATH in this workspace; use the bundled executable above.
 - Native CHZZK emote behavior depends on the current picker DOM and cannot be fully verified while logged out.
 - `page-bridge.js` must stay in the MAIN world because CHZZK keeps emoji ID-to-image state on the page's `window` object.
+- Mapped-key suppression must stay in the document-start MAIN-world bridge; a later isolated-world keydown handler can allow Korean IME composition input to leak through.
 - Do not replace physical-key `KeyboardEvent.code` mappings with layout-dependent `KeyboardEvent.key` mappings.

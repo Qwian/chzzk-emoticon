@@ -42,6 +42,10 @@
     <script src="../content.js"></script>
     <script>
       const editor = document.querySelector("#editor");
+      let siteKeydownCount = 0;
+      window.addEventListener("keydown", () => {
+        siteKeydownCount += 1;
+      }, true);
 
       function press(code, key, options = {}) {
         const event = new KeyboardEvent("keydown", {
@@ -59,11 +63,25 @@
         return event;
       }
 
+      function emitImeText() {
+        const event = new InputEvent("beforeinput", {
+          bubbles: true,
+          cancelable: true,
+          inputType: "insertCompositionText",
+          data: "ㅂ",
+          isComposing: true
+        });
+        editor.dispatchEvent(event);
+        if (!event.defaultPrevented) editor.append("ㅂ");
+        return event;
+      }
+
       window.setTimeout(() => {
         editor.focus();
         const unmapped = press("KeyW", "w");
         const first = press("KeyQ", "q");
         const duringBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
+        const imeDuringBusy = duringBusy.defaultPrevented ? null : emitImeText();
 
         window.setTimeout(() => {
           const afterBusy = press("KeyQ", "q", { repeat: true, isComposing: true });
@@ -73,7 +91,9 @@
               !unmapped.defaultPrevented &&
               first.defaultPrevented &&
               duringBusy.defaultPrevented &&
+              imeDuringBusy === null &&
               afterBusy.defaultPrevented &&
+              siteKeydownCount === 1 &&
               images.length === 2 &&
               images.every((image) => image.alt === "{:dynamic_test:}");
             document.body.dataset.result = passed ? "pass" : "fail";
