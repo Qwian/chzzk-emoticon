@@ -24,6 +24,7 @@
       </label>
       <p id="status" role="status"></p>
       <p class="footnote">팝업 UI 테스트</p>
+      <button id="external-update" type="button">외부 등록 반영 테스트</button>
     </main>
     <script>
       const icon = "data:image/svg+xml," + encodeURIComponent(
@@ -47,11 +48,22 @@
             }
           }
         : { enabled: true, sendImmediately: false, shortcuts };
+      let storageChangeListener;
       window.chrome = {
         storage: {
           local: {
             get: async () => ({ settings: window.savedSettings }),
-            set: async ({ settings }) => { window.savedSettings = settings; }
+            set: async ({ settings }) => {
+              const oldValue = window.savedSettings;
+              window.savedSettings = settings;
+              storageChangeListener?.(
+                { settings: { oldValue, newValue: settings } },
+                "local"
+              );
+            }
+          },
+          onChanged: {
+            addListener: (listener) => { storageChangeListener = listener; }
           }
         },
         tabs: {
@@ -59,6 +71,22 @@
           sendMessage: async () => ({ ok: true })
         }
       };
+      document.querySelector("#external-update").addEventListener("click", () => {
+        const oldValue = window.savedSettings;
+        const nextShortcuts = oldValue.shortcuts.map((shortcut, index) =>
+          index === 1
+            ? {
+                ...shortcut,
+                mapping: { type: "native", code: "{:external_emote:}", imageUrl: icon }
+              }
+            : shortcut
+        );
+        window.savedSettings = { ...oldValue, shortcuts: nextShortcuts };
+        storageChangeListener(
+          { settings: { oldValue, newValue: window.savedSettings } },
+          "local"
+        );
+      });
     </script>
     <script src="../popup.js"></script>
   </body>

@@ -365,6 +365,14 @@
       mapping: fingerprint
     };
     await chrome.storage.local.set({ settings: next });
+    const { settings: saved } = await chrome.storage.local.get("settings");
+    const savedShortcut = mergeSettings(saved).shortcuts.find(({ id, code }) =>
+      currentCapture.shortcutId ? id === currentCapture.shortcutId : code === currentCapture.code
+    );
+    if (savedShortcut?.mapping?.code !== fingerprint.code) {
+      showToast("이모티콘 설정을 저장하지 못했습니다. 다시 시도하세요.", "error");
+      return;
+    }
     showToast(`${currentCapture.key} 키에 ${fingerprint.code} 등록 완료`);
   }, true);
 

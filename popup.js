@@ -52,8 +52,8 @@ function normalizeSettings(stored = {}) {
       }));
 
   return {
-    ...DEFAULT_SETTINGS,
-    ...stored,
+    enabled: stored.enabled ?? DEFAULT_SETTINGS.enabled,
+    sendImmediately: stored.sendImmediately ?? DEFAULT_SETTINGS.sendImmediately,
     shortcuts: shortcuts.map((shortcut) => ({
       id: shortcut.id || createId(),
       code: shortcut.code || "",
@@ -248,10 +248,29 @@ function renderMappings() {
   list.querySelector(".key-button.recording")?.focus();
 }
 
+function settingsSignature(value) {
+  return JSON.stringify(value);
+}
+
+function applyStoredSettings(stored, message = "") {
+  const next = normalizeSettings(stored);
+  if (settingsSignature(next) === settingsSignature(settings)) return;
+
+  recordingId = null;
+  document.removeEventListener("keydown", captureKey, true);
+  settings = next;
+  enabledInput.checked = settings.enabled;
+  sendInput.checked = settings.sendImmediately;
+  renderMappings();
+  if (message) setStatus(message);
+}
+
 async function initialize() {
   const stored = await chrome.storage.local.get("settings");
   settings = normalizeSettings(stored.settings);
-  await saveSettings();
+  if (stored.settings?.mappings && !Array.isArray(stored.settings.shortcuts)) {
+    await saveSettings();
+  }
 
   enabledInput.checked = settings.enabled;
   sendInput.checked = settings.sendImmediately;
@@ -276,5 +295,10 @@ async function initialize() {
     startRecording(shortcut.id);
   });
 }
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.settings) return;
+  applyStoredSettings(changes.settings.newValue, "등록 내용을 불러왔습니다.");
+});
 
 initialize();
