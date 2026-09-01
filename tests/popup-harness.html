@@ -46,16 +46,21 @@
           ? { type: "native", code: "{:test_emote:}", imageUrl: icon }
           : { type: "text", value: `테스트 ${index + 1}` }
       }));
-      window.savedSettings = new URLSearchParams(location.search).has("legacy")
-        ? {
-            enabled: true,
-            sendImmediately: true,
-            mappings: {
-              Minus: { type: "native", code: "{:legacy_emote:}", imageUrl: icon },
-              Equal: { type: "text", value: "기존 매핑" }
-            }
-          }
-        : { enabled: true, shortcuts };
+      const testParams = new URLSearchParams(location.search);
+      window.savedSettings = testParams.has("fresh")
+        ? undefined
+        : testParams.has("empty")
+          ? { enabled: true, shortcuts: [] }
+          : testParams.has("legacy")
+            ? {
+                enabled: true,
+                sendImmediately: true,
+                mappings: {
+                  Minus: { type: "native", code: "{:legacy_emote:}", imageUrl: icon },
+                  Equal: { type: "text", value: "기존 매핑" }
+                }
+              }
+            : { enabled: true, shortcuts };
       let storageChangeListener;
       window.savedDiagnosticLog = [];
       window.chrome = {

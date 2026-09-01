@@ -7,6 +7,13 @@ const LEGACY_KEY_LABELS = {
   Quote: "'"
 };
 
+const DEFAULT_SHORTCUTS = Object.entries(LEGACY_KEY_LABELS).map(([code, keyLabel]) => ({
+  id: `default-${code}`,
+  code,
+  keyLabel,
+  mapping: null
+}));
+
 const BLOCKED_CODES = new Set([
   "CapsLock",
   "Enter",
@@ -25,7 +32,7 @@ const BLOCKED_CODES = new Set([
 const DEFAULT_SETTINGS = {
   enabled: true,
   diagnostics: false,
-  shortcuts: []
+  shortcuts: DEFAULT_SHORTCUTS
 };
 
 const enabledInput = document.querySelector("#enabled");
@@ -48,12 +55,14 @@ function createId() {
 function normalizeSettings(stored = {}) {
   const shortcuts = Array.isArray(stored.shortcuts)
     ? stored.shortcuts
-    : Object.entries(stored.mappings || {}).map(([code, mapping]) => ({
-        id: `legacy-${code}`,
-        code,
-        keyLabel: LEGACY_KEY_LABELS[code] || code,
-        mapping
-      }));
+    : stored.mappings
+      ? Object.entries(stored.mappings).map(([code, mapping]) => ({
+          id: `legacy-${code}`,
+          code,
+          keyLabel: LEGACY_KEY_LABELS[code] || code,
+          mapping
+        }))
+      : DEFAULT_SHORTCUTS;
 
   return {
     enabled: stored.enabled ?? DEFAULT_SETTINGS.enabled,
@@ -294,6 +303,7 @@ async function initialize() {
   const stored = await chrome.storage.local.get(["settings", "diagnosticLog"]);
   settings = normalizeSettings(stored.settings);
   if (
+    !stored.settings ||
     (stored.settings?.mappings && !Array.isArray(stored.settings.shortcuts)) ||
     Object.hasOwn(stored.settings || {}, "sendImmediately")
   ) {

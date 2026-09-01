@@ -8,10 +8,17 @@
     Quote: "'"
   };
 
+  const DEFAULT_SHORTCUTS = Object.entries(LEGACY_KEY_LABELS).map(([code, keyLabel]) => ({
+    id: `default-${code}`,
+    code,
+    keyLabel,
+    mapping: null
+  }));
+
   const DEFAULT_SETTINGS = {
     enabled: true,
     diagnostics: false,
-    shortcuts: []
+    shortcuts: DEFAULT_SHORTCUTS
   };
 
   const INSERT_EVENT = "chzzk-caps-emote:insert";
@@ -41,12 +48,14 @@
   function mergeSettings(value) {
     const shortcuts = Array.isArray(value?.shortcuts)
       ? value.shortcuts
-      : Object.entries(value?.mappings || {}).map(([code, mapping]) => ({
-          id: `legacy-${code}`,
-          code,
-          keyLabel: LEGACY_KEY_LABELS[code] || code,
-          mapping
-        }));
+      : value?.mappings
+        ? Object.entries(value.mappings).map(([code, mapping]) => ({
+            id: `legacy-${code}`,
+            code,
+            keyLabel: LEGACY_KEY_LABELS[code] || code,
+            mapping
+          }))
+        : DEFAULT_SHORTCUTS;
 
     return {
       enabled: value?.enabled ?? DEFAULT_SETTINGS.enabled,
