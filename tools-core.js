@@ -66,10 +66,14 @@
   function channelId(path) {
     return path.match(/^\/(?:live\/)?([a-f0-9]{32})\/?$/i)?.[1]?.toLowerCase() || "";
   }
+  function channelGroup(item, favorites = []) {
+    if (favorites.includes(item.id)) return 0;
+    return item.openLive === true ? (item.followed === false ? 2 : 1) : (item.followed === false ? 4 : 3);
+  }
   function orderChannels(items, favorites = [], order = []) {
-    const pinned = new Set(favorites), positions = new Map(order.map((id, i) => [id, i]));
-    return [...items].sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)) ||
+    const positions = new Map(order.map((id, i) => [id, i]));
+    return [...items].sort((a, b) => channelGroup(a, favorites) - channelGroup(b, favorites) ||
       (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.6.0", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.6.1", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels, channelGroup });
 })();

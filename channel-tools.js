@@ -17,7 +17,10 @@
     .ct-row-actions button,.ct-list-tools button{border:0;background:transparent;color:inherit;border-radius:5px;cursor:pointer;font:inherit;padding:3px;width:23px;height:26px}
     .ct-row-actions button:hover,.ct-list-tools button:hover{background:#8883}
     .ct-row-actions button:focus-visible,.ct-list-tools button:focus-visible,.ct-bookmark:focus-visible{outline:2px solid #00dc91;outline-offset:1px}
-    .ct-row-actions .ct-star{font-size:21px;line-height:20px;color:var(--color-content-03,#92949b)}
+    .ct-row-actions .ct-star{display:grid;place-items:center;color:var(--color-content-03,#92949b);opacity:0;pointer-events:none}
+    .ct-channel-row:hover .ct-star,.ct-channel-row:has(:focus-visible) .ct-star{opacity:1;pointer-events:auto}
+    .ct-star svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round}
+    .ct-star[aria-pressed="true"] svg{fill:currentColor}
     .ct-row-actions .ct-star[aria-pressed="true"]{color:#e6b64e}
     .ct-channel-row:not(.ct-edit) .ct-move{display:none}
     .ct-move:disabled{opacity:.25;cursor:default}
@@ -36,7 +39,7 @@
     .ct-bookmark[aria-pressed="true"]{color:#00c985;border-color:#00c98588}.ct-bookmark svg{width:16px;height:16px}
     .ct-fallback-nav{padding:12px 8px;color:inherit}.ct-fallback-nav strong{font-size:13px}.ct-fallback-nav ul{padding:0;margin:8px 0}
     .ct-sidebar-section{container-type:inline-size}
-    @container(max-width:110px){.ct-saved-name,.ct-saved-label,.ct-list-tools{display:none}.ct-saved-link{padding-left:3px;gap:0}.ct-native-body{padding-right:18px!important}.ct-row-actions{right:0}.ct-row-actions .ct-star{width:18px;font-size:17px}}
+    @container(max-width:110px){.ct-saved-name,.ct-saved-label,.ct-list-tools{display:none}.ct-saved-link{padding-left:3px;gap:0}.ct-native-body{padding-right:18px!important}.ct-row-actions{right:0}.ct-row-actions .ct-star{width:18px}.ct-star svg{width:16px;height:16px}}
   `;
   document.documentElement.append(style);
   const playerHost = document.createElement("span"); playerHost.id = "chzzk-player-tools";
@@ -147,7 +150,7 @@
     const value = String(rank); if (row.style.getPropertyValue("--ct-order") !== value) row.style.setProperty("--ct-order", value);
   }
   function move(id, target, after = false) {
-    if (id === target || pins.includes(id) !== pins.includes(target)) return;
+    if (id === target || groupOf(id) !== groupOf(target)) return;
     const visible = core.orderChannels([...nativeRows.values(), ...addedRows.values()], pins, order).map(row => row.id);
     update("channelOrder", value => {
       const ids = [...new Set([...(Array.isArray(value) ? value : []), ...visible])].filter(x => x !== id);
@@ -155,6 +158,7 @@
       return ids;
     });
   }
+  function groupOf(id) { const item = nativeRows.get(id) || addedRows.get(id); return item ? core.channelGroup(item, pins) : -1; }
   function decorate(item, sorted) {
     const row = item.row; row.classList.add("ct-channel-row"); row.classList.toggle("ct-edit", editing);
     if (!decoratedRows.has(row)) { row.querySelector(":scope > .ct-row-actions")?.remove(); decoratedRows.add(row); }
@@ -164,7 +168,7 @@
         const button = document.createElement("button"); button.type = "button"; button.className = "ct-move";
         button.textContent = direction < 0 ? "↑" : "↓"; button.setAttribute("aria-label", `${item.name} ${label}`);
         button.addEventListener("click", event => {
-          event.preventDefault(); event.stopPropagation(); const group = core.orderChannels([...nativeRows.values(), ...addedRows.values()], pins, order).filter(other => pins.includes(other.id) === pins.includes(item.id));
+          event.preventDefault(); event.stopPropagation(); const group = core.orderChannels([...nativeRows.values(), ...addedRows.values()], pins, order).filter(other => groupOf(other.id) === groupOf(item.id));
           const target = group[group.findIndex(other => other.id === item.id) + direction]; if (target) move(item.id, target.id, direction > 0);
         }); actions.append(button);
       }
@@ -172,18 +176,19 @@
       grip.addEventListener("dragstart", event => { dragId = item.id; event.dataTransfer.setData("application/x-chzzk-tools-channel", item.id); event.dataTransfer.effectAllowed = "move"; event.stopPropagation(); });
       grip.addEventListener("dragend", () => { dragId = ""; }); actions.append(grip);
       const star = document.createElement("button"); star.type = "button"; star.className = "ct-star";
+      star.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 2.65 5.37 5.93.86-4.29 4.18 1.01 5.9L12 17.03 6.7 19.8l1.01-5.9-4.29-4.18 5.93-.86Z"/></svg>';
       star.addEventListener("click", event => {
         event.preventDefault(); event.stopPropagation(); update("followingFavorites", value => {
           const ids = Array.isArray(value) ? value : []; return ids.includes(item.id) ? ids.filter(id => id !== item.id) : [...ids, item.id];
         });
       }); actions.append(star); row.append(actions);
-      row.addEventListener("dragover", event => { if (editing && dragId && pins.includes(dragId) === pins.includes(item.id)) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } });
+      row.addEventListener("dragover", event => { if (editing && dragId && groupOf(dragId) === groupOf(item.id)) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } });
       row.addEventListener("drop", event => { if (editing && dragId) { event.preventDefault(); event.stopPropagation(); move(dragId, item.id); dragId = ""; } });
     }
     const star = row.querySelector(".ct-star"), pinned = pins.includes(item.id);
-    text(star, pinned ? "★" : "☆"); star.setAttribute("aria-pressed", String(pinned));
+    star.setAttribute("aria-pressed", String(pinned));
     star.title = `${item.name} 즐겨찾기 ${pinned ? "해제" : "등록"}`; star.setAttribute("aria-label", star.title);
-    const group = sorted.filter(other => pins.includes(other.id) === pinned), index = group.findIndex(other => other.id === item.id);
+    const group = sorted.filter(other => groupOf(other.id) === groupOf(item.id)), index = group.findIndex(other => other.id === item.id);
     row.querySelectorAll(".ct-move:not(.ct-drag)").forEach((button, i) => { button.disabled = i === 0 ? index === 0 : index === group.length - 1; });
   }
   function savedRow(channel) {
@@ -197,6 +202,7 @@
       name.append(title, badge, state); link.append(avatar, name); row.append(link); item = { id: channel.id, name: channel.name, row, link, avatar, title, state }; addedRows.set(channel.id, item);
     }
     const data = channelCache.get(channel.id)?.data || channel;
+    item.followed = false; item.openLive = data.openLive === true;
     item.name = data.name || channel.name; text(item.title, item.name); item.link.href = data.openLive ? `/live/${channel.id}` : `/${channel.id}`;
     text(item.state, data.openLive === true ? "LIVE" : data.openLive === false ? "오프라인" : "팔로우 없이 보관");
     const image = data.image || channel.image;
@@ -242,7 +248,9 @@
       if (link.classList.contains("ct-saved-link")) continue;
       const id = channelId(link), row = link.closest("li");
       if (!id || !row || row.parentElement !== list || nativeRows.has(id)) continue;
-      const name = readName(link, row) || id; nativeRows.set(id, { id, name, row });
+      const name = readName(link, row) || id;
+      const openLive = new URL(link.href, location.href).pathname.startsWith("/live/");
+      nativeRows.set(id, { id, name, row, followed: true, openLive });
       link.parentElement.classList.add("ct-native-body");
       const saved = settings.favorites && bookmarks.some(channel => channel.id === id);
       let badge = row.querySelector(".ct-native-saved-label");

@@ -13,18 +13,19 @@ const sidebarStyle=document.createElement('style');sidebarStyle.textContent='#si
 history.replaceState(null,'','/live/'+'a'.repeat(32));
 // Match the actual channel action's text; native follow is never called by this extension.
 document.querySelector('#follow').textContent='팔로잉';
-const ids=['a','b','c','d'].map(c=>c.repeat(32)),names=['가람','나래','다온','라온'];
+const ids=['a','b','c','d','e','f'].map(c=>c.repeat(32)),names=['가람','나래','다온','라온','마루','바다'];
 const list=document.querySelector('#native-list');
 for(let i=0;i<3;i++){const li=document.createElement('li');li.innerHTML=`<div data-native><span>${names[i][0]}</span><strong data-channel-name="${names[i]}">${names[i]}</strong><a href="/live/${ids[i]}"></a></div>`;list.append(li)}
+const offline=document.createElement('li');offline.innerHTML=`<div data-native><span>마</span><strong data-channel-name="마루">마루 <small style="font-size:10px;color:#92949b">오프라인</small></strong><a href="/${ids[4]}"></a></div>`;list.append(offline);
 let followHits=0,expandHits=0,moreHits=0,hoverHits=0,apiCalls=0;
 document.querySelector('#follow').onclick=()=>followHits++;
 list.firstElementChild.addEventListener('pointerenter',()=>hoverHits++);
 document.querySelector('#collapse').onclick=event=>{expandHits++;event.currentTarget.setAttribute('aria-expanded',String(event.currentTarget.getAttribute('aria-expanded')!=='true'))};
 document.querySelector('#more').onclick=event=>{moreHits++;event.currentTarget.setAttribute('aria-expanded',String(event.currentTarget.getAttribute('aria-expanded')!=='true'))};
-const state={features:{followingExpanded:true},favorites:[{id:ids[3],name:'라온'}],followingFavorites:[],channelOrder:[]},listeners=[];
+const state={features:{followingExpanded:true},favorites:[{id:ids[3],name:'라온'},{id:ids[5],name:'바다'}],followingFavorites:[],channelOrder:[]},listeners=[];
 if(preview){state.followingFavorites=[ids[2],ids[1]];state.channelOrder=[ids[2],ids[1],ids[0],ids[3]];state.favorites.push({id:ids[0],name:'가람'});}
 window.chrome={storage:{local:{get:async()=>structuredClone(state),set:async values=>{const changes={};for(const[key,value]of Object.entries(values)){changes[key]={oldValue:state[key],newValue:value};state[key]=structuredClone(value)}listeners.forEach(fn=>fn(changes,'local'))}},onChanged:{addListener:fn=>listeners.push(fn)}}};
-window.fetch=async(url,options)=>{apiCalls++;return{ok:true,json:async()=>({code:200,content:{channelId:ids[3],channelName:'라온',openLive:true}})}};
+window.fetch=async(url,options)=>{apiCalls++;const id=url.slice(-32);return{ok:true,json:async()=>({code:200,content:{channelId:id,channelName:names[ids.indexOf(id)],openLive:id===ids[3]}})}};
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),click=element=>element.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
 const visualRows=()=>[...list.querySelectorAll(':scope > .ct-channel-row')].sort((a,b)=>Number(a.style.getPropertyValue('--ct-order'))-Number(b.style.getPropertyValue('--ct-order')));
 const rowFor=id=>[...list.querySelectorAll(':scope > li')].find(row=>row.querySelector(`a[href$="${id}"]`));
@@ -36,9 +37,10 @@ check('왼쪽 아래 고정 패널 제거',!document.querySelector('#chzzk-tools
 check('따라잡기 도구가 가위 바로 왼쪽',document.querySelector('.custom__clip-button').previousElementSibling?.id==='chzzk-player-tools');
 check('보관 버튼이 팔로잉 툴팁 바깥의 바로 왼쪽',document.querySelector('#follow').parentElement.previousElementSibling?.id==='chzzk-channel-save');
 check('상시 펼치기가 두 접힘 상태 모두 해제',expandHits===1&&moreHits===1);
-check('기본 팔로잉 항목에 빈 별표',list.querySelectorAll('.ct-star[aria-pressed="false"]').length===4);
+check('기본 팔로잉 항목에 빈 별표',list.querySelectorAll('.ct-star[aria-pressed="false"]').length===6);
 check('기존 저장 채널이 보관 표시와 함께 목록에 표시',rowFor(ids[3])?.textContent.includes('보관'));
 check('보관 채널의 방송 중 상태·링크 반영',rowFor(ids[3])?.querySelector('a').getAttribute('href')==='/live/'+ids[3]&&rowFor(ids[3]).textContent.includes('LIVE'));
+check('팔로잉 LIVE → 보관 LIVE → 팔로잉 오프라인 → 보관 오프라인',visualRows().map(row=>row.querySelector('a').getAttribute('href').slice(-32)).join(',')===[ids[0],ids[1],ids[2],ids[3],ids[4],ids[5]].join(','));
 click(rowFor(ids[2]).querySelector('.ct-star'));await wait(180);
 check('별 클릭으로 즐겨찾기 저장·상단 정렬',state.followingFavorites[0]===ids[2]&&visualRows()[0]===rowFor(ids[2]));
 check('즐겨찾기와 일반 채널 사이 구분선',list.querySelector('.ct-channel-divider')?.style.getPropertyValue('--ct-order')==='1');
@@ -48,11 +50,13 @@ click(rowFor(ids[2]).querySelector('.ct-move'));await wait(180);
 check('즐겨찾기 안에서 위로 이동·저장',visualRows()[0]===rowFor(ids[2])&&state.channelOrder.indexOf(ids[2])<state.channelOrder.indexOf(ids[1]));
 const handle=rowFor(ids[3]).querySelector('.ct-drag'),target=rowFor(ids[0]),data=new DataTransfer();
 handle.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:data}));target.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data}));await wait(180);
-check('일반 채널도 드래그로 순서 변경',visualRows()[2]===rowFor(ids[3]));
+check('드래그로도 보관 LIVE를 팔로잉 LIVE 위로 올리지 않음',visualRows()[2]===rowFor(ids[0])&&visualRows()[3]===rowFor(ids[3]));
+const pinData=new DataTransfer();rowFor(ids[1]).querySelector('.ct-drag').dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:pinData}));rowFor(ids[2]).dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:pinData}));await wait(180);
+check('같은 즐겨찾기 구역에서는 드래그 순서 변경',visualRows()[0]===rowFor(ids[1]));
 click(document.querySelector('#chzzk-channel-save'));await wait(200);
 check('팔로우 없이 보관 저장, 기본 행과 중복하지 않음',state.favorites.some(row=>row.id===ids[0])&&list.querySelectorAll(`a[href$="${ids[0]}"]`).length===1);
 check('보관한 팔로잉 채널에도 구분 표시',rowFor(ids[0]).querySelector('.ct-native-saved-label')?.textContent==='보관');
-check('팔로잉 즐겨찾기와 보관 채널의 저장값 독립',state.followingFavorites.length===2&&state.favorites.length===2);
+check('팔로잉 즐겨찾기와 보관 채널의 저장값 독립',state.followingFavorites.length===2&&state.favorites.length===3);
 check('보관해도 네이버 팔로우를 누르지 않음',followHits===0);
 rowFor(ids[0]).dispatchEvent(new PointerEvent('pointerenter'));check('기본 행과 기존 이벤트 보존',hoverHits===1);
 click(document.querySelector('#chzzk-channel-save'));await wait(180);check('보관 해제 시 기본 팔로잉 행 유지',rowFor(ids[0])&&!rowFor(ids[0]).querySelector('.ct-native-saved-label'));
@@ -60,12 +64,12 @@ click(rowFor(ids[1]).querySelector('.ct-star'));click(rowFor(ids[2]).querySelect
 await chrome.storage.local.set({features:{followingExpanded:false}});document.querySelector('#collapse').setAttribute('aria-expanded','false');await wait(1700);
 check('상시 펼치기 끄면 접힌 상태 유지',document.querySelector('#collapse').getAttribute('aria-expanded')==='false');
 const player=document.querySelector('#chzzk-player-tools').shadowRoot;player.querySelector('#catch-up').checked=false;player.querySelector('#catch-up').dispatchEvent(new Event('change'));await wait(180);check('이동된 따라잡기 설정 저장',state.features.catchUp===false);
-check('보관 채널 정보 조회가 매번 반복되지 않음',apiCalls===1);
+check('보관 채널 정보 조회가 매번 반복되지 않음',apiCalls===2);
 const before=list.firstElementChild;list.replaceChild(before.cloneNode(true),before);await wait(250);check('사이트가 행을 다시 렌더링해도 별 중복 없음',rowFor(ids[0]).querySelectorAll('.ct-star').length===1);
 const nativeNav=list.closest('nav');nativeNav.remove();await wait(300);
 check('기본 팔로잉이 없으면 상단 헤더 대신 사이드바에 보관 목록',document.querySelector('#sidebar .ct-fallback-nav a')?.href.endsWith(ids[3])&&!document.querySelector('#header .ct-fallback-nav'));
 document.querySelector('#sidebar').append(nativeNav);await wait(300);
-check('기본 팔로잉 복귀 시 보관 목록 합치고 중복 영역 제거',!document.querySelector('.ct-fallback-nav')&&rowFor(ids[3]));
+check('기본 팔로잉 복귀 시 보관 목록 합치고 중복 영역 제거',!document.querySelector('.ct-fallback-nav')&&Boolean(rowFor(ids[3])));
 document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
 })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
 </script></body></html>

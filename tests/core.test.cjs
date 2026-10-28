@@ -39,3 +39,13 @@ test("channel ordering keeps favorites first and applies custom order inside eac
   assert.deepEqual(core.orderChannels(items, ["c"], ["b"]).map(row => row.id), ["c", "b", "a", "d"]);
   assert.deepEqual(items.map(row => row.id), ["a", "b", "c", "d"]);
 });
+test("following live precedes saved live, then following offline and saved offline", () => {
+  const rows = [
+    { id: "saved-off", followed: false, openLive: false }, { id: "follow-off", followed: true, openLive: false },
+    { id: "saved-live", followed: false, openLive: true }, { id: "follow-live-a", followed: true, openLive: true },
+    { id: "follow-live-b", followed: true, openLive: true }
+  ];
+  const custom = ["saved-off", "follow-off", "saved-live", "follow-live-b", "follow-live-a"];
+  assert.deepEqual(core.orderChannels(rows, [], custom).map(row => row.id), ["follow-live-b", "follow-live-a", "saved-live", "follow-off", "saved-off"]);
+  assert.deepEqual(core.orderChannels(rows, ["saved-off"], custom).map(row => row.id), ["saved-off", "follow-live-b", "follow-live-a", "saved-live", "follow-off"]);
+});

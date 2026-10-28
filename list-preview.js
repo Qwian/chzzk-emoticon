@@ -21,17 +21,22 @@
     for (const link of links) {
       const url = new URL(link.href, location.href);
       if (url.hostname === "chzzk.naver.com" && /^\/live\/[a-f0-9]{32}$/i.test(url.pathname)) {
+        const image = card.querySelector("img[src*='/thumbnail/']");
+        const region = image?.parentElement.closest('[class*="thumbnail"], [class*="thumb"]') ||
+          card.querySelector('a[href*="/live/"] [class*="thumbnail"]');
+        if (!region || !region.contains(target)) continue;
         const metadata = card.querySelector("[data-nlog-params]") || card.closest("[data-nlog-params]") || card;
         let liveId;
         try { liveId = JSON.parse(metadata.getAttribute("data-nlog-params") || "{}").content_id; } catch { /* no metadata */ }
-        const image = card.querySelector("img[src*='/thumbnail/']");
         liveId ||= image?.src.match(/\/live\/(\d+)\//)?.[1];
         if (!/^\d+$/.test(String(liveId || ""))) continue;
-        return { card, mount: link, liveId };
+        return { card, mount: region, liveId };
       }
       const match = url.pathname.match(/^\/([a-z0-9_-]+)\/(\d+)\/?$/i);
       if (/^play\.sooplive\.(com|co\.kr)$/.test(url.hostname) && match) {
-        return { card, mount: card.querySelector(".thumbs-box") || link, streamer: match[1], broadcast: match[2], soop: true };
+        const region = card.querySelector(".thumbs-box");
+        if (!region || !region.contains(target)) continue;
+        return { card, mount: region, streamer: match[1], broadcast: match[2], soop: true };
       }
     }
     return null;
@@ -48,7 +53,7 @@
     label.style.cssText = "position:absolute;left:5px;bottom:5px;z-index:8;background:#10271deb;color:#ccffe0;padding:3px 7px;border-radius:4px;font:11px system-ui;pointer-events:none";
     state.mount.append(label); badge(state, "소리 켜고 미리보기 준비 중…");
     if (getComputedStyle(state.mount).position === "static") { state.position = state.mount.style.position; state.mount.style.position = "relative"; }
-    state.video.muted = false; state.video.volume = 0.5;
+    state.video.muted = false; state.video.volume = 1;
     if (native) {
       try { await native.play(); badge(state, "소리 켜짐 · 우클릭 종료"); } catch { badge(state, "미리보기 재생이 허용되지 않았습니다."); }
       return;

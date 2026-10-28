@@ -86,7 +86,7 @@
     if (ownSeekTarget !== null && Math.abs(activeMain.currentTime - ownSeekTarget) < 0.5) return;
     ownSeekTarget = null;
     restoreRate(); heldUntil = performance.now() + 30000;
-    status = "사용자 위치 이동 · 30초 대기";
+    status = "위치 이동 감지 · 자동 따라잡기만 30초 대기";
   }
   function seeked() { ownSeekTarget = null; }
   function sourceChanged() {
