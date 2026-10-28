@@ -8,7 +8,28 @@
   let heldUntil = 0, ownedRate = null;
   let ownSeekTarget = null;
   const patches = new Map();
+  const localAdMute = new WeakMap();
+  let beforeAdAudio = null, userChangedAdAudio = false;
   let status = "플레이어 대기";
+
+  function markAdMute(video, value) {
+    if (video.matches?.("#midAdVideoContainer video, #preAdVideoContainer video")) {
+      localAdMute.set(video, { value, until: performance.now() + 1500 });
+    }
+  }
+  // The ad SDK mirrors volumechange to the site's shared mute setting. Keep our ad-only change local.
+  window.addEventListener("volumechange", event => {
+    const owned = localAdMute.get(event.target);
+    if (owned && owned.until > performance.now() && event.target.muted === owned.value) event.stopImmediatePropagation();
+  }, true);
+  document.addEventListener("pointerdown", event => {
+    if (adActive && event.isTrusted && event.target.closest?.(".pzp-pc__volume-control,button[aria-label*='음소거']")) userChangedAdAudio = true;
+  }, true);
+  document.addEventListener("keydown", event => {
+    if (!adActive || !event.isTrusted || event.target.closest?.("input,textarea,[contenteditable='true']")) return;
+    if (event.code === "KeyM" && !event.ctrlKey && !event.altKey && !event.metaKey ||
+        event.target.closest?.(".pzp-pc__volume-control")) userChangedAdAudio = true;
+  }, true);
 
   function ranges(value) {
     return Array.from({ length: value.length }, (_, i) => [value.start(i), value.end(i)]);
@@ -20,12 +41,16 @@
     const entry = entries.get(key);
     // Respect a user's volume/mute changes made while the ad is playing.
     if (entry.written !== element[key]) entry.original = element[key];
+    if (key === "muted") markAdMute(element, value);
     if (element[key] !== value) element[key] = value;
     entry.written = value;
   }
   function restorePatches() {
     for (const [el, entries] of patches) for (const [key, entry] of entries) {
-      if (el[key] === entry.written) el[key] = entry.original;
+      if (el[key] === entry.written) {
+        if (key === "muted") markAdMute(el, entry.original);
+        el[key] = entry.original;
+      }
     }
     patches.clear();
     document.querySelectorAll(".chzzk-tools-ad-mini, .chzzk-tools-main-full").forEach(el =>
@@ -79,6 +104,7 @@
       activeMain.removeEventListener("loadedmetadata", sourceChanged);
     }
     activeMain = main; margin = 1.5; lastNormal = null;
+    beforeAdAudio = null;
     cooldown = performance.now() + 5000;
     stableSince = performance.now();
     ownSeekTarget = null;
@@ -116,11 +142,15 @@
     const main = mains.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0];
     bind(main || null);
     const adVideos = wrapper => [...wrapper.querySelectorAll("#midAdVideoContainer video, #preAdVideoContainer video")];
-    const wrappers = [...document.querySelectorAll("#midAdPlayerWrapper, #preAdPlayerWrapper")]
-      .filter(el => getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden" &&
-        adVideos(el).some(v => !v.ended && v.readyState >= 2));
+    const visibleAdWrappers = [...document.querySelectorAll("#midAdPlayerWrapper, #preAdPlayerWrapper")]
+      .filter(el => getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden");
+    const wrappers = visibleAdWrappers.filter(el => adVideos(el).some(v => !v.ended && v.readyState >= 2));
+    if (visibleAdWrappers.length && !adActive) {
+      beforeAdAudio = lastNormal ? { ...lastNormal } : main ? { muted: main.muted, volume: main.volume } : null;
+      userChangedAdAudio = false; restoreRate(); adActive = true;
+    }
+    if (visibleAdWrappers.length && !wrappers.length) { announce("광고 준비 중"); return; }
     if (wrappers.length) {
-      if (!adActive) { restoreRate(); adActive = true; }
       for (const wrapper of wrappers) {
         for (const video of adVideos(wrapper)) {
           if (settings.adMute) patch(video, "muted", true);
@@ -133,22 +163,24 @@
           main.closest(".webplayer-internal-source-wrapper")?.classList.add("chzzk-tools-main-full");
         }
       }
-      if (settings.mainAudio && main && lastNormal && !lastNormal.muted && lastNormal.volume > 0) {
-        patch(main, "muted", false);
-        patch(main, "volume", lastNormal.volume);
-        patches.get(main).get("muted").original = lastNormal.muted;
-        patches.get(main).get("volume").original = lastNormal.volume;
+      if (settings.mainAudio && main && beforeAdAudio && !beforeAdAudio.muted && !userChangedAdAudio) {
+        main.muted = false;
       }
       status = main?.paused ? "광고 처리 중 · 본방 재생 대기" : "광고 처리 중";
       announce(status); return;
     }
     if (adActive) {
       restorePatches(); adActive = false;
+      if (settings.adMute && main && beforeAdAudio && !userChangedAdAudio) {
+        main.muted = beforeAdAudio.muted;
+      }
+      beforeAdAudio = null;
       suspend("광고 종료 · 재생 안정화 중", 5000);
     }
     if (!main) { announce("플레이어 대기"); return; }
     lastNormal = { muted: main.muted, volume: main.volume };
     if (!settings.catchUp) { restoreRate(); announce("자동 따라잡기 꺼짐"); return; }
+    if (main.dataset.chzzkToolsManualRate) { restoreRate(); announce("수동 배속 사용 중 · 자동 따라잡기 대기"); return; }
     const now = performance.now();
     if (main.paused || main.seeking || main.readyState < 3) {
       restoreRate(); announce("일시정지 / 버퍼 대기"); return;

@@ -1,0 +1,33 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>실제 검색 이벤트 회귀 검사</title>
+<body data-result="pending"><h1>자동 표시 · 기본 Enter · 검색 버튼 검사</h1>
+<input id="search-input"><pre id="result">pending</pre>
+<script>
+  const params=new URLSearchParams(location.search), baseline=params.has('baseline');
+  window.chrome={storage:{local:{get:async()=>({features:{koreanSearch:true,favorites:false}})},onChanged:{addListener:()=>{}}}};
+  window.fetch=async(url)=>{
+    const keyword=new URL(url).searchParams.get('keyword');
+    if(keyword==='rkdwl')await new Promise(r=>setTimeout(r,1800));
+    return {ok:true,json:async()=>({code:200,content:{data:keyword==='강지'?[{channel:{channelId:'a'.repeat(32),channelName:'강지',openLive:true}}]:[]}})};
+  };
+</script><script src="../tools-core.js"></script>
+<script>document.write('<script src="'+(baseline?'../artifacts/site-tools-0.4.1.js':'../site-tools.js')+'"><\/script>');</script>
+<script>
+  (async()=>{
+    const results=[],check=(name,passed)=>results.push({name,passed});
+    await new Promise(r=>setTimeout(r,30));
+    const input=document.querySelector('input');input.focus();input.value='rkdwl';input.dispatchEvent(new Event('input',{bubbles:true}));
+    await new Promise(r=>setTimeout(r,350));
+    check('다른 응답을 기다리지 않고 한글 채널 즉시 표시',document.querySelector('#chzzk-tools-channel-results')?.textContent.includes('강지'));
+    for(const kind of ['enter','button']) {
+      const passed=await new Promise(resolve=>{
+        const frame=document.createElement('iframe');
+        const timer=setTimeout(()=>resolve(false),3000);
+        frame.onload=()=>{const url=new URL(frame.contentWindow.location.href);if(url.pathname!=='/search')return;clearTimeout(timer);resolve(url.searchParams.get('query')==='강지'&&!url.searchParams.has('native'));};
+        frame.src='/tests/search-native-fixture.html?kind='+kind+(baseline?'&baseline':'');document.body.append(frame);
+      });
+      check(kind==='enter'?'기본 Enter가 영타 원문 검색으로 새지 않음':'기본 검색 버튼이 영타 원문 검색으로 새지 않음',passed);
+    }
+    document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+    document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
+  })();
+</script></body></html>

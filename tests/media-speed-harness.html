@@ -1,0 +1,40 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>모든 사이트 속도 단축키 검사</title>
+<body data-result="pending"><h1>속도 · 프레임 단축키</h1><video style="width:640px;height:360px"></video><input id="typing"><pre id="result">pending</pre>
+<script>
+  const worker=new Worker('/tests/media-background-worker.js'),pending=new Map(),mediaListeners=[],storageListeners=[],deliveries=[];
+  let serial=0;
+  worker.onmessage=event=>{
+    const data=event.data;
+    if(data.kind==='result'){pending.get(data.id)?.(data.result);pending.delete(data.id);return;}
+    deliveries.push(data);
+    let result={ok:true};mediaListeners.forEach(fn=>fn(data.message,{},value=>{result=value}));
+    worker.postMessage({kind:'reply',id:data.id,result});
+  };
+  const request=(message,frameId=0)=>new Promise(resolve=>{const id=++serial;pending.set(id,resolve);worker.postMessage({kind:'request',id,message,frameId})});
+  window.chrome={runtime:{sendMessage:request,onMessage:{addListener:fn=>mediaListeners.push(fn)}},storage:{local:{get:async()=>({features:{globalSpeed:true}})},onChanged:{addListener:fn=>storageListeners.push(fn)}}};
+  const video=document.querySelector('video');let current=10,paused=false,frameCallback;
+  Object.defineProperties(video,{readyState:{get:()=>4},duration:{get:()=>100},paused:{get:()=>paused},currentTime:{get:()=>current,set:value=>current=value},seekable:{get:()=>({length:1,start:()=>0,end:()=>100})}});
+  video.pause=()=>{paused=true};video.requestVideoFrameCallback=cb=>{frameCallback=cb};
+  const delay=ms=>new Promise(r=>setTimeout(r,ms));
+  const press=(code,shiftKey=false,target=document.body)=>{const e=new KeyboardEvent('keydown',{code,shiftKey,bubbles:true,cancelable:true,composed:true});target.dispatchEvent(e);return e;};
+</script><script src="../media-speed.js"></script>
+<script>
+  (async()=>{
+    const results=[],check=(name,passed)=>results.push({name,passed});await delay(120);
+    press('Period');await delay(50);check('마침표로 0.1배 증가',video.playbackRate===1.1);
+    press('Comma');await delay(50);check('쉼표로 0.1배 감소',video.playbackRate===1);
+    press('Period');press('Period');await delay(80);press('Slash');await delay(50);check('슬래시로 1배 복귀',video.playbackRate===1);
+    for(let n=0;n<5;n++)frameCallback(n*16.666,{mediaTime:n/60,presentedFrames:n+1});
+    const before=current;press('Period',true);await delay(50);check('Shift+마침표는 60fps 기준 한 프레임 전진하고 정지',Math.abs(current-before-1/60)<.00001&&paused);
+    press('Comma',true);await delay(50);check('Shift+쉼표는 한 프레임 후진',Math.abs(current-before)<.00001);
+    check('입력창에서 가로채지 않음',!press('Period',false,document.querySelector('input')).defaultPrevented);
+    const host=document.createElement('div');document.body.append(host);const shadow=host.attachShadow({mode:'open'}),input=document.createElement('input');shadow.append(input);
+    check('Shadow DOM 입력창에서도 가로채지 않음',!press('Comma',false,input).defaultPrevented);
+    await request({type:'MEDIA_FRAME_REPORT',score:1000000},17);
+    await request({type:'MEDIA_SPEED_COMMAND',action:'step',direction:1,hasVideo:false});
+    check('상위 페이지 명령은 영상 iframe으로 전달',deliveries.some(d=>d.message.type==='MEDIA_FRAME_STEP'&&d.options?.frameId===17));
+    storageListeners.forEach(fn=>fn({features:{newValue:{globalSpeed:false}}},'local'));
+    check('기능을 끄면 단축키 통과',!press('Period').defaultPrevented);
+    document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';worker.terminate();
+  })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});
+</script></body></html>

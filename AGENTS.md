@@ -15,6 +15,11 @@ Run JavaScript syntax checks with the bundled Node executable:
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check tools-core.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check player-tools.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check site-tools.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check chzzk-quality.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check media-speed.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check media-background.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check list-preview.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check preview-bridge.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --test tests/core.test.cjs
 Get-Content -LiteralPath 'manifest.json' -Raw | ConvertFrom-Json
 ```
@@ -31,6 +36,10 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/input-regression-harness.html` verifies limits, duplicate/repeat suppression, selection replacement and Enter/IME draft restoration.
 - `tests/site-player-harness.html` verifies search, favorites, adaptive catch-up and ad cleanup against simulated media.
 - `tests/search-suggestions-harness.html` verifies immediate channel results, merged English/Korean matches, cancellation, stale-response protection, cache and failure behavior.
+- `tests/search-native-harness.html` reproduces native Enter/button handlers and a stalled parallel response.
+- `tests/media-speed-harness.html` runs the actual background script in a worker and verifies speed, measured-FPS stepping, iframe routing and editable-field exclusions.
+- `tests/ad-quality-harness.html` verifies ad preparation/SDK mute isolation, post-ad audio restoration and native quality/notice controls.
+- `tests/list-preview-harness.html` verifies CHZZK HLS and SOOP native preview dispatch and cleanup using simulated playback.
 
 Do not type or send messages in a real CHZZK chat during agent verification. Real logged-in chat checks must be performed by the user:
 
@@ -56,3 +65,6 @@ Do not type or send messages in a real CHZZK chat during agent verification. Rea
 - Under fast repeats, Windows IME can reclassify a second leaked Korean character or U+FFFC object marker as ordinary `insertText` 2-6 ms after the blocked keydown. Guard that narrow post-keydown window, but mark extension-originated text insertion explicitly so user-configured text mappings are not rolled back.
 - Apply the six default shortcut rows only when settings are missing. An explicit `shortcuts: []` means the user deleted every row and must stay empty.
 - Do not replace physical-key `KeyboardEvent.code` mappings with layout-dependent `KeyboardEvent.key` mappings.
+- Scope ad mute event suppression to changes made by this extension on ad-container video elements. Never suppress the main video's volume events.
+- CHZZK handles Enter and search-button clicks directly; guarding only form submit misses both paths.
+- Do not report mock preview/quality tests as live verification. Official high-quality extension/login requirements remain in force.

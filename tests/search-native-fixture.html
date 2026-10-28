@@ -1,0 +1,17 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>Native search fixture</title><body>
+<form role="search"><input id="search-input"><button type="submit">검색</button></form>
+<script>
+  window.chrome={storage:{local:{get:async()=>({features:{koreanSearch:true,favorites:false}})},onChanged:{addListener:()=>{}}}};
+  window.fetch=async()=>({ok:true,json:async()=>({code:200,content:{data:[]}})});
+  function nativeSearch(e){e.preventDefault();location.assign('/search?native=1&query='+encodeURIComponent(document.querySelector('input').value));}
+  document.querySelector('input').addEventListener('keydown',e=>{if(e.key==='Enter')nativeSearch(e);});
+  document.querySelector('button').addEventListener('click',nativeSearch);
+</script><script src="../tools-core.js"></script>
+<script>document.write('<script src="'+(new URLSearchParams(location.search).has('baseline')?'../artifacts/site-tools-0.4.1.js':'../site-tools.js')+'"><\/script>');</script>
+<script>
+  setTimeout(()=>{
+    const input=document.querySelector('input');input.focus();input.value='rkdwl';input.dispatchEvent(new Event('input',{bubbles:true}));
+    if(new URLSearchParams(location.search).get('kind')==='button')document.querySelector('button').click();
+    else input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true,cancelable:true}));
+  },30);
+</script></body></html>

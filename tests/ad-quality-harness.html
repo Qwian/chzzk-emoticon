@@ -1,0 +1,37 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>광고 음소거와 최고 화질 회귀 검사</title>
+<body data-result="pending"><h1>광고만 음소거 · 최고 화질</h1>
+<main><div class="pzp"><video class="webplayer-internal-video" style="width:640px;height:360px"></video>
+<ul hidden><li class="pzp-ui-setting-quality-item pzp-ui-setting-pane-item--checked">480p</li><li class="pzp-ui-setting-quality-item">1080p(원본) 60fps</li><li class="pzp-ui-setting-quality-item" aria-disabled="true">2160p</li></ul></div>
+<div id="midAdPlayerWrapper" style="display:none"><div id="midAdVideoContainer"><video id="ad"></video></div></div>
+<div data-nlog-area="ad_blocking_info_layer">광고 차단 프로그램을 사용 중인가요?<button>확인</button></div><div id="other-alert" role="alert">다른 안내</div></main><pre id="result">pending</pre>
+<script>
+  const baseline=new URLSearchParams(location.search).has('baseline');history.replaceState(null,'','/live/'+'a'.repeat(32));
+  const listeners=[],features={catchUp:false,adMute:true,adSpeed:1,adMini:false,mainAudio:true,highestQuality:true,dismissAdNotice:true};
+  window.chrome={storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+  const main=document.querySelector('video'),ad=document.querySelector('#ad'),wrapper=document.querySelector('#midAdPlayerWrapper');
+  let ready=0,sharedMuted=false;
+  Object.defineProperties(main,{paused:{get:()=>false},readyState:{get:()=>4}});
+  Object.defineProperties(ad,{paused:{get:()=>false},ended:{get:()=>false},readyState:{get:()=>ready}});
+  main.muted=false;main.volume=.4;ad.muted=false;
+  ad.addEventListener('volumechange',()=>{if(wrapper.style.display!=='none'){sharedMuted=ad.muted;main.muted=sharedMuted;}});
+  document.querySelectorAll('.pzp-ui-setting-quality-item').forEach(item=>item.addEventListener('click',()=>{
+    document.querySelector('.pzp-ui-setting-pane-item--checked')?.classList.remove('pzp-ui-setting-pane-item--checked');item.classList.add('pzp-ui-setting-pane-item--checked');
+  }));
+</script><script src="/tools-core.js"></script>
+<script>document.write('<script src="'+(baseline?'/artifacts/player-tools-0.4.1.js':'/player-tools.js')+'"><\/script>');</script>
+<script src="/chzzk-quality.js"></script>
+<script>
+ (async()=>{
+  const results=[],check=(name,passed)=>results.push({name,passed}),delay=ms=>new Promise(r=>setTimeout(r,ms));
+  await delay(1200);wrapper.style.display='block';main.muted=true;await delay(1100);ready=4;await delay(1100);
+  check('광고 준비 중에도 본방의 이전 음소거 상태 보존',!main.muted);
+  check('광고 음소거 이벤트가 전체 음소거로 전달되지 않음',ad.muted&&!sharedMuted);
+  wrapper.style.display='none';await delay(1100);
+  check('광고 종료 뒤 본방 소리가 유지됨',!main.muted&&!ad.muted&&main.volume===.4);
+  check('선택 가능한 최고 화질 선택, 잠긴 화질 제외',document.querySelector('.pzp-ui-setting-pane-item--checked').textContent.includes('1080p'));
+  check('광고 차단 안내만 숨김',document.querySelector('[data-nlog-area]').style.display==='none'&&document.querySelector('#other-alert').style.display!=='none');
+  listeners.forEach(fn=>fn({features:{newValue:{...features,dismissAdNotice:false}}},'local'));
+  check('안내 숨김 설정을 끄면 복원',document.querySelector('[data-nlog-area]').style.display==='');
+  document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+ })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});
+</script></body></html>

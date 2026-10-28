@@ -359,6 +359,7 @@ async function initialize() {
 
   if (settings.diagnostics) await syncDiagnosticsWithActiveTab();
   await initializeFeatures();
+  await initializeVersionStatus();
 }
 
 async function initializeFeatures() {
@@ -373,6 +374,10 @@ async function initializeFeatures() {
   let features = core.features(stored.features);
   const controls = new Map();
   const labels = {
+    globalSpeed: "모든 사이트 속도·프레임 단축키",
+    listPreview: "치지직·숲 목록 우클릭 소리 미리보기",
+    highestQuality: "치지직에서 선택 가능한 최고 화질 자동 선택",
+    dismissAdNotice: "치지직 광고 차단 안내 숨김",
     koreanSearch: "영타로 입력해도 스트리머 바로 찾기",
     favorites: "팔로우와 별개인 즐겨찾기",
     catchUp: "끊김에 맞춰 조절하는 자동 실시간 따라잡기",
@@ -399,7 +404,7 @@ async function initializeFeatures() {
   speed.addEventListener("change", () => saveFeature("adSpeed", Number(speed.value)));
   const note = document.createElement("p");
   note.className = "intro";
-  note.textContent = "치즈 플래터의 실시간 따라잡기는 끄고 사용하세요. 광고 처리는 지원되는 플레이어에 적용됩니다. 본방 소리는 기존에 켜져 있고 오디오가 제공될 때 유지합니다. 단축키는 한 번 누를 때 한 번 입력하며 이모티콘은 최대 10개입니다.";
+  note.textContent = ", / . : 0.1배 감소 / 증가 · / : 1배 · Shift+, / Shift+. : 이전 / 다음 프레임. 입력창에서는 작동하지 않습니다. FPS를 아직 읽지 못했으면 30fps로 추정합니다. 썸네일 우클릭으로 소리 미리보기, 다시 우클릭하거나 마우스를 빼면 종료합니다. 치즈 플래터의 자동 따라잡기는 끄고 사용하세요. 고화질 설치·로그인 조건과 실제 광고 차단 프로그램 설정은 자동 변경하지 않습니다.";
   panel.append(note); diagnosticsPanel.before(panel);
   async function saveFeature(key, value) {
     try {
@@ -417,6 +422,20 @@ async function initializeFeatures() {
       else control.value = String(features[key]);
     }
   });
+}
+
+async function initializeVersionStatus() {
+  const element = document.createElement("p"); element.className = "footnote"; element.id = "version-status";
+  document.querySelector("main").append(element);
+  const codeVersion = globalThis.ChzzkTools?.version || "";
+  const installed = chrome.runtime?.getManifest?.().version || codeVersion;
+  if (installed !== codeVersion) { element.textContent = `설치 ${installed} · 소스 ${codeVersion} — 확장을 다시 로드하세요.`; return; }
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const result = tab?.id ? await chrome.tabs.sendMessage(tab.id, { type: "GET_TOOL_STATUS" }) : null;
+    element.textContent = result?.codeVersion === codeVersion ? `확장 ${installed} · 페이지 ${result.codeVersion} 연결됨` :
+      `확장 ${installed} · 페이지를 새로고침해야 합니다.`;
+  } catch { element.textContent = `확장 ${installed} · 페이지 연결 없음 (페이지 새로고침 필요)`; }
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {

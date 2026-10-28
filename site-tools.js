@@ -5,6 +5,7 @@
   let settings = core.features(), favorites = [], currentPath = location.pathname, playerStatus = "플레이어 대기";
   const host = document.createElement("div");
   host.id = "chzzk-tools-panel";
+  host.dataset.codeVersion = core.version;
   const shadow = host.attachShadow({ mode: "open" });
   shadow.innerHTML = `<style>
     :host{position:fixed;bottom:16px;left:16px;z-index:10000;font:12px/1.6 system-ui;color:#eef5f1}
@@ -149,41 +150,50 @@
       const controller = new AbortController();
       searchAbort = controller;
       const timeout = window.setTimeout(() => controller.abort(), 4000);
-      // CORS permits the CHZZK page origin. No cookies, login tokens or new host permission are needed.
-      const responses = await Promise.allSettled([converted, original].map(query => findChannels(query, controller.signal)));
-      window.clearTimeout(timeout);
-      if (generation !== searchGeneration || input.value.trim() !== original || !settings.koreanSearch) return;
-      const channels = new Map();
-      for (const response of responses) if (response.status === "fulfilled") {
-        for (const row of response.value) if (!channels.has(row.channelId)) channels.set(row.channelId, row);
+      const responses = [null, null];
+      function renderResults() {
+        if (generation !== searchGeneration || input.value.trim() !== original || !settings.koreanSearch) return;
+        const selectedHref = searchRows[selectedSearchRow]?.href;
+        const channels = new Map();
+        for (const response of responses) if (response?.status === "fulfilled") {
+          for (const row of response.value) if (!channels.has(row.channelId)) channels.set(row.channelId, row);
+        }
+        searchRows = [...channels.values()].slice(0, 8).map((channel, index) => {
+          const link = document.createElement("a");
+          link.id = `chzzk-tools-channel-${index}`;
+          link.href = channel.openLive ? `/live/${channel.channelId}` : `/${channel.channelId}`;
+          link.setAttribute("role", "option");
+          link.setAttribute("aria-selected", "false");
+          link.style.cssText = "display:flex;align-items:center;gap:10px;padding:9px 8px;color:#effff4;text-decoration:none;border-radius:5px";
+          if (typeof channel.channelImageUrl === "string" && channel.channelImageUrl.startsWith("https://")) {
+            const image = document.createElement("img");
+            image.src = channel.channelImageUrl; image.alt = ""; image.width = image.height = 28;
+            image.style.cssText = "border-radius:50%;object-fit:cover";
+            link.append(image);
+          }
+          const name = document.createElement("span"); name.textContent = channel.channelName;
+          link.append(name);
+          if (channel.openLive) {
+            const live = document.createElement("span"); live.textContent = "LIVE";
+            live.style.cssText = "margin-left:auto;color:#00ffa3;font-size:10px"; link.append(live);
+          }
+          link.addEventListener("pointerenter", () => selectSearchRow(index));
+          return link;
+        });
+        list.replaceChildren(...searchRows);
+        selectSearchRow(selectedHref ? searchRows.findIndex(row => row.href === selectedHref) : -1);
+        const pending = responses.some(response => response === null);
+        const failed = responses.every(response => response?.status === "rejected");
+        message.textContent = searchRows.length ? `${converted} · 스트리머` : pending ? `${converted} · 스트리머 검색 중…` :
+          failed ? "검색 연결을 확인해 주세요. 아래 전체 검색도 사용할 수 있습니다." : "일치하는 스트리머가 없습니다.";
       }
-      searchRows = [...channels.values()].slice(0, 8).map((channel, index) => {
-        const link = document.createElement("a");
-        link.id = `chzzk-tools-channel-${index}`;
-        link.href = channel.openLive ? `/live/${channel.channelId}` : `/${channel.channelId}`;
-        link.setAttribute("role", "option");
-        link.setAttribute("aria-selected", "false");
-        link.style.cssText = "display:flex;align-items:center;gap:10px;padding:9px 8px;color:#effff4;text-decoration:none;border-radius:5px";
-        if (typeof channel.channelImageUrl === "string" && channel.channelImageUrl.startsWith("https://")) {
-          const image = document.createElement("img");
-          image.src = channel.channelImageUrl; image.alt = ""; image.width = image.height = 28;
-          image.style.cssText = "border-radius:50%;object-fit:cover";
-          link.append(image);
-        }
-        const name = document.createElement("span");
-        name.textContent = channel.channelName;
-        link.append(name);
-        if (channel.openLive) {
-          const live = document.createElement("span"); live.textContent = "LIVE";
-          live.style.cssText = "margin-left:auto;color:#00ffa3;font-size:10px"; link.append(live);
-        }
-        link.addEventListener("pointerenter", () => selectSearchRow(index));
-        return link;
-      });
-      list.replaceChildren(...searchRows);
-      const failed = responses.every(response => response.status === "rejected");
-      message.textContent = searchRows.length ? `${converted} · 스트리머` :
-        failed ? "검색 연결을 확인해 주세요. 아래 전체 검색도 사용할 수 있습니다." : "일치하는 스트리머가 없습니다.";
+      // CORS permits the CHZZK page origin. No cookies, login tokens or new host permission are needed.
+      await Promise.allSettled([converted, original].map(async (query, index) => {
+        try { responses[index] = { status: "fulfilled", value: await findChannels(query, controller.signal) }; }
+        catch { responses[index] = { status: "rejected" }; }
+        renderResults();
+      }));
+      window.clearTimeout(timeout);
     }, 180);
   }
   function selectSearchRow(index) {
@@ -200,8 +210,10 @@
     if (e.target.id === "search-input") updateSearch(e.target);
   }, true);
   document.addEventListener("keydown", event => {
-    if (event.target !== searchInput || searchHint.style.display === "none") return;
+    if (event.target.id !== "search-input") return;
     if (event.isComposing || event.keyCode === 229 || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.key === "Enter" && selectedSearchRow < 0 && submitConverted(event, event.target)) return;
+    if (event.target !== searchInput || searchHint.style.display === "none") return;
     if (event.key === "Escape") { cancelSearch(); return; }
     if (searchRows.length && ["ArrowDown", "ArrowUp"].includes(event.key)) {
       event.preventDefault(); event.stopImmediatePropagation();
@@ -220,13 +232,20 @@
   document.addEventListener("pointerdown", e => {
     if (e.target.id !== "search-input" && !searchHint.contains(e.target)) cancelSearch();
   });
-  document.addEventListener("submit", event => {
-    const input = event.target.querySelector?.("#search-input");
-    if (!input || !settings.koreanSearch || !/^[a-z\s]+$/i.test(input.value.trim())) return;
+  function submitConverted(event, input) {
+    if (!input || !settings.koreanSearch || !/^[a-z\s]+$/i.test(input.value.trim())) return false;
     const converted = core.koreanFromEnglish(input.value.trim());
-    if (!/[가-힣]/.test(converted)) return;
+    if (!/[가-힣]/.test(converted)) return false;
     event.preventDefault(); event.stopImmediatePropagation();
     location.assign(`/search?query=${encodeURIComponent(converted)}`);
+    return true;
+  }
+  document.addEventListener("click", event => {
+    const button = event.target.closest?.("button[type='submit'], input[type='submit']");
+    if (button) submitConverted(event, button.form?.querySelector("#search-input"));
+  }, true);
+  document.addEventListener("submit", event => {
+    submitConverted(event, event.target.querySelector?.("#search-input"));
   }, true);
   chrome.storage.local.get(["features", "favorites"]).then(data => {
     settings = core.features(data.features);
