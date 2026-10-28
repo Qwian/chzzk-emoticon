@@ -1,4 +1,6 @@
 (() => {
+  if (globalThis.__chzzkCapsContentInstalled) return;
+  globalThis.__chzzkCapsContentInstalled = true;
   const LEGACY_KEY_LABELS = {
     Minus: "-",
     Equal: "=",
@@ -162,6 +164,23 @@
   }
 
   function insertText(input, text) {
+    const count = value => (value.match(/\{:[^{}]+:}/g) || []).length;
+    let projected;
+    if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+      projected = count(input.value.slice(0, input.selectionStart ?? input.value.length) + text +
+        input.value.slice(input.selectionEnd ?? input.value.length));
+    } else {
+      const selection = window.getSelection();
+      const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      const selected = document.createElement("div");
+      if (range && input.contains(range.commonAncestorContainer)) selected.append(range.cloneContents());
+      projected = input.querySelectorAll("img").length + count(input.textContent) -
+        selected.querySelectorAll("img").length - count(selected.textContent) + count(text);
+    }
+    if (projected > 10) {
+      showToast("이모티콘은 한 메시지에 최대 10개까지 입력할 수 있습니다.", "error");
+      return;
+    }
     document.dispatchEvent(new CustomEvent(EXTENSION_INPUT_EVENT, {
       detail: { active: true }
     }));
@@ -187,16 +206,24 @@
       }
 
       const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(input);
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      document.execCommand("insertText", false, text);
-      input.dispatchEvent(new InputEvent("input", {
-        bubbles: true,
-        inputType: "insertText",
-        data: text
+      const currentRange = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      if (!currentRange || !input.contains(currentRange.commonAncestorContainer)) {
+        const range = document.createRange();
+        range.selectNodeContents(input);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      let emittedInput = false;
+      const observe = () => { emittedInput = true; };
+      input.addEventListener("input", observe, { once: true });
+      try {
+        document.execCommand("insertText", false, text);
+      } finally {
+        input.removeEventListener("input", observe);
+      }
+      if (!emittedInput) input.dispatchEvent(new InputEvent("input", {
+        bubbles: true, inputType: "insertText", data: text
       }));
     } finally {
       document.dispatchEvent(new CustomEvent(EXTENSION_INPUT_EVENT, {
@@ -321,6 +348,7 @@
   }
 
   document.addEventListener(SHORTCUT_EVENT, async (event) => {
+    if (event.detail?.repeat) return;
     const shortcut = settings.shortcuts.find(({ code }) => code === event.detail?.code);
     if (!settings.enabled || !shortcut) return;
     const mapping = shortcut.mapping;

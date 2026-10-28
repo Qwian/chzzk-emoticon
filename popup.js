@@ -358,6 +358,65 @@ async function initialize() {
   });
 
   if (settings.diagnostics) await syncDiagnosticsWithActiveTab();
+  await initializeFeatures();
+}
+
+async function initializeFeatures() {
+  if (!globalThis.ChzzkTools) return;
+  const core = globalThis.ChzzkTools;
+  const panel = document.createElement("details");
+  panel.className = "diagnostics feature-panel";
+  const summary = document.createElement("summary");
+  summary.textContent = "검색 · 즐겨찾기 · 플레이어 설정";
+  panel.append(summary);
+  const stored = await chrome.storage.local.get("features");
+  let features = core.features(stored.features);
+  const controls = new Map();
+  const labels = {
+    koreanSearch: "영타를 한글로 변환해 검색 (원문 검색 제공)",
+    favorites: "팔로우와 별개인 즐겨찾기",
+    catchUp: "끊김에 맞춰 조절하는 자동 실시간 따라잡기",
+    adMute: "광고 자동 음소거",
+    adMini: "본방이 재생 중이면 광고를 우측 상단에 작게",
+    mainAudio: "광고 중 본방의 기존 소리 유지"
+  };
+  for (const [key, text] of Object.entries(labels)) {
+    const label = document.createElement("label"), input = document.createElement("input");
+    label.className = "send-option";
+    input.type = "checkbox"; input.checked = Boolean(features[key]); input.id = `feature-${key}`;
+    label.append(input, document.createTextNode(text)); panel.append(label); controls.set(key, input);
+    input.addEventListener("change", () => saveFeature(key, input.checked));
+  }
+  const speedLabel = document.createElement("label"), speed = document.createElement("select");
+  speedLabel.className = "send-option"; speedLabel.append(document.createTextNode("광고 재생 속도 "));
+  speed.id = "feature-adSpeed";
+  for (const value of [1, 2, 4, 8, 16]) {
+    const option = document.createElement("option");
+    option.value = String(value); option.textContent = value === 1 ? "원래 속도" : `${value}배`;
+    speed.append(option);
+  }
+  speed.value = String(features.adSpeed); speedLabel.append(speed); panel.append(speedLabel); controls.set("adSpeed", speed);
+  speed.addEventListener("change", () => saveFeature("adSpeed", Number(speed.value)));
+  const note = document.createElement("p");
+  note.className = "intro";
+  note.textContent = "치즈 플래터의 실시간 따라잡기는 끄고 사용하세요. 광고 처리는 지원되는 플레이어에 적용됩니다. 본방 소리는 기존에 켜져 있고 오디오가 제공될 때 유지합니다. 단축키는 한 번 누를 때 한 번 입력하며 이모티콘은 최대 10개입니다.";
+  panel.append(note); diagnosticsPanel.before(panel);
+  async function saveFeature(key, value) {
+    try {
+      const latest = await chrome.storage.local.get("features");
+      features = core.features({ ...latest.features, [key]: value });
+      await chrome.storage.local.set({ features });
+      setStatus("기능 설정을 저장했습니다.");
+    } catch { setStatus("기능 설정을 저장하지 못했습니다.", true); }
+  }
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !changes.features) return;
+    features = core.features(changes.features.newValue);
+    for (const [key, control] of controls) {
+      if (control.type === "checkbox") control.checked = Boolean(features[key]);
+      else control.value = String(features[key]);
+    }
+  });
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {

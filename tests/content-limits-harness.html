@@ -1,0 +1,35 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>문자 매핑과 입력 범위 테스트</title>
+<body data-result="pending"><h1>문자 매핑과 입력 범위 테스트</h1>
+<aside id="aside-chatting"><pre id="editor" contenteditable="true" style="width:400px;min-height:40px"></pre></aside>
+<input id="ordinary" aria-label="일반 검색창"><pre id="result"></pre>
+<script>
+  const settings={enabled:true,shortcuts:[
+    {id:'many',code:'KeyQ',mapping:{type:'text',value:'{:x:}'.repeat(11)}},
+    {id:'one',code:'KeyW',mapping:{type:'text',value:'{:x:}'}},
+    {id:'text',code:'KeyT',mapping:{type:'text',value:'테스트'}}
+  ]};
+  window.chrome={storage:{local:{get:async()=>({settings}),set:async()=>{}},onChanged:{addListener:()=>{}}},runtime:{onMessage:{addListener:()=>{}}}};
+</script><script src="../page-bridge.js"></script><script src="../content.js"></script>
+<script>
+  (async()=>{
+    const editor=document.querySelector('#editor'),results=[];
+    const delay=()=>new Promise(r=>setTimeout(r,30));
+    const check=(name,passed)=>results.push({name,passed});
+    function press(code,caps=true){const e=new KeyboardEvent('keydown',{key:'Process',code,bubbles:true,cancelable:true});Object.defineProperty(e,'getModifierState',{value:()=>caps});document.activeElement.dispatchEvent(e);return e;}
+    function selectAll(){const r=document.createRange();r.selectNodeContents(editor);getSelection().removeAllRanges();getSelection().addRange(r);}
+    await delay();editor.focus();press('KeyQ');await delay();
+    check('문자 매핑으로 11개 코드 입력도 차단',editor.textContent==='');
+    editor.textContent='{:x:}'.repeat(10);getSelection().collapse(editor,editor.childNodes.length);press('KeyW');await delay();
+    check('기존 코드와 새 문자 매핑 합산',editor.textContent==='{:x:}'.repeat(10));
+    selectAll();press('KeyW');await delay();
+    check('선택한 문자 코드 교체 허용',editor.textContent==='{:x:}');
+    editor.replaceChildren();getSelection().collapse(editor,0);let inputs=0;
+    editor.addEventListener('input',()=>inputs++);press('KeyT');await delay();
+    check('문자 매핑은 input 이벤트 한 번만 발생',inputs===1&&editor.textContent==='테스트');
+    check('Caps Lock이 꺼지면 가로채지 않음',!press('KeyT',false).defaultPrevented);
+    document.querySelector('#ordinary').focus();
+    check('일반 입력창에서 매핑 키 가로채지 않음',!press('KeyT').defaultPrevented);
+    document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+    document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+  })();
+</script></body></html>

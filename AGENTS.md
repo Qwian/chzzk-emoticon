@@ -12,6 +12,10 @@ Run JavaScript syntax checks with the bundled Node executable:
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check content.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check page-bridge.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check popup.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check tools-core.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check player-tools.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check site-tools.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --test tests/core.test.cjs
 Get-Content -LiteralPath 'manifest.json' -Raw | ConvertFrom-Json
 ```
 
@@ -24,8 +28,10 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/bridge-harness.html` verifies direct native-emote insertion.
 - `tests/content-shortcut-harness.html` verifies dynamic shortcut dispatch.
 - `tests/popup-harness.html` verifies the icon preview and bounded scrolling UI; add `?legacy` to verify old mapping migration.
+- `tests/input-regression-harness.html` verifies limits, duplicate/repeat suppression, selection replacement and Enter/IME draft restoration.
+- `tests/site-player-harness.html` verifies search, favorites, adaptive catch-up and ad cleanup against simulated media.
 
-Then verify on a logged-in CHZZK live page:
+Do not type or send messages in a real CHZZK chat during agent verification. Real logged-in chat checks must be performed by the user:
 
 1. Save a text mapping and confirm Caps Lock plus its physical key inserts it into chat.
 2. Capture a native CHZZK emote and confirm the same shortcut selects it again.

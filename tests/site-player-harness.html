@@ -1,0 +1,63 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>치지직 편의 도구 테스트</title>
+<body data-result="pending"><h1>검색·즐겨찾기·플레이어 모의 테스트</h1>
+<form role="search"><input id="search-input" aria-label="검색창"><button>검색</button></form>
+<a id="channel" href="/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">테스트 채널</a>
+<div style="position:relative;width:640px;height:360px;background:#26392c">
+  <div class="webplayer-internal-source-wrapper"><video class="webplayer-internal-video" style="width:640px;height:360px"></video></div>
+  <div id="midAdPlayerWrapper" style="display:none;position:absolute;inset:0">
+    <video id="midPlayer"></video><div id="midAdVideoContainer"><video id="ad"></video></div>
+  </div>
+</div><pre id="result">pending</pre>
+<script>
+  history.replaceState(null,'','/live/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+  const results = [], check = (name, passed) => results.push({name,passed});
+  const listeners = [], state = {features:{adSpeed:4}, favorites:[]};
+  window.chrome = {storage:{local:{
+    get:async()=>structuredClone(state),set:async values=>{const changes={};for(const [k,v] of Object.entries(values)){changes[k]={oldValue:state[k],newValue:v};state[k]=v;}listeners.forEach(fn=>fn(changes,'local'));}
+  },onChanged:{addListener:fn=>listeners.push(fn)}}};
+  const main = document.querySelector('video.webplayer-internal-video'), ad = document.querySelector('#ad');
+  let now = 100000, current = 50;
+  Object.defineProperty(performance,'now',{value:()=>now});
+  const range = (start,end)=>({length:1,start:()=>start,end:()=>end});
+  for(const v of [main,ad]) {
+    Object.defineProperties(v,{paused:{configurable:true,get:()=>false},ended:{get:()=>false},readyState:{get:()=>4}});
+  }
+  Object.defineProperties(main,{
+    currentTime:{get:()=>current,set:v=>current=v},seekable:{get:()=>range(0,100)},buffered:{get:()=>range(0,100)}
+  });
+  main.muted=false;main.volume=.4;
+  const delay = ms=>new Promise(resolve=>setTimeout(resolve,ms));
+</script>
+<script src="/tools-core.js"></script><script src="/player-tools.js"></script><script src="/site-tools.js"></script>
+<script>
+  (async()=>{
+    await delay(1200);
+    const panel = document.querySelector('#chzzk-tools-panel').shadowRoot;
+    panel.querySelector('details').open=true;
+    panel.querySelector('#favorite-add').click(); await delay(50);
+    check('팔로우 없이 즐겨찾기 저장',state.favorites[0]?.id==='a'.repeat(32)&&panel.querySelector('li a')?.textContent==='테스트 채널');
+    const search=document.querySelector('#search-input'); search.value='rkdwl';search.dispatchEvent(new Event('input',{bubbles:true}));
+    check('영타 검색과 영문 원문 검색 모두 표시',document.querySelector('#chzzk-tools-search-hint').textContent.includes('강지 검색')&&document.querySelector('#chzzk-tools-search-hint a:last-child').getAttribute('href').includes('rkdwl'));
+    panel.querySelector('#catch-now').click();
+    check('이동 가능한 최신 버퍼 안으로 따라잡기',Math.abs(current-98.5)<.01);
+    main.dispatchEvent(new Event('waiting')); now+=1000; await delay(1100);
+    check('끊김 후 즉시 다시 당기지 않음',panel.querySelector('#player-status').textContent.includes('버퍼 회복'));
+    document.querySelector('#midAdPlayerWrapper').style.display='block';
+    main.muted=true;now+=1000;await delay(1100);
+    check('광고만 음소거와 4배속',ad.muted&&ad.playbackRate===4&&document.querySelector('#midPlayer').playbackRate===1);
+    check('본방 기존 소리 복구와 광고 미니 배치',!main.muted&&main.volume===.4&&document.querySelector('#midAdPlayerWrapper').classList.contains('chzzk-tools-ad-mini'));
+    document.querySelector('#midAdPlayerWrapper').style.display='none';now+=1000;await delay(1100);
+    check('광고 종료 뒤 속도 음소거 배치 원복',ad.playbackRate===1&&!ad.muted&&!main.muted&&!document.querySelector('.chzzk-tools-ad-mini'));
+    const catchToggle=panel.querySelector('#catch-up');catchToggle.checked=false;catchToggle.dispatchEvent(new Event('change'));await delay(50);
+    check('기능별 설정 저장',state.features.catchUp===false);
+    main.muted=true;
+    now+=1000;await delay(1100);
+    document.querySelector('#midAdPlayerWrapper').style.display='block';
+    now+=1000;await delay(1100);
+    check('사용자가 미리 음소거한 본방을 켜지 않음',main.muted);
+    history.replaceState(null,'','/video/123');now+=1000;await delay(1100);
+    check('VOD 이동 시 광고 처리와 속도 복구',ad.playbackRate===1&&!ad.muted&&!document.querySelector('.chzzk-tools-ad-mini')&&main.playbackRate===1);
+    document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+    document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+  })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});
+</script></body></html>

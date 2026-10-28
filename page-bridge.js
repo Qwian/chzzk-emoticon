@@ -13,6 +13,32 @@
   let imeGuard = null;
   let diagnosticsEnabled = false;
   let extensionInputDepth = 0;
+  const MAX_EMOTES = 10;
+  const handledRequests = new Set();
+
+  function clearImeGuard() {
+    if (!imeGuard) return;
+    window.clearTimeout(imeGuard.cleanupTimer);
+    imeGuard.observer.disconnect();
+    imeGuard = null;
+  }
+
+  function countEmotes(root) {
+    return root.querySelectorAll("img").length +
+      (root.textContent.match(/\{:[^{}]+:}/g) || []).length;
+  }
+
+  function resultingEmoteCount(editor) {
+    const copy = editor.cloneNode(true);
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    // Count selection fragments using the same representation as the full editor.
+    const selected = document.createElement("div");
+    if (range && editor.contains(range.commonAncestorContainer)) {
+      selected.append(range.cloneContents());
+    }
+    return countEmotes(copy) - countEmotes(selected) + 1;
+  }
 
   function debug(type, event = null, extra = {}) {
     if (!diagnosticsEnabled) return;
@@ -24,7 +50,7 @@
         code: event?.code || "",
         key: event?.key || "",
         inputType: event?.inputType || "",
-        data: typeof event?.data === "string" ? event.data.slice(0, 16) : null,
+        dataLength: typeof event?.data === "string" ? event.data.length : null,
         composing: Boolean(event?.isComposing),
         cancelable: Boolean(event?.cancelable),
         prevented: Boolean(event?.defaultPrevented),
@@ -229,6 +255,9 @@
   }, true);
 
   window.addEventListener("keydown", (event) => {
+    if (imeGuard && !["ShiftLeft", "ShiftRight", "CapsLock"].includes(event.code) &&
+        (!shortcutCodes.has(event.code) || !event.getModifierState("CapsLock") ||
+         event.ctrlKey || event.altKey || event.metaKey)) clearImeGuard();
     if (
       event.ctrlKey ||
       event.altKey ||
@@ -248,7 +277,7 @@
     event.stopImmediatePropagation();
     armImeGuard(editor, event.code);
     debug("keydown-blocked", event, { repeat: event.repeat });
-    dispatchShortcut(event.code, event.repeat);
+    if (!event.repeat) dispatchShortcut(event.code, false);
   }, true);
 
   window.addEventListener("keyup", (event) => {
@@ -269,6 +298,8 @@
   }
 
   window.addEventListener("input", observeInput, true);
+  window.addEventListener("pointerdown", clearImeGuard, true);
+  window.addEventListener("blur", clearImeGuard, true);
 
   document.addEventListener(INSERT_EVENT, (event) => {
     const { requestId, code, imageUrl } = event.detail || {};
@@ -276,6 +307,9 @@
       respond(requestId, false, "이모티콘 코드가 올바르지 않습니다.");
       return;
     }
+    if (handledRequests.has(requestId)) return;
+    handledRequests.add(requestId);
+    if (handledRequests.size > 256) handledRequests.delete(handledRequests.values().next().value);
 
     let parsedUrl;
     try {
@@ -297,6 +331,10 @@
     }
 
     const emojiId = code.slice(2, -2);
+    if (resultingEmoteCount(editor) > MAX_EMOTES) {
+      respond(requestId, false, "이모티콘은 한 메시지에 최대 10개까지 입력할 수 있습니다.");
+      return;
+    }
     const image = document.createElement("img");
     image.src = parsedUrl.href;
     image.alt = code;

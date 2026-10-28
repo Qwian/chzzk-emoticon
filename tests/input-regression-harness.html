@@ -1,0 +1,48 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>채팅 입력 회귀 테스트</title>
+<body data-result="pending"><h1>외부 전송 없는 모의 채팅 테스트</h1>
+<aside id="aside-chatting"><pre id="editor" contenteditable="true" style="width:400px;min-height:40px"></pre></aside><pre id="result"></pre>
+<script>
+  const baseline = new URLSearchParams(location.search).has('baseline');
+  document.write('<script src="' + (baseline ? '../artifacts/baseline-bridge.js' : '../page-bridge.js') + '"><\/script>');
+</script>
+<script>
+  const editor = document.querySelector('#editor'), results = [];
+  const check = (name, passed) => results.push({name, passed});
+  let serial = 0, response;
+  document.addEventListener('chzzk-caps-emote:result', e => response = e.detail);
+  const insert = (requestId = String(++serial)) => {
+    response = null;
+    document.dispatchEvent(new CustomEvent('chzzk-caps-emote:insert', {detail:{requestId,code:'{:test:}',imageUrl:'https://ssl.pstatic.net/test.png'}}));
+    return response;
+  };
+  const endCaret = () => { const r = document.createRange(); r.selectNodeContents(editor);r.collapse(false);getSelection().removeAllRanges();getSelection().addRange(r); };
+  editor.focus();
+  // Native-picker images (without extension alt attributes) and raw codes both count.
+  editor.innerHTML = '<img src="https://ssl.pstatic.net/normal.png">'.repeat(6) + '{:raw:}'.repeat(4);
+  endCaret();
+  check('11번째 이모티콘 차단', insert()?.ok === false && editor.querySelectorAll('img').length === 6);
+  const selection = document.createRange(); selection.selectNode(editor.querySelector('img'));
+  getSelection().removeAllRanges();getSelection().addRange(selection);
+  check('10개에서 선택한 이모티콘 교체 허용', insert()?.ok === true && editor.querySelectorAll('img').length === 6);
+  editor.replaceChildren(); endCaret(); insert('same-request'); insert('same-request');
+  check('동일 요청 중복 삽입 차단', editor.querySelectorAll('img').length === 1);
+  editor.textContent = '남아 있으면 안 되는 모의 문장'; endCaret();
+  document.dispatchEvent(new CustomEvent('chzzk-caps-emote:config',{detail:{codes:['KeyQ']}}));
+  let shortcuts = 0;
+  document.addEventListener('chzzk-caps-emote:shortcut', () => { shortcuts++; insert(); });
+  function key(code, repeat=false) {
+    const e = new KeyboardEvent('keydown',{key:code==='Enter'?'Enter':'Process',code,bubbles:true,cancelable:true,repeat});
+    Object.defineProperty(e,'getModifierState',{value:n=>n==='CapsLock'});editor.dispatchEvent(e); return e;
+  }
+  key('KeyQ'); key('KeyQ',true);
+  check('길게 누르기 중복 삽입 없음', shortcuts === 1);
+  // The mock site's Enter handler clears the draft, just as a successful site send would.
+  // No network/socket or real chat service exists in this harness.
+  const enter = key('Enter');
+  editor.replaceChildren();
+  editor.append('ㅂ');
+  editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertCompositionText',data:'ㅂ',isComposing:true}));
+  check('Enter 뒤 늦은 IME 이벤트가 이전 문장을 복원하지 않음', !enter.defaultPrevented && !editor.textContent.includes('모의 문장') && editor.querySelectorAll('img').length === 0);
+  document.body.dataset.result = results.every(r=>r.passed)?'pass':'fail';
+  document.querySelector('#result').textContent = JSON.stringify(results,null,2);
+</script></body></html>

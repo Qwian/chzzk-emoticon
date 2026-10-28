@@ -12,6 +12,8 @@
 body {
   width: 390px;
   margin: 0;
+  max-height: 590px;
+  overflow-y: auto;
   background:
     radial-gradient(circle at 90% 0%, rgba(0, 255, 163, 0.14), transparent 35%),
     #0e1110;
@@ -307,3 +309,6 @@ button:hover {
   font-size: 10px;
   line-height: 1.5;
 }
+
+.feature-panel { border-top: 1px solid #343c38; padding-top: 12px; }
+.feature-panel select { background: #1d2922; color: #eef5f1; border: 1px solid #4a6052; padding: 4px; border-radius: 5px; }

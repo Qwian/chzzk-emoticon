@@ -11,7 +11,7 @@
       <header>
         <div>
           <p class="eyebrow">CHZZK QUICK EMOTE</p>
-          <h1>Caps Lock 이모티콘</h1>
+          <h1>치지직 편의 도구</h1>
         </div>
         <label class="switch"><input id="enabled" type="checkbox" /><span></span></label>
       </header>
@@ -61,16 +61,25 @@
                 }
               }
             : { enabled: true, shortcuts };
-      let storageChangeListener;
+      const storageChangeListeners = [];
+      const storageChangeListener = (...args) => storageChangeListeners.forEach(listener => listener(...args));
+      window.savedFeatures = {};
       window.savedDiagnosticLog = [];
       window.chrome = {
         storage: {
           local: {
             get: async () => ({
               settings: window.savedSettings,
-              diagnosticLog: window.savedDiagnosticLog
+              diagnosticLog: window.savedDiagnosticLog,
+              features: window.savedFeatures
             }),
             set: async (values) => {
+              if (Object.hasOwn(values, "features")) {
+                const oldValue = window.savedFeatures;
+                window.savedFeatures = values.features;
+                document.body.dataset.savedAdSpeed = String(values.features.adSpeed);
+                storageChangeListener({ features: { oldValue, newValue: values.features } }, "local");
+              }
               if (Object.hasOwn(values, "diagnosticLog")) {
                 window.savedDiagnosticLog = values.diagnosticLog;
               }
@@ -88,7 +97,7 @@
             }
           },
           onChanged: {
-            addListener: (listener) => { storageChangeListener = listener; }
+            addListener: (listener) => { storageChangeListeners.push(listener); }
           }
         },
         tabs: {
@@ -115,6 +124,7 @@
         );
       });
     </script>
+    <script src="../tools-core.js"></script>
     <script src="../popup.js"></script>
   </body>
 </html>
