@@ -434,9 +434,16 @@ async function initializeVersionStatus() {
   if (installed !== codeVersion) { element.textContent = `설치 ${installed} · 소스 ${codeVersion} — 확장을 다시 로드하세요.`; return; }
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const result = tab?.id ? await chrome.tabs.sendMessage(tab.id, { type: "GET_TOOL_STATUS" }) : null;
+    const result = tab?.id ? await chrome.tabs.sendMessage(tab.id, { type: "GET_TOOL_STATUS" }, { frameId: 0 }) : null;
     element.textContent = result?.codeVersion === codeVersion ? `확장 ${installed} · 페이지 ${result.codeVersion} 연결됨` :
       `확장 ${installed} · 페이지를 새로고침해야 합니다.`;
+    if (result?.quality) {
+      const q = result.quality;
+      element.textContent += ` · 화질 응답 ${q.metadataResponses} / 보정 ${q.repairs}` +
+        (result.videoHeight ? ` · 실제 ${result.videoHeight}p` : "");
+      if (!q.enabled) element.textContent += " · 화질 보정 꺼짐";
+      if (q.reason === "hook-unavailable") element.textContent += " · 화질 연결 실패";
+    }
   } catch { element.textContent = `확장 ${installed} · 페이지 연결 없음 (페이지 새로고침 필요)`; }
 }
 

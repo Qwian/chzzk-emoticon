@@ -1,0 +1,37 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>재생정보 터널·자체 파서 회귀 검사</title>
+<body data-result="pending"><h1>화질 메타데이터 · 복호화 경로</h1><pre id="result">pending</pre>
+<script>
+const params=new URLSearchParams(location.search),baseline=params.has('baseline');
+const settingsListeners=[];
+window.chrome={storage:{local:{get:async()=>({features:{adblockQuality:true}})},onChanged:{addListener:fn=>settingsListeners.push(fn)}}};
+const capturedParse=JSON.parse;
+window.chzzkNativeParse=bytes=>capturedParse(new TextDecoder().decode(bytes));
+const results=[],check=(name,passed)=>results.push({name,passed});
+</script><script>
+if(params.has('native'))document.write('<script src="/artifacts/chzzk-native-parser.js"><\/script>');
+</script><script src="/quality-settings.js"></script><script>
+document.write('<script src="'+(baseline?'/artifacts/quality-bridge-0.5.2.js':'/quality-bridge.js')+'"><\/script>');
+</script><script>
+(async()=>{
+ const encoder=new TextEncoder(),key=await crypto.subtle.generateKey({name:'AES-GCM',length:128},false,['encrypt','decrypt']);
+ const label=encoder.encode('gfp-tunnel-response-v1'),aad=new Uint8Array(2+label.length+12);aad[1]=label.length;aad.set(label,2);
+ const media={liveId:123,liveTitle:'방송',dab:true,channel:{channelId:'a'.repeat(32)},adult:true,paidProduct:{required:true},livePlaybackJson:'unchanged'};
+ const text=JSON.stringify({code:200,content:media});
+ async function roundTrip(text,additionalData=aad){
+   const algorithm={name:'AES-GCM',iv:crypto.getRandomValues(new Uint8Array(12)),additionalData};
+   const encrypted=await crypto.subtle.encrypt(algorithm,key,encoder.encode(text));
+   return new Uint8Array(await crypto.subtle.decrypt(algorithm,key,encrypted));
+ }
+ const bytes=await roundTrip(text),parsed=chzzkNativeParse(bytes);
+ check('사이트 자체 파서에 전달되기 전에 dab 보정',parsed.content.dab===false);
+ check('그 밖의 응답 바이트 보존',new TextDecoder().decode(bytes)===text.replace('"dab":true','"dab":false'));
+ check('성인·유료 조건과 스트림 정보 보존',parsed.content.adult&&parsed.content.paidProduct.required&&parsed.content.livePlaybackJson==='unchanged');
+ check('고화질 강제 제한 조건 해제',!!parsed.content.dab===false);
+ const other=await roundTrip(text,new Uint8Array([1,2,3]));check('다른 암호화 응답은 그대로 통과',new TextDecoder().decode(other)===text);
+ settingsListeners.forEach(fn=>fn({features:{newValue:{adblockQuality:false}}},'local'));
+ check('설정 끄면 원래 메타데이터 유지',chzzkNativeParse(await roundTrip(text)).content.dab===true);
+ if(!baseline)check('실제 보정 횟수만 진단에 표시',window.__chzzkQualityStatus.repairs===1&&window.__chzzkQualityStatus.metadataResponses===1);
+ document.querySelector('#result').textContent=JSON.stringify({native:params.has('native'),results},null,2);
+ document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>

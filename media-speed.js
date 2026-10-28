@@ -152,7 +152,11 @@
   }
   function onMessage(message, _sender, respond) {
     if (stopped) return;
-    if (message.type === "GET_TOOL_STATUS") { respond({ ok: true, codeVersion: "0.5.2" }); return; }
+    if (message.type === "GET_TOOL_STATUS") {
+      document.dispatchEvent(new Event("chzzk-tools:quality-query"));
+      respond({ ok: true, codeVersion: "0.5.3", quality: globalThis.__chzzkQualityStatus,
+        videoHeight: bestVideo()?.videoHeight || 0 }); return;
+    }
     if (message.type === "MEDIA_FRAME_AVAILABLE") { remoteMediaUntil = message.available ? performance.now() + 9000 : 0; return; }
     if (!enabled) return;
     if (message.type === "MEDIA_SPEED_APPLY" && Number.isFinite(message.rate) && message.rate >= 0.1 && message.rate <= 16) {

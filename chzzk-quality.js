@@ -36,7 +36,13 @@
       if (state.source !== video.currentSrc) { state.count = 0; state.source = video.currentSrc; }
       if (state.count >= 3 || performance.now() - state.time < 15000) continue;
       state.count++; state.time = performance.now(); attempts.set(video, state);
-      best.click();
+      // Retain the item's native listener while avoiding the page's synthetic-click guard.
+      const parent = best.parentElement, placeholder = best.cloneNode(true);
+      if (!parent) continue;
+      parent.replaceChild(placeholder, best);
+      try { best.click(); } finally {
+        requestAnimationFrame(() => { if (placeholder.parentElement === parent) parent.replaceChild(best, placeholder); });
+      }
     }
   }
   chrome.storage.local.get("features").then(data => { settings = core.features(data.features); });

@@ -1,0 +1,16 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>화질 메뉴 합성 클릭 회귀 검사</title>
+<body data-result="pending"><h1>기본 화질 메뉴 이벤트 경로</h1><main><div class="pzp">
+<video class="webplayer-internal-video" style="width:640px;height:360px"></video>
+<ul hidden><li class="pzp-ui-setting-quality-item pzp-ui-setting-pane-item--checked">360p</li>
+<li class="pzp-ui-setting-quality-item">1080p</li></ul></div></main><pre id="result">pending</pre>
+<script>
+const baseline=new URLSearchParams(location.search).has('baseline');history.replaceState(null,'','/live/'+'a'.repeat(32));
+window.chrome={storage:{local:{get:async()=>({features:{highestQuality:true,dismissAdNotice:false}})},onChanged:{addListener:()=>{}}}};
+let hits=0;const original=document.querySelectorAll('li')[1];
+// Reproduce the page-level guard: the player's own item listener still handles a detached click.
+window.addEventListener('click',event=>{if(!event.isTrusted&&event.target.isConnected&&event.target.closest('.pzp'))event.stopImmediatePropagation()},true);
+original.addEventListener('click',()=>{hits++;document.querySelector('li').classList.remove('pzp-ui-setting-pane-item--checked');original.classList.add('pzp-ui-setting-pane-item--checked')});
+</script><script src="/tools-core.js"></script><script>
+document.write('<script src="'+(baseline?'/artifacts/chzzk-quality-0.5.2.js':'/chzzk-quality.js')+'"><\/script>');
+setTimeout(()=>{const results=[{name:'플레이어의 기본 화질 변경 핸들러 실행',passed:hits===1},{name:'원본 메뉴 항목과 이벤트 복원',passed:document.querySelectorAll('li')[1]===original},{name:'최고 화질 선택 상태 표시',passed:original.classList.contains('pzp-ui-setting-pane-item--checked')}];document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail'},2200);
+</script></body></html>

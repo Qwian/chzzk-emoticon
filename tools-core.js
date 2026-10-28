@@ -66,5 +66,5 @@
   function channelId(path) {
     return path.match(/^\/(?:live\/)?([a-f0-9]{32})\/?$/i)?.[1]?.toLowerCase() || "";
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.5.2", defaults, features, koreanFromEnglish, planCatchUp, channelId });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.5.3", defaults, features, koreanFromEnglish, planCatchUp, channelId });
 })();
