@@ -11,7 +11,7 @@
     worker.postMessage({kind:'reply',id:data.id,result});
   };
   const request=(message,frameId=0)=>new Promise(resolve=>{const id=++serial;pending.set(id,resolve);worker.postMessage({kind:'request',id,message,frameId})});
-  window.chrome={runtime:{sendMessage:request,onMessage:{addListener:fn=>mediaListeners.push(fn)}},storage:{local:{get:async()=>({features:{globalSpeed:true}})},onChanged:{addListener:fn=>storageListeners.push(fn)}}};
+  window.chrome={runtime:{id:'test',sendMessage:request,onMessage:{addListener:fn=>mediaListeners.push(fn)}},storage:{local:{get:async()=>({features:{globalSpeed:true}})},onChanged:{addListener:fn=>storageListeners.push(fn)}}};
   const video=document.querySelector('video');let current=10,paused=false,frameCallback;
   Object.defineProperties(video,{readyState:{get:()=>4},duration:{get:()=>100},paused:{get:()=>paused},currentTime:{get:()=>current,set:value=>current=value},seekable:{get:()=>({length:1,start:()=>0,end:()=>100})}});
   video.pause=()=>{paused=true};video.requestVideoFrameCallback=cb=>{frameCallback=cb};

@@ -2,7 +2,9 @@
 
 Caps Lock이 켜진 동안 원하는 키를 치지직 채팅 이모티콘 단축키로 바꾸는 Chrome/Edge 확장 프로그램입니다.
 
-## 0.5.1 편의 도구
+## 0.5.2 편의 도구
+
+확장을 다시 로드해 기존 탭의 연결이 끊긴 경우, 배속 제어의 주기 통신에서 발생하는 동기 예외도 처리하고 이전 코드의 타이머·키 가로채기·영상 이벤트·프레임 수집을 정리합니다. 새 코드를 사용하려면 등록된 확장을 다시 로드한 뒤 방송 탭도 새로고침하세요.
 
 ### 모든 사이트 영상 단축키
 
@@ -49,6 +51,7 @@ Caps Lock이 켜진 동안 원하는 키를 치지직 채팅 이모티콘 단축
 - `tests/search-suggestions-harness.html`: 입력 즉시 실제 채널 표시, 한영 결과 병합·중복 제거, 요청 제한·취소·캐시, 오래된 응답 배제, 실패·설정 꺼짐 처리
 - `tests/search-native-harness.html`: 느린 영문 응답과 사이트 자체 Enter·검색 버튼 처리 회귀 검사
 - `tests/media-speed-harness.html`: 실제 background worker와 속도·프레임 단축키, 입력창 통과, iframe 명령 전달
+- `tests/media-lifecycle-harness.html`: 연결 해제의 동기 예외·비동기 거부·확장 ID 소실, 이전 코드 정리 및 일시 통신 실패 후 복구 (`?scenario=report`, `key`, `async`, `missing-id`, `transient`)
 - `tests/ad-quality-harness.html`: 광고 준비·SDK 음소거 전파·종료 복원, 최고 화질과 안내 숨김
 - `tests/ad-skip-harness.html`: 실제 SDK 형태의 Skip 버튼, 숨김·비활성·카운트다운·다음 광고·설정 변경·일반 버튼 제외
 - `tests/list-preview-harness.html`: 치지직·숲 우클릭 미리보기, 음성·종료·원래 메뉴 보존
