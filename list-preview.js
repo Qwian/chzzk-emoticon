@@ -3,17 +3,17 @@
   globalThis.__chzzkListPreview = true;
   let enabled = false, sidebarEnabled = false, active = null, hoverCard = null, hoverTimer = 0;
   const previewStyle = document.createElement("style");
-  previewStyle.textContent = ".ct-sidebar-previewing [class*='_tooltip_']{display:none!important}";
+    previewStyle.textContent = ".ct-sidebar-previewing [class*='_tooltip_']:not(.ct-preview-host){display:none!important}";
   document.documentElement.append(previewStyle);
   function cancelHover() { clearTimeout(hoverTimer); hoverTimer = 0; hoverCard = null; }
   function close() {
     const previous = active; active = null;
     if (!previous) return;
-    clearTimeout(previous.timer); previous.abort?.abort(); previous.hls?.destroy();
+    clearTimeout(previous.timer); clearInterval(previous.adoptionTimer); previous.abort?.abort(); previous.hls?.destroy();
     if (previous.owned) { previous.video.pause(); previous.video.removeAttribute("src"); previous.video.load(); }
     else { previous.video.muted = previous.muted; previous.video.volume = previous.volume; if (previous.paused) previous.video.pause(); }
     previous.overlay?.remove(); previous.badge?.remove(); previous.playButton?.remove();
-    previous.popup?.remove(); previous.card.classList.remove("ct-sidebar-previewing");
+    releasePanel(previous); previous.card.classList.remove("ct-sidebar-previewing");
     previous.card.removeEventListener("pointerleave", previous.leave);
     if (previous.sidebar && hoverCard === previous.card) cancelHover();
     if (previous.position !== undefined) previous.mount.style.position = previous.position;
@@ -48,6 +48,63 @@
     return null;
   }
   function badge(state, message) { if (state.badge) state.badge.textContent = message; }
+  function existingPanel(info) {
+    const platter = document.getElementById("cheese-follow-preview");
+    const platterName = platter?.querySelector(".cheese-follow-preview-meta-name")?.textContent.trim();
+    const visible = node => node?.isConnected && node.getBoundingClientRect().width > 0 &&
+      getComputedStyle(node).display !== "none" && getComputedStyle(node).visibility !== "hidden";
+    if (visible(platter) && platterName === info.name.trim() &&
+        platter.querySelector(".cheese-follow-preview-pin")?.getAttribute("aria-pressed") !== "true") {
+      const mount = platter.querySelector(".cheese-follow-preview-body");
+      if (mount) return { popup: platter, mount, borrowed: true };
+    }
+    const tooltip = info.card.querySelector("[class*='_tooltip_'],[role='tooltip']");
+    if (visible(tooltip)) {
+      const mount = document.createElement("div");
+      mount.style.cssText = "position:relative;width:360px;max-width:calc(100vw - 32px);aspect-ratio:16/9;background:#000";
+      return { popup: tooltip, mount, borrowed: true, addedMount: true };
+    }
+    return null;
+  }
+  function releasePanel(state) {
+    if (!state.popup) return;
+    state.popup.removeEventListener("pointerleave", state.popupLeave);
+    state.popup.classList.remove("ct-preview-host");
+    for (const saved of state.borrowedVideos || []) {
+      saved.video.removeEventListener("play", saved.stop);
+      saved.video.style.visibility = saved.visibility;
+      saved.video.muted = saved.muted; saved.video.volume = saved.volume;
+      // The other preview owns restarting its media when it next opens.
+    }
+    if (state.position !== undefined) { state.mount.style.position = state.position; delete state.position; }
+    if (state.addedMount) state.mount.remove();
+    if (!state.borrowed) state.popup.remove();
+    state.borrowedVideos = [];
+  }
+  function attachPanel(state, panel) {
+    Object.assign(state, { borrowed: false, addedMount: false }, panel);
+    if (state.addedMount) state.popup.append(state.mount);
+    state.popup.classList.add("ct-preview-host");
+    if (getComputedStyle(state.mount).position === "static") { state.position = state.mount.style.position; state.mount.style.position = "relative"; }
+    state.borrowedVideos = state.borrowed ? [...state.mount.querySelectorAll("video")].filter(video => video !== state.video).map(video => {
+      const saved = { video, visibility: video.style.visibility, muted: video.muted, volume: video.volume };
+      saved.stop = () => { video.muted = true; video.pause(); };
+      video.style.visibility = "hidden"; video.addEventListener("play", saved.stop); saved.stop(); return saved;
+    }) : [];
+    state.popupLeave = event => { if (!state.card.contains(event.relatedTarget)) close(); };
+    state.popup.addEventListener("pointerleave", state.popupLeave);
+  }
+  function adoptPanel(state) {
+    if (active !== state || state.popup?.id === "cheese-follow-preview") return;
+    const panel = existingPanel(state);
+    if (!panel || panel.popup === state.popup) return;
+    // A portal can appear after our metadata request. Move the same playing video;
+    // never create a second player or retain the fallback window behind it.
+    const elements = [state.overlay, state.badge, state.playButton].filter(Boolean);
+    elements.forEach(element => element.remove()); releasePanel(state);
+    delete state.title; delete state.tags; delete state.nameElement;
+    attachPanel(state, panel); elements.forEach(element => state.mount.append(element));
+  }
   function sidebarPanel(info) {
     const popup = document.createElement("aside"); popup.id = "chzzk-sidebar-preview";
     popup.setAttribute("aria-label", "채널 소리 미리보기");
@@ -64,8 +121,7 @@
     const rect = info.card.getBoundingClientRect(), width = popup.getBoundingClientRect().width;
     popup.style.left = `${Math.max(8, Math.min(innerWidth - width - 8, rect.right + 8))}px`;
     popup.style.top = `${Math.max(8, Math.min(innerHeight - 320, rect.top))}px`;
-    popup.addEventListener("pointerleave", event => { if (!info.card.contains(event.relatedTarget)) close(); });
-    return { popup, mount, title, tags, name };
+    return { popup, mount, title, tags, nameElement: name };
   }
   async function play(state) {
     if (active !== state) return;
@@ -85,11 +141,14 @@
   }
   async function open(info) {
     close();
-    if (info.sidebar) Object.assign(info, sidebarPanel(info));
     const native = !info.sidebar && info.card.querySelector("video:not([id*='AD'])");
     const state = { ...info, video: native || document.createElement("video"), owned: !native,
       paused: native?.paused, muted: native?.muted, volume: native?.volume, abort: new AbortController() };
     active = state;
+    if (info.sidebar) {
+      attachPanel(state, existingPanel(info) || sidebarPanel(info));
+      state.adoptionTimer = setInterval(() => adoptPanel(state), 100);
+    }
     state.leave = event => { if (!state.popup?.contains(event.relatedTarget)) close(); };
     info.card.addEventListener("pointerleave", state.leave);
     if (info.sidebar) info.card.classList.add("ct-sidebar-previewing");
@@ -114,8 +173,9 @@
       if (state.sidebar) {
         const channel = await globalThis.ChzzkChannels.get(state.channelId, { signal: state.abort.signal });
         if (active !== state) return;
-        state.name.textContent = channel.name; state.title.textContent = channel.title || channel.name;
-        state.tags.textContent = [channel.category, Number.isFinite(channel.viewers) ? `${channel.viewers.toLocaleString("ko-KR")}명` : "", ...channel.tags.map(tag => `#${tag}`)].filter(Boolean).join(" · ");
+        if (state.nameElement) state.nameElement.textContent = channel.name;
+        if (state.title) state.title.textContent = channel.title || channel.name;
+        if (state.tags) state.tags.textContent = [channel.category, Number.isFinite(channel.viewers) ? `${channel.viewers.toLocaleString("ko-KR")}명` : ""].filter(Boolean).join(" · ");
         if (!channel.openLive || !channel.liveId) { badge(state, "현재 방송 중이 아닙니다."); return; }
         state.liveId = channel.liveId;
       }
@@ -133,13 +193,24 @@
       const playback = JSON.parse(data?.livePlaybackJson || data?.previewPlaybackJson || "{}");
       const source = playback.media?.find(media => media.mediaId === "HLS") || playback.media?.find(media => media.protocol === "HLS");
       if (!source?.path || !source.path.startsWith("https://") || active !== state) throw new Error();
-      if (state.video.canPlayType("application/vnd.apple.mpegurl")) state.video.src = source.path;
-      else if (globalThis.Hls?.isSupported()) {
-        state.hls = new globalThis.Hls({ enableWorker: false, maxBufferLength: 8, backBufferLength: 4, capLevelToPlayerSize: true });
-        state.hls.loadSource(source.path); state.hls.attachMedia(state.video);
+      if (globalThis.Hls?.isSupported()) {
+        state.hls = new globalThis.Hls({ enableWorker: false, maxBufferLength: 8, backBufferLength: 4, capLevelToPlayerSize: false, autoStartLoad: false });
+        state.hls.on(globalThis.Hls.Events.MANIFEST_PARSED, () => {
+          if (active !== state) return;
+          const levels = state.hls.levels;
+          const best = levels.reduce((chosen, level, index) => {
+            const current = levels[chosen];
+            return !current || (level.height || 0) > (current.height || 0) ||
+              ((level.height || 0) === (current.height || 0) && (level.bitrate || 0) > (current.bitrate || 0)) ? index : chosen;
+          }, -1);
+          // Select before starting fragment downloads; leave ABR free to recover on slow links.
+          if (best >= 0) state.hls.startLevel = best;
+          state.hls.startLoad(); play(state);
+        });
         state.hls.on(globalThis.Hls.Events.ERROR, (_event, error) => { if (error.fatal && active === state) badge(state, "미리보기 재생 오류"); });
-      } else throw new Error();
-      await play(state);
+        state.hls.loadSource(source.path); state.hls.attachMedia(state.video);
+      } else if (state.video.canPlayType("application/vnd.apple.mpegurl")) { state.video.src = source.path; await play(state); }
+      else throw new Error();
     } catch { if (active === state) badge(state, "이 방송은 목록 미리보기를 제공하지 않거나 재생이 제한돼 있습니다."); }
   }
   function sidebarRow(target) {
@@ -151,8 +222,11 @@
       try { const url = new URL(a.href, location.href); return url.origin === location.origin && /^\/live\/[a-f0-9]{32}$/i.test(url.pathname); } catch { return false; }
     });
     if (!link) return null;
+    const nameElement = card.querySelector("[data-channel-name], [class*='_name_'], .ct-saved-name");
+    const nameCopy = nameElement?.cloneNode(true);
+    nameCopy?.querySelectorAll(".ct-saved-label").forEach(node => node.remove());
     return { card, sidebar: true, channelId: new URL(link.href, location.href).pathname.split("/")[2],
-      name: (card.querySelector("[data-channel-name], [class*='_name_'], .ct-saved-name")?.textContent || "방송 미리보기").slice(0, 80) };
+      name: (nameElement?.getAttribute("data-channel-name") || nameCopy?.textContent || "방송 미리보기").trim().slice(0, 80) };
   }
   document.addEventListener("pointerover", event => {
     const info = sidebarRow(event.target); if (!info || info.card === hoverCard) return;

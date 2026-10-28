@@ -5,7 +5,7 @@
   let settings = core.features(), bookmarks = [], pins = [], order = [], ready = false, editing = false;
   let scheduled = 0, stopped = false, dragId = "", playerStatus = "플레이어 대기", edits = Promise.resolve();
   const nativeRows = new Map(), addedRows = new Map(), lists = new Set(), sections = new Set(), decoratedRows = new WeakSet();
-  const originalOrders = new Map(), expansionAttempts = new WeakMap(), channelCache = new Map();
+  const originalOrders = new Map(), expansionAttempts = new WeakMap(), channelCache = new Map(), followingRefreshes = new WeakMap();
   let publicRequests = 0;
   const style = document.createElement("style");
   style.textContent = `
@@ -37,8 +37,6 @@
     .ct-saved-category{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
     .ct-saved-viewers{flex:none;margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
     .ct-saved-viewers[hidden]{display:none}
-    .ct-saved-tags{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:normal;font-size:10px;color:var(--color-content-03,#92949b);line-height:1.4}
-    .ct-saved-tags[hidden]{display:none}
     .ct-channel-row.ct-edit .ct-saved-link{padding-right:94px}
     .ct-bookmark{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;height:34px;padding:0 13px;border:1px solid #8884;border-radius:20px;background:var(--color-bg-layer-03,#292b30);color:var(--color-content-01,#f5f5f5);font:700 14px system-ui;cursor:pointer;white-space:nowrap;margin-right:8px}
     .ct-bookmark[aria-pressed="true"]{color:#00c985;border-color:#00c98588}.ct-bookmark svg{width:16px;height:16px}
@@ -213,12 +211,11 @@
       });
       const avatar = document.createElement("span"); avatar.className = "ct-avatar"; avatar.textContent = channel.name[0] || "□";
       const name = document.createElement("span"); name.className = "ct-saved-name";
-      const title = document.createElement("span"), badge = document.createElement("span"), state = document.createElement("small"), tags = document.createElement("small");
+      const title = document.createElement("span"), badge = document.createElement("span"), state = document.createElement("small");
       const category = document.createElement("span"), viewers = document.createElement("span");
       category.className = "ct-saved-category"; viewers.className = "ct-saved-viewers"; state.append(category, viewers);
       badge.className = "ct-saved-label"; badge.textContent = "보관"; state.className = "ct-saved-state";
-      tags.className = "ct-saved-tags";
-      name.append(title, badge, state, tags); link.append(avatar, name); row.append(link); item = { id: channel.id, name: channel.name, row, link, avatar, title, state, tags, category, viewers }; addedRows.set(channel.id, item);
+      name.append(title, badge, state); link.append(avatar, name); row.append(link); item = { id: channel.id, name: channel.name, row, link, avatar, title, state, category, viewers }; addedRows.set(channel.id, item);
     }
     const data = channelCache.get(channel.id)?.data || channel;
     item.followed = false; item.openLive = data.openLive === true;
@@ -226,11 +223,7 @@
     text(item.category, data.openLive === true ? ["LIVE", data.category].filter(Boolean).join(" · ") : data.openLive === false ? "오프라인" : "팔로우 없이 보관");
     item.viewers.hidden = !data.openLive || !Number.isFinite(data.viewers);
     text(item.viewers, Number.isFinite(data.viewers) ? `${data.viewers.toLocaleString("ko-KR")}명` : "");
-    const tags = Array.isArray(data.tags) ? data.tags : [];
-    item.tags.hidden = !data.openLive || !tags.length;
-    text(item.tags, tags.slice(0, 4).map(tag => `#${tag}`).join(" · "));
-    item.tags.title = tags.map(tag => `#${tag}`).join(" · ");
-    item.link.title = [data.title, data.category, item.tags.title].filter(Boolean).join("\n");
+    item.link.title = [data.title, data.category].filter(Boolean).join("\n");
     const image = data.image || channel.image;
     if (typeof image === "string" && image.startsWith("https://") && item.avatar.dataset.image !== image) {
       const img = document.createElement("img"); img.src = image; img.alt = ""; item.avatar.replaceChildren(img); item.avatar.dataset.image = image;
@@ -250,7 +243,16 @@
     for (const section of sections) if (!section.isConnected) sections.delete(section);
     for (const row of originalOrders.keys()) if (!row.isConnected) originalOrders.delete(row);
     let section = followingSection();
-    if (section) { fallbackNav?.remove(); expand(section); }
+    if (section) {
+      fallbackNav?.remove(); expand(section);
+      const now = Date.now(), last = followingRefreshes.get(section);
+      if (last === undefined) followingRefreshes.set(section, now);
+      else if (settings.followingRefresh && !document.hidden && now - last >= 30000) {
+        const refresh = [...section.querySelectorAll("button[aria-label]")].find(button =>
+          !button.disabled && !button.closest(".ct-list-tools,.ct-row-actions") && /새로\s*고침|refresh/i.test(button.getAttribute("aria-label")));
+        if (refresh) { followingRefreshes.set(section, now); refresh.click(); }
+      }
+    }
     if (!section && settings.favorites && bookmarks.length) {
       const header = document.querySelector("#sidebar") || document.querySelector("#header");
       if (header) {

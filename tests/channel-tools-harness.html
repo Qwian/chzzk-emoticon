@@ -40,7 +40,7 @@ check('상시 펼치기가 두 접힘 상태 모두 해제',expandHits===1&&more
 check('기본 팔로잉 항목에 빈 별표',list.querySelectorAll('.ct-star[aria-pressed="false"]').length===6);
 check('기존 저장 채널이 보관 표시와 함께 목록에 표시',rowFor(ids[3])?.textContent.includes('보관'));
 check('보관 채널의 방송 중 상태·링크 반영',rowFor(ids[3])?.querySelector('a').getAttribute('href')==='/live/'+ids[3]&&rowFor(ids[3]).textContent.includes('LIVE'));
-check('보관 LIVE의 카테고리·방송 태그 표시',rowFor(ids[3]).textContent.includes('게임')&&rowFor(ids[3]).textContent.includes('#첫방송'));
+check('보관 LIVE는 카테고리만 표시하고 방송 해시태그 제외',rowFor(ids[3]).textContent.includes('게임')&&!rowFor(ids[3]).textContent.includes('첫방송')&&!rowFor(ids[3]).querySelector('.ct-saved-tags'));
 check('보관 LIVE의 공개 시청자 수 표시',rowFor(ids[3]).querySelector('.ct-saved-viewers').textContent==='1,234명');
 check('팔로잉 LIVE → 보관 LIVE → 팔로잉 오프라인 → 보관 오프라인',visualRows().map(row=>row.querySelector('a').getAttribute('href').slice(-32)).join(',')===[ids[0],ids[1],ids[2],ids[3],ids[4],ids[5]].join(','));
 click(rowFor(ids[2]).querySelector('.ct-star'));await wait(180);
@@ -76,6 +76,13 @@ const originalList=list,originalMain=document.querySelector('main');let navigati
 window.addEventListener('popstate',()=>navigations++);
 click(rowFor(ids[3]).querySelector('a'));await wait(120);
 check('보관 채널 클릭 시 전체 새로고침 없이 SPA 이동',location.pathname==='/live/'+ids[3]&&navigations===1&&document.querySelector('#native-list')===originalList&&document.querySelector('main')===originalMain);
+const clock=Date.now;let now=clock(),refreshHits=0;Date.now=()=>now;
+const refresh=document.createElement('button');refresh.setAttribute('aria-label','새로고침');refresh.onclick=()=>{refreshHits++;rowFor(ids[0]).querySelector('a').href=(refreshHits===1?'/':'/live/')+ids[0]};nativeNav.firstElementChild.append(refresh);
+await wait(200);check('초기 로드 직후 불필요한 팔로잉 갱신 없음',refreshHits===0);
+now+=30001;await wait(1800);check('30초 뒤 기본 갱신으로 방송 종료와 정렬 반영',refreshHits===1&&visualRows().indexOf(rowFor(ids[3]))<visualRows().indexOf(rowFor(ids[0])));
+Object.defineProperty(document,'hidden',{configurable:true,value:true});now+=30001;await wait(1800);check('숨겨진 탭에서는 팔로잉 자동 갱신 중지',refreshHits===1);
+Object.defineProperty(document,'hidden',{configurable:true,value:false});await wait(1800);check('탭 복귀 후 갱신과 방송 시작·정렬 반영',refreshHits===2&&new URL(rowFor(ids[0]).querySelector('a').href).pathname.startsWith('/live/')&&visualRows().indexOf(rowFor(ids[0]))<visualRows().indexOf(rowFor(ids[3])));
+await chrome.storage.local.set({features:{followingRefresh:false}});now+=30001;await wait(1800);check('자동 갱신 설정 끄기 적용',refreshHits===2);Date.now=clock;
 document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
 })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
 </script></body></html>

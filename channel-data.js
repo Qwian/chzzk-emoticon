@@ -15,7 +15,7 @@
     const profile = await json(`https://api.chzzk.naver.com/service/v1/channels/${id}`, signal);
     if (profile?.channelId !== id) throw new Error("Channel mismatch");
     const data = { id, name: String(profile.channelName || id).slice(0, 80), image: profile.channelImageUrl,
-      openLive: profile.openLive === true, liveId: null, title: "", category: "", tags: [], viewers: null };
+      openLive: profile.openLive === true, liveId: null, title: "", category: "", viewers: null };
     if (!data.openLive) return data;
     const live = await json(`https://api.chzzk.naver.com/service/v2/channels/${id}/live-detail`, signal);
     if (!live || live.channel?.channelId !== id) throw new Error("Live channel mismatch");
@@ -25,7 +25,6 @@
     data.title = String(live.liveTitle || "").slice(0, 180);
     data.category = String(live.liveCategoryValue || "").slice(0, 80);
     data.viewers = live.cvExposure === true && Number.isFinite(live.concurrentUserCount) ? Math.max(0, Math.trunc(live.concurrentUserCount)) : null;
-    data.tags = (Array.isArray(live.tags) ? live.tags : []).filter(tag => typeof tag === "string").slice(0, 12).map(tag => tag.slice(0, 50));
     return data;
   }
   function pump() {

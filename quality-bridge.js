@@ -2,7 +2,7 @@
 (() => {
   if (globalThis.__chzzkQualityBridge) return;
   globalThis.__chzzkQualityBridge = true;
-  const status = { version: "0.7.0", enabled: false, tunnelResponses: 0, metadataResponses: 0, repairs: 0, reason: "metadata-wait" };
+  const status = { version: "0.7.1", enabled: false, tunnelResponses: 0, metadataResponses: 0, repairs: 0, reason: "metadata-wait" };
   const publish = () => document.dispatchEvent(new CustomEvent("chzzk-tools:quality-status", { detail: JSON.stringify(status) }));
   document.addEventListener("chzzk-tools:quality-config", event => {
     status.enabled = event.detail === true;

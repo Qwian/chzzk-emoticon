@@ -22,10 +22,10 @@ function setup(custom) {
   vm.runInContext(source, context);
   return { get: context.ChzzkChannels.get, calls, advance: delta => { now += delta; } };
 }
-test("public metadata includes category, tags and visible count but excludes playback/account fields", async () => {
+test("public metadata includes category and visible count but excludes hashtags/playback/account fields", async () => {
   const f = setup(), data = await f.get(id);
   assert.equal(data.liveId, 123); assert.equal(data.category, "게임"); assert.equal(data.viewers, 1234);
-  assert.deepEqual([...data.tags], ["태그", "두 번째"]);
+  assert.equal(Object.hasOwn(data, "tags"), false);
   assert.equal(Object.hasOwn(data, "livePlaybackJson"), false);
   assert.equal(Object.hasOwn(data, "liveTokenList"), false);
   assert(f.calls.every(call => call.options.credentials === "omit"));
@@ -34,7 +34,7 @@ test("hidden viewer counts and ended broadcasts do not expose stale live details
   const hidden = setup((url, _, value) => reply(url.endsWith("/live-detail") ? { ...live(value), cvExposure: false } : profile(value)));
   assert.equal((await hidden.get(id)).viewers, null);
   const ended = setup((url, _, value) => reply(url.endsWith("/live-detail") ? { ...live(value), status: "CLOSE", closeDate: "2026-10-29" } : profile(value)));
-  const data = await ended.get(id); assert.equal(data.openLive, false); assert.equal(data.liveId, null); assert.equal(data.viewers, null); assert.equal(data.tags.length, 0);
+  const data = await ended.get(id); assert.equal(data.openLive, false); assert.equal(data.liveId, null); assert.equal(data.viewers, null); assert.equal(Object.hasOwn(data, "tags"), false);
 });
 test("simultaneous sidebar/row requests share one pair of requests and expire after 30 seconds", async () => {
   const f = setup(); const [a, b] = await Promise.all([f.get(id), f.get(id)]);
