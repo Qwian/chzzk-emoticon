@@ -1,0 +1,53 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>영타 스트리머 바로 검색 테스트</title>
+<style>body{background:#0d1712;color:#eafff1;font:14px system-ui;padding:30px}input{width:350px;padding:12px}pre{margin-top:340px}</style>
+<body data-result="pending"><h1>영타 입력 즉시 스트리머 표시</h1>
+<form role="search"><input id="search-input" aria-label="검색창" placeholder="rkdwl 입력"><button>검색</button></form>
+<pre id="result">pending</pre>
+<script>
+  const listeners=[], calls=[];
+  const state={features:{koreanSearch:true,favorites:false}};
+  window.chrome={storage:{local:{get:async()=>state,set:async()=>{}},onChanged:{addListener:fn=>listeners.push(fn)}}};
+  const channel=(id,name,live=false)=>({channel:{channelId:id.repeat(32),channelName:name,openLive:live}});
+  let mode='normal';
+  window.fetch=async(url,options)=>{
+    const query=new URL(url).searchParams.get('keyword'); calls.push({query,credentials:options.credentials});
+    const capturedMode=mode;
+    // Ignore abort deliberately to check that obsolete responses cannot overwrite newer input.
+    if(capturedMode==='slow')await new Promise(r=>setTimeout(r,500));
+    if(capturedMode==='error')throw new Error('Simulated offline');
+    const data=query==='강지'?[channel('a','강지',true),channel('b','강지형')]:
+      query==='rkdwl'?[channel('a','강지',true),channel('c','rkdwl English')]:[channel('d','새 검색 결과')];
+    return {ok:true,json:async()=>({code:200,content:{data}})};
+  };
+</script><script src="../tools-core.js"></script><script src="../site-tools.js"></script>
+<script>
+  (async()=>{
+    const results=[],check=(name,passed)=>results.push({name,passed});
+    const delay=ms=>new Promise(r=>setTimeout(r,ms));
+    const input=document.querySelector('#search-input');
+    const set=value=>{input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));};
+    const names=()=>[...document.querySelectorAll('#chzzk-tools-channel-results a')].map(a=>a.textContent);
+    await delay(30);input.focus();set('r');set('rk');set('rkdwl');await delay(250);
+    check('Enter 없이 영타만으로 실제 채널명 표시',names().some(name=>name.includes('강지')));
+    check('한글과 원래 영문 결과 모두 표시하고 중복 제거',names().length===3&&names().includes('rkdwl English'));
+    check('빠른 연속 입력은 마지막 검색만 요청',calls.length===2&&calls.some(c=>c.query==='강지')&&calls.some(c=>c.query==='rkdwl'));
+    check('계정 쿠키 없이 공개 검색',calls.every(c=>c.credentials==='omit'));
+    check('방송 중인 채널은 라이브로 연결',document.querySelector('#chzzk-tools-channel-results a').getAttribute('href')==='/live/'+'a'.repeat(32));
+    input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));
+    check('아래 방향키로 실제 채널 선택',document.querySelector('[aria-selected="true"]')?.textContent.includes('강지'));
+    set('');await delay(20);
+    check('검색어를 비우면 결과 숨김',document.querySelector('#chzzk-tools-search-hint').style.display==='none');
+    mode='slow';set('dkssud');await delay(200);set('gksrmf');mode='normal';await delay(650);
+    check('이전 요청이 늦게 끝나도 새 결과 유지',document.querySelector('#chzzk-tools-search-hint [role="status"]').textContent.includes('한글'));
+    mode='error';set('dhvmfkdls');await delay(250);
+    check('검색 실패 시 전체 검색 링크 유지',document.querySelector('#chzzk-tools-search-hint').textContent.includes('검색 연결')&&document.querySelectorAll('#chzzk-tools-search-hint a').length===2);
+    mode='normal';set('rkdwl');await delay(250);
+    check('재입력은 메모리 캐시 사용',calls.filter(c=>c.query==='강지').length===1);
+    listeners.forEach(fn=>fn({features:{newValue:{koreanSearch:false,favorites:false}}},'local'));
+    check('설정을 끄면 결과와 요청 중단',document.querySelector('#chzzk-tools-search-hint').style.display==='none');
+    listeners.forEach(fn=>fn({features:{newValue:{koreanSearch:true,favorites:false}}},'local'));
+    set('rkdwl');await delay(250);
+    document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+    document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+  })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});
+</script></body></html>

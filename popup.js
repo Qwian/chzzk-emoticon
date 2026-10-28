@@ -373,7 +373,7 @@ async function initializeFeatures() {
   let features = core.features(stored.features);
   const controls = new Map();
   const labels = {
-    koreanSearch: "영타를 한글로 변환해 검색 (원문 검색 제공)",
+    koreanSearch: "영타로 입력해도 스트리머 바로 찾기",
     favorites: "팔로우와 별개인 즐겨찾기",
     catchUp: "끊김에 맞춰 조절하는 자동 실시간 따라잡기",
     adMute: "광고 자동 음소거",

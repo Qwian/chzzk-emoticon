@@ -11,6 +11,7 @@
 <script>
   history.replaceState(null,'','/live/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   const results = [], check = (name, passed) => results.push({name,passed});
+  window.fetch = async () => ({ ok:true, json:async()=>({code:200,content:{data:[]}}) });
   const listeners = [], state = {features:{adSpeed:4}, favorites:[]};
   window.chrome = {storage:{local:{
     get:async()=>structuredClone(state),set:async values=>{const changes={};for(const [k,v] of Object.entries(values)){changes[k]={oldValue:state[k],newValue:v};state[k]=v;}listeners.forEach(fn=>fn(changes,'local'));}
@@ -37,7 +38,7 @@
     panel.querySelector('#favorite-add').click(); await delay(50);
     check('팔로우 없이 즐겨찾기 저장',state.favorites[0]?.id==='a'.repeat(32)&&panel.querySelector('li a')?.textContent==='테스트 채널');
     const search=document.querySelector('#search-input'); search.value='rkdwl';search.dispatchEvent(new Event('input',{bubbles:true}));
-    check('영타 검색과 영문 원문 검색 모두 표시',document.querySelector('#chzzk-tools-search-hint').textContent.includes('강지 검색')&&document.querySelector('#chzzk-tools-search-hint a:last-child').getAttribute('href').includes('rkdwl'));
+    check('영타 검색과 영문 원문 검색 모두 표시',document.querySelector('#chzzk-tools-search-hint').textContent.includes('강지 전체 검색')&&document.querySelector('#chzzk-tools-search-hint a:last-child').getAttribute('href').includes('rkdwl'));
     panel.querySelector('#catch-now').click();
     check('이동 가능한 최신 버퍼 안으로 따라잡기',Math.abs(current-98.5)<.01);
     main.dispatchEvent(new Event('waiting')); now+=1000; await delay(1100);

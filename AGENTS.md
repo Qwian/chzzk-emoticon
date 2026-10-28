@@ -30,6 +30,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/popup-harness.html` verifies the icon preview and bounded scrolling UI; add `?legacy` to verify old mapping migration.
 - `tests/input-regression-harness.html` verifies limits, duplicate/repeat suppression, selection replacement and Enter/IME draft restoration.
 - `tests/site-player-harness.html` verifies search, favorites, adaptive catch-up and ad cleanup against simulated media.
+- `tests/search-suggestions-harness.html` verifies immediate channel results, merged English/Korean matches, cancellation, stale-response protection, cache and failure behavior.
 
 Do not type or send messages in a real CHZZK chat during agent verification. Real logged-in chat checks must be performed by the user:
 
