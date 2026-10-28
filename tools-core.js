@@ -1,6 +1,6 @@
 (() => {
   const defaults = Object.freeze({
-    koreanSearch: true, favorites: true, catchUp: true,
+    koreanSearch: true, favorites: true, catchUp: true, followingExpanded: true,
     adMute: true, adSpeed: 4, adMini: true, mainAudio: true, adAutoSkip: true, adblockQuality: true,
     globalSpeed: true, listPreview: true, highestQuality: true, dismissAdNotice: true
   });
@@ -66,5 +66,10 @@
   function channelId(path) {
     return path.match(/^\/(?:live\/)?([a-f0-9]{32})\/?$/i)?.[1]?.toLowerCase() || "";
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.5.3", defaults, features, koreanFromEnglish, planCatchUp, channelId });
+  function orderChannels(items, favorites = [], order = []) {
+    const pinned = new Set(favorites), positions = new Map(order.map((id, i) => [id, i]));
+    return [...items].sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)) ||
+      (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
+  }
+  globalThis.ChzzkTools = Object.freeze({ version: "0.6.0", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels });
 })();

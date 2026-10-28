@@ -368,7 +368,7 @@ async function initializeFeatures() {
   const panel = document.createElement("details");
   panel.className = "diagnostics feature-panel";
   const summary = document.createElement("summary");
-  summary.textContent = "검색 · 즐겨찾기 · 플레이어 설정";
+  summary.textContent = "검색 · 채널 목록 · 플레이어 설정";
   panel.append(summary);
   const stored = await chrome.storage.local.get("features");
   let features = core.features(stored.features);
@@ -380,7 +380,8 @@ async function initializeFeatures() {
     adblockQuality: "광고 차단 감지로 인한 360p 제한 보정 (새로고침 필요)",
     dismissAdNotice: "치지직 광고 차단 안내 숨김",
     koreanSearch: "영타로 입력해도 스트리머 바로 찾기",
-    favorites: "팔로우와 별개인 즐겨찾기",
+    favorites: "팔로우 없이 보관 채널 사용",
+    followingExpanded: "팔로잉 채널 목록 상시 펼치기",
     catchUp: "끊김에 맞춰 조절하는 자동 실시간 따라잡기",
     adMute: "광고 자동 음소거",
     adAutoSkip: "활성화된 광고 SKIP 버튼 자동 누르기",

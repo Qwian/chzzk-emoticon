@@ -1,0 +1,71 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>팔로잉·보관 채널과 플레이어 도구</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#141517;color:#e4e5e8;font:14px system-ui}#header{position:fixed;left:0;top:0;bottom:0;width:230px;background:#1d1e21;padding:18px 10px}nav>div{display:flex;gap:3px;align-items:center}nav>div>strong{margin-right:auto;font-size:13px}button{color:inherit;background:#303238;border:0;border-radius:5px;cursor:pointer;padding:5px}nav ul{padding:0;margin:10px 0;list-style:none}li>div[data-native]{display:flex;align-items:center;gap:9px;min-height:48px;position:relative;padding:6px}li>div[data-native]>span:first-child{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#667578}li>div[data-native]>a{position:absolute;inset:0}main{margin-left:250px;padding:25px;max-width:1120px}.player{aspect-ratio:16/9;background:linear-gradient(120deg,#1b2630,#142524);position:relative;border-radius:12px}.player>p{position:absolute;inset:38% 20%;text-align:center;color:#6d9692;font-size:24px}.controls{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:10px;background:#111b}.right{display:flex;gap:4px;align-items:center}.right button{background:transparent;font-size:20px}.actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin:18px 0}.actions>button{border-radius:24px;padding:9px 18px;font-weight:700}#follow{background:#33363c}#result{font-size:11px;max-height:260px;overflow:auto;white-space:pre-wrap;color:#abc1b6}.ct-bookmark{margin-right:0!important}
+</style><body data-result="pending">
+<header id="top-header" hidden></header><header id="header"><p style="color:#00efa4;font-weight:800;font-size:20px">CHZZK <small style="color:#8a919b;font-size:10px">로컬 UI 검사</small></p>
+<nav aria-label="팔로우"><div><strong>팔로잉 채널</strong><button id="collapse" aria-label="목록 펼치기" aria-expanded="false">⌄</button></div><ul id="native-list"></ul><div><button id="more" aria-label="더보기" aria-expanded="false">더보기</button></div></nav></header>
+<main><h1 style="font-size:19px">채널 목록 · 플레이어 도구</h1><div class="player"><p>실제 방송·채팅을 사용하지 않는 검사 화면</p><div class="controls"><span>Ⅱ　◖))　◷ 실시간</span><div class="right"><button class="custom__clip-button" aria-label="클립 만들기">✂</button><button>⚙</button><button>⛶</button></div></div></div>
+<div class="actions"><a id="current-channel" href="/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" style="margin-right:auto;color:inherit;text-decoration:none;font-size:18px;font-weight:700">가람</a><div class="_has_tooltip_box_mock"><button id="follow" style="height:34px;min-width:89px;border-radius:20px;font-weight:700">♥ 팔로잉</button></div><button>＋ 구독</button><button style="background:#5943d5">구독 선물</button></div><pre id="result">pending</pre></main>
+<script>
+const preview=new URLSearchParams(location.search).has('preview');
+document.querySelector('#header').id='sidebar';document.querySelector('#top-header').id='header';
+const sidebarStyle=document.createElement('style');sidebarStyle.textContent='#sidebar{position:fixed;left:0;top:0;bottom:0;width:230px;background:#1d1e21;padding:18px 10px}';document.head.append(sidebarStyle);
+history.replaceState(null,'','/live/'+'a'.repeat(32));
+// Match the actual channel action's text; native follow is never called by this extension.
+document.querySelector('#follow').textContent='팔로잉';
+const ids=['a','b','c','d'].map(c=>c.repeat(32)),names=['가람','나래','다온','라온'];
+const list=document.querySelector('#native-list');
+for(let i=0;i<3;i++){const li=document.createElement('li');li.innerHTML=`<div data-native><span>${names[i][0]}</span><strong data-channel-name="${names[i]}">${names[i]}</strong><a href="/live/${ids[i]}"></a></div>`;list.append(li)}
+let followHits=0,expandHits=0,moreHits=0,hoverHits=0,apiCalls=0;
+document.querySelector('#follow').onclick=()=>followHits++;
+list.firstElementChild.addEventListener('pointerenter',()=>hoverHits++);
+document.querySelector('#collapse').onclick=event=>{expandHits++;event.currentTarget.setAttribute('aria-expanded',String(event.currentTarget.getAttribute('aria-expanded')!=='true'))};
+document.querySelector('#more').onclick=event=>{moreHits++;event.currentTarget.setAttribute('aria-expanded',String(event.currentTarget.getAttribute('aria-expanded')!=='true'))};
+const state={features:{followingExpanded:true},favorites:[{id:ids[3],name:'라온'}],followingFavorites:[],channelOrder:[]},listeners=[];
+if(preview){state.followingFavorites=[ids[2],ids[1]];state.channelOrder=[ids[2],ids[1],ids[0],ids[3]];state.favorites.push({id:ids[0],name:'가람'});}
+window.chrome={storage:{local:{get:async()=>structuredClone(state),set:async values=>{const changes={};for(const[key,value]of Object.entries(values)){changes[key]={oldValue:state[key],newValue:value};state[key]=structuredClone(value)}listeners.forEach(fn=>fn(changes,'local'))}},onChanged:{addListener:fn=>listeners.push(fn)}}};
+window.fetch=async(url,options)=>{apiCalls++;return{ok:true,json:async()=>({code:200,content:{channelId:ids[3],channelName:'라온',openLive:true}})}};
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),click=element=>element.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+const visualRows=()=>[...list.querySelectorAll(':scope > .ct-channel-row')].sort((a,b)=>Number(a.style.getPropertyValue('--ct-order'))-Number(b.style.getPropertyValue('--ct-order')));
+const rowFor=id=>[...list.querySelectorAll(':scope > li')].find(row=>row.querySelector(`a[href$="${id}"]`));
+</script><script src="/tools-core.js"></script><script src="/site-tools.js"></script><script src="/channel-tools.js"></script><script>
+(async()=>{
+const results=[],check=(name,passed)=>results.push({name,passed});await wait(700);
+if(preview){document.querySelector('#result').textContent='로컬 UI 미리보기 · 실제 방송 화면이 아닙니다.\n별: 팔로잉 즐겨찾기 / 보관: 팔로우 없이 저장 / 순서: 드래그 또는 ↑↓';document.body.dataset.result='preview';return;}
+check('왼쪽 아래 고정 패널 제거',!document.querySelector('#chzzk-tools-panel'));
+check('따라잡기 도구가 가위 바로 왼쪽',document.querySelector('.custom__clip-button').previousElementSibling?.id==='chzzk-player-tools');
+check('보관 버튼이 팔로잉 툴팁 바깥의 바로 왼쪽',document.querySelector('#follow').parentElement.previousElementSibling?.id==='chzzk-channel-save');
+check('상시 펼치기가 두 접힘 상태 모두 해제',expandHits===1&&moreHits===1);
+check('기본 팔로잉 항목에 빈 별표',list.querySelectorAll('.ct-star[aria-pressed="false"]').length===4);
+check('기존 저장 채널이 보관 표시와 함께 목록에 표시',rowFor(ids[3])?.textContent.includes('보관'));
+check('보관 채널의 방송 중 상태·링크 반영',rowFor(ids[3])?.querySelector('a').getAttribute('href')==='/live/'+ids[3]&&rowFor(ids[3]).textContent.includes('LIVE'));
+click(rowFor(ids[2]).querySelector('.ct-star'));await wait(180);
+check('별 클릭으로 즐겨찾기 저장·상단 정렬',state.followingFavorites[0]===ids[2]&&visualRows()[0]===rowFor(ids[2]));
+check('즐겨찾기와 일반 채널 사이 구분선',list.querySelector('.ct-channel-divider')?.style.getPropertyValue('--ct-order')==='1');
+click(rowFor(ids[1]).querySelector('.ct-star'));await wait(180);
+click(document.querySelector('.ct-list-tools button'));await wait(180);
+click(rowFor(ids[2]).querySelector('.ct-move'));await wait(180);
+check('즐겨찾기 안에서 위로 이동·저장',visualRows()[0]===rowFor(ids[2])&&state.channelOrder.indexOf(ids[2])<state.channelOrder.indexOf(ids[1]));
+const handle=rowFor(ids[3]).querySelector('.ct-drag'),target=rowFor(ids[0]),data=new DataTransfer();
+handle.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:data}));target.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data}));await wait(180);
+check('일반 채널도 드래그로 순서 변경',visualRows()[2]===rowFor(ids[3]));
+click(document.querySelector('#chzzk-channel-save'));await wait(200);
+check('팔로우 없이 보관 저장, 기본 행과 중복하지 않음',state.favorites.some(row=>row.id===ids[0])&&list.querySelectorAll(`a[href$="${ids[0]}"]`).length===1);
+check('보관한 팔로잉 채널에도 구분 표시',rowFor(ids[0]).querySelector('.ct-native-saved-label')?.textContent==='보관');
+check('팔로잉 즐겨찾기와 보관 채널의 저장값 독립',state.followingFavorites.length===2&&state.favorites.length===2);
+check('보관해도 네이버 팔로우를 누르지 않음',followHits===0);
+rowFor(ids[0]).dispatchEvent(new PointerEvent('pointerenter'));check('기본 행과 기존 이벤트 보존',hoverHits===1);
+click(document.querySelector('#chzzk-channel-save'));await wait(180);check('보관 해제 시 기본 팔로잉 행 유지',rowFor(ids[0])&&!rowFor(ids[0]).querySelector('.ct-native-saved-label'));
+click(rowFor(ids[1]).querySelector('.ct-star'));click(rowFor(ids[2]).querySelector('.ct-star'));await wait(250);check('빠른 별 해제에서 변경 누락 없음',state.followingFavorites.length===0&&!list.querySelector('.ct-channel-divider'));
+await chrome.storage.local.set({features:{followingExpanded:false}});document.querySelector('#collapse').setAttribute('aria-expanded','false');await wait(1700);
+check('상시 펼치기 끄면 접힌 상태 유지',document.querySelector('#collapse').getAttribute('aria-expanded')==='false');
+const player=document.querySelector('#chzzk-player-tools').shadowRoot;player.querySelector('#catch-up').checked=false;player.querySelector('#catch-up').dispatchEvent(new Event('change'));await wait(180);check('이동된 따라잡기 설정 저장',state.features.catchUp===false);
+check('보관 채널 정보 조회가 매번 반복되지 않음',apiCalls===1);
+const before=list.firstElementChild;list.replaceChild(before.cloneNode(true),before);await wait(250);check('사이트가 행을 다시 렌더링해도 별 중복 없음',rowFor(ids[0]).querySelectorAll('.ct-star').length===1);
+const nativeNav=list.closest('nav');nativeNav.remove();await wait(300);
+check('기본 팔로잉이 없으면 상단 헤더 대신 사이드바에 보관 목록',document.querySelector('#sidebar .ct-fallback-nav a')?.href.endsWith(ids[3])&&!document.querySelector('#header .ct-fallback-nav'));
+document.querySelector('#sidebar').append(nativeNav);await wait(300);
+check('기본 팔로잉 복귀 시 보관 목록 합치고 중복 영역 제거',!document.querySelector('.ct-fallback-nav')&&rowFor(ids[3]));
+document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>

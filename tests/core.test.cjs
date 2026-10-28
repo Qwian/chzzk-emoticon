@@ -33,3 +33,9 @@ test("channel matching excludes VOD, clips, malformed and third path segments", 
   assert.equal(core.features({ adSpeed: 999 }).adSpeed, 4);
   assert.equal(core.features({ catchUp: false }).catchUp, false);
 });
+test("channel ordering keeps favorites first and applies custom order inside each group", () => {
+  const items = [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }, { id: "d", name: "D" }];
+  assert.deepEqual(core.orderChannels(items, ["c", "a"], ["d", "b", "c", "a"]).map(row => row.id), ["c", "a", "d", "b"]);
+  assert.deepEqual(core.orderChannels(items, ["c"], ["b"]).map(row => row.id), ["c", "b", "a", "d"]);
+  assert.deepEqual(items.map(row => row.id), ["a", "b", "c", "d"]);
+});

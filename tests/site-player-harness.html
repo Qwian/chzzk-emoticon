@@ -1,13 +1,13 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><title>치지직 편의 도구 테스트</title>
 <body data-result="pending"><h1>검색·즐겨찾기·플레이어 모의 테스트</h1>
 <form role="search"><input id="search-input" aria-label="검색창"><button>검색</button></form>
-<a id="channel" href="/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">테스트 채널</a>
+<main><a id="channel" href="/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">테스트 채널</a><button>팔로잉</button>
 <div style="position:relative;width:640px;height:360px;background:#26392c">
   <div class="webplayer-internal-source-wrapper"><video class="webplayer-internal-video" style="width:640px;height:360px"></video></div>
   <div id="midAdPlayerWrapper" style="display:none;position:absolute;inset:0">
     <video id="midPlayer"></video><div id="midAdVideoContainer"><video id="ad"></video></div>
   </div>
-</div><pre id="result">pending</pre>
+</div><div><button class="custom__clip-button">클립 만들기</button></div></main><pre id="result">pending</pre>
 <script>
   history.replaceState(null,'','/live/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   const results = [], check = (name, passed) => results.push({name,passed});
@@ -29,14 +29,14 @@
   main.muted=false;main.volume=.4;
   const delay = ms=>new Promise(resolve=>setTimeout(resolve,ms));
 </script>
-<script src="/tools-core.js"></script><script src="/player-tools.js"></script><script src="/site-tools.js"></script>
+<script src="/tools-core.js"></script><script src="/player-tools.js"></script><script src="/site-tools.js"></script><script src="/channel-tools.js"></script>
 <script>
   (async()=>{
     await delay(1200);
-    const panel = document.querySelector('#chzzk-tools-panel').shadowRoot;
+    const panel = document.querySelector('#chzzk-player-tools').shadowRoot;
     panel.querySelector('details').open=true;
-    panel.querySelector('#favorite-add').click(); await delay(50);
-    check('팔로우 없이 즐겨찾기 저장',state.favorites[0]?.id==='a'.repeat(32)&&panel.querySelector('li a')?.textContent==='테스트 채널');
+    document.querySelector('#chzzk-channel-save').click(); await delay(150);
+    check('팔로우 없이 보관 채널 저장',state.favorites[0]?.id==='a'.repeat(32)&&document.querySelector('#chzzk-channel-save').getAttribute('aria-pressed')==='true');
     const search=document.querySelector('#search-input'); search.value='rkdwl';search.dispatchEvent(new Event('input',{bubbles:true}));
     check('영타 검색과 영문 원문 검색 모두 표시',document.querySelector('#chzzk-tools-search-hint').textContent.includes('강지 전체 검색')&&document.querySelector('#chzzk-tools-search-hint a:last-child').getAttribute('href').includes('rkdwl'));
     panel.querySelector('#catch-now').click();
