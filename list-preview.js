@@ -3,19 +3,37 @@
   globalThis.__chzzkListPreview = true;
   let enabled = false, sidebarEnabled = false, active = null, hoverCard = null, hoverTimer = 0;
   const previewStyle = document.createElement("style");
-    previewStyle.textContent = ".ct-sidebar-previewing [class*='_tooltip_']:not(.ct-preview-host){display:none!important}";
+  const alternatePreview = '#cheese-follow-preview:not(:has(.cheese-follow-preview-pin[aria-pressed="true"])),#cheese-follow-channel-tooltip';
+  previewStyle.textContent = `.ct-sidebar-previewing [class*='_tooltip_'],.ct-sidebar-previewing [role='tooltip'],
+    html.ct-sidebar-preview-active #cheese-follow-preview:not(:has(.cheese-follow-preview-pin[aria-pressed="true"])),
+    html.ct-sidebar-preview-active #cheese-follow-channel-tooltip{display:none!important}`;
   document.documentElement.append(previewStyle);
-  function cancelHover() { clearTimeout(hoverTimer); hoverTimer = 0; hoverCard = null; }
+  function syncSuppression() {
+    document.documentElement.classList.toggle("ct-sidebar-preview-active", sidebarEnabled && Boolean(hoverCard || active?.sidebar));
+  }
+  function cancelHover() {
+    clearTimeout(hoverTimer); hoverTimer = 0;
+    if (hoverCard !== active?.card) hoverCard?.classList.remove("ct-sidebar-previewing");
+    hoverCard = null; syncSuppression();
+  }
+  function pauseAlternateMedia() {
+    document.querySelectorAll(alternatePreview).forEach(root => root.querySelectorAll("video").forEach(video => video.pause()));
+  }
+  document.addEventListener("play", event => {
+    if (document.documentElement.classList.contains("ct-sidebar-preview-active") &&
+        event.target.matches?.("video") && event.target.closest(alternatePreview + ",.ct-sidebar-previewing [class*='_tooltip_']")) event.target.pause();
+  }, true);
   function close() {
     const previous = active; active = null;
-    if (!previous) return;
-    clearTimeout(previous.timer); clearInterval(previous.adoptionTimer); previous.abort?.abort(); previous.hls?.destroy();
+    if (!previous) { syncSuppression(); return; }
+    clearTimeout(previous.timer); previous.abort?.abort(); previous.hls?.destroy();
     if (previous.owned) { previous.video.pause(); previous.video.removeAttribute("src"); previous.video.load(); }
     else { previous.video.muted = previous.muted; previous.video.volume = previous.volume; if (previous.paused) previous.video.pause(); }
     previous.overlay?.remove(); previous.badge?.remove(); previous.playButton?.remove();
-    releasePanel(previous); previous.card.classList.remove("ct-sidebar-previewing");
+    previous.popup?.remove(); previous.card.classList.remove("ct-sidebar-previewing");
     previous.card.removeEventListener("pointerleave", previous.leave);
     if (previous.sidebar && hoverCard === previous.card) cancelHover();
+    syncSuppression();
     if (previous.position !== undefined) previous.mount.style.position = previous.position;
     if (previous.soop) document.dispatchEvent(new CustomEvent("chzzk-tools:soop-preview", { detail: { action: "close" } }));
   }
@@ -48,63 +66,6 @@
     return null;
   }
   function badge(state, message) { if (state.badge) state.badge.textContent = message; }
-  function existingPanel(info) {
-    const platter = document.getElementById("cheese-follow-preview");
-    const platterName = platter?.querySelector(".cheese-follow-preview-meta-name")?.textContent.trim();
-    const visible = node => node?.isConnected && node.getBoundingClientRect().width > 0 &&
-      getComputedStyle(node).display !== "none" && getComputedStyle(node).visibility !== "hidden";
-    if (visible(platter) && platterName === info.name.trim() &&
-        platter.querySelector(".cheese-follow-preview-pin")?.getAttribute("aria-pressed") !== "true") {
-      const mount = platter.querySelector(".cheese-follow-preview-body");
-      if (mount) return { popup: platter, mount, borrowed: true };
-    }
-    const tooltip = info.card.querySelector("[class*='_tooltip_'],[role='tooltip']");
-    if (visible(tooltip)) {
-      const mount = document.createElement("div");
-      mount.style.cssText = "position:relative;width:360px;max-width:calc(100vw - 32px);aspect-ratio:16/9;background:#000";
-      return { popup: tooltip, mount, borrowed: true, addedMount: true };
-    }
-    return null;
-  }
-  function releasePanel(state) {
-    if (!state.popup) return;
-    state.popup.removeEventListener("pointerleave", state.popupLeave);
-    state.popup.classList.remove("ct-preview-host");
-    for (const saved of state.borrowedVideos || []) {
-      saved.video.removeEventListener("play", saved.stop);
-      saved.video.style.visibility = saved.visibility;
-      saved.video.muted = saved.muted; saved.video.volume = saved.volume;
-      // The other preview owns restarting its media when it next opens.
-    }
-    if (state.position !== undefined) { state.mount.style.position = state.position; delete state.position; }
-    if (state.addedMount) state.mount.remove();
-    if (!state.borrowed) state.popup.remove();
-    state.borrowedVideos = [];
-  }
-  function attachPanel(state, panel) {
-    Object.assign(state, { borrowed: false, addedMount: false }, panel);
-    if (state.addedMount) state.popup.append(state.mount);
-    state.popup.classList.add("ct-preview-host");
-    if (getComputedStyle(state.mount).position === "static") { state.position = state.mount.style.position; state.mount.style.position = "relative"; }
-    state.borrowedVideos = state.borrowed ? [...state.mount.querySelectorAll("video")].filter(video => video !== state.video).map(video => {
-      const saved = { video, visibility: video.style.visibility, muted: video.muted, volume: video.volume };
-      saved.stop = () => { video.muted = true; video.pause(); };
-      video.style.visibility = "hidden"; video.addEventListener("play", saved.stop); saved.stop(); return saved;
-    }) : [];
-    state.popupLeave = event => { if (!state.card.contains(event.relatedTarget)) close(); };
-    state.popup.addEventListener("pointerleave", state.popupLeave);
-  }
-  function adoptPanel(state) {
-    if (active !== state || state.popup?.id === "cheese-follow-preview") return;
-    const panel = existingPanel(state);
-    if (!panel || panel.popup === state.popup) return;
-    // A portal can appear after our metadata request. Move the same playing video;
-    // never create a second player or retain the fallback window behind it.
-    const elements = [state.overlay, state.badge, state.playButton].filter(Boolean);
-    elements.forEach(element => element.remove()); releasePanel(state);
-    delete state.title; delete state.tags; delete state.nameElement;
-    attachPanel(state, panel); elements.forEach(element => state.mount.append(element));
-  }
   function sidebarPanel(info) {
     const popup = document.createElement("aside"); popup.id = "chzzk-sidebar-preview";
     popup.setAttribute("aria-label", "채널 소리 미리보기");
@@ -121,6 +82,7 @@
     const rect = info.card.getBoundingClientRect(), width = popup.getBoundingClientRect().width;
     popup.style.left = `${Math.max(8, Math.min(innerWidth - width - 8, rect.right + 8))}px`;
     popup.style.top = `${Math.max(8, Math.min(innerHeight - 320, rect.top))}px`;
+    popup.addEventListener("pointerleave", event => { if (!info.card.contains(event.relatedTarget)) close(); });
     return { popup, mount, title, tags, nameElement: name };
   }
   async function play(state) {
@@ -146,8 +108,8 @@
       paused: native?.paused, muted: native?.muted, volume: native?.volume, abort: new AbortController() };
     active = state;
     if (info.sidebar) {
-      attachPanel(state, existingPanel(info) || sidebarPanel(info));
-      state.adoptionTimer = setInterval(() => adoptPanel(state), 100);
+      Object.assign(state, sidebarPanel(info));
+      syncSuppression(); pauseAlternateMedia();
     }
     state.leave = event => { if (!state.popup?.contains(event.relatedTarget)) close(); };
     info.card.addEventListener("pointerleave", state.leave);
@@ -232,7 +194,7 @@
     const info = sidebarRow(event.target); if (!info || info.card === hoverCard) return;
     cancelHover();
     if (active?.sidebar) close();
-    hoverCard = info.card;
+    hoverCard = info.card; info.card.classList.add("ct-sidebar-previewing"); syncSuppression(); pauseAlternateMedia();
     hoverTimer = setTimeout(() => { hoverTimer = 0; if (hoverCard === info.card && info.card.isConnected && sidebarEnabled) open(info); }, 300);
   }, true);
   document.addEventListener("pointerout", event => {

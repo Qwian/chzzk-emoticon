@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "치지직 Caps Lock 이모티콘",
   "description": "치지직 검색·채팅·광고 편의, 치지직·숲 목록 미리보기, 모든 웹사이트의 영상 속도와 프레임 이동을 지원합니다.",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "background": { "service_worker": "media-background.js" },
   "icons": {
     "16": "icons/icon16.png",
