@@ -377,11 +377,13 @@ async function initializeFeatures() {
     globalSpeed: "모든 사이트 속도·프레임 단축키",
     listPreview: "치지직·숲 목록 우클릭 소리 미리보기",
     highestQuality: "치지직에서 선택 가능한 최고 화질 자동 선택",
+    adblockQuality: "광고 차단 감지로 인한 360p 제한 보정 (새로고침 필요)",
     dismissAdNotice: "치지직 광고 차단 안내 숨김",
     koreanSearch: "영타로 입력해도 스트리머 바로 찾기",
     favorites: "팔로우와 별개인 즐겨찾기",
     catchUp: "끊김에 맞춰 조절하는 자동 실시간 따라잡기",
     adMute: "광고 자동 음소거",
+    adAutoSkip: "활성화된 광고 SKIP 버튼 자동 누르기",
     adMini: "본방이 재생 중이면 광고를 우측 상단에 작게",
     mainAudio: "광고 중 본방의 기존 소리 유지"
   };

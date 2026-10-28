@@ -1,0 +1,33 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>광고 자동 SKIP 검사</title>
+<style>.hide{display:none}video{width:100px;height:50px}</style>
+<body data-result="pending"><h1>광고 자동 SKIP · 로컬 검사</h1>
+<div id="midAdPlayerWrapper"><div id="midAdVideoContainer"><video></video></div>
+<div class="vod_player_wrap"><button class="btn_skip hide" data-role="skipBtn" aria-label="광고 SKIP">SKIP</button></div></div>
+<button id="other">일반 SKIP</button><pre id="result">pending</pre>
+<script>
+history.replaceState(null,'','/live/'+'a'.repeat(32));
+const listeners=[],features={adAutoSkip:true};
+window.chrome={storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+let hits=0,otherHits=0,ready=4,ended=false,source='ad1';
+const button=document.querySelector('[data-role="skipBtn"]'),video=document.querySelector('video'),wrapper=document.querySelector('#midAdPlayerWrapper');
+Object.defineProperties(video,{readyState:{get:()=>ready},ended:{get:()=>ended},currentSrc:{get:()=>source}});
+button.onclick=()=>hits++;document.querySelector('#other').onclick=()=>otherHits++;
+</script><script src="/tools-core.js"></script><script src="/ad-skip.js"></script><script>
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed}),wait=()=>new Promise(r=>setTimeout(r,350));
+ await wait();check('SDK의 hide 상태에서는 누르지 않음',hits===0);
+ button.classList.remove('hide');button.disabled=true;await wait();check('비활성 버튼 제외',hits===0);
+ button.disabled=false;button.setAttribute('aria-disabled','true');await wait();check('aria-disabled 제외',hits===0);
+ button.removeAttribute('aria-disabled');button.textContent='5초 후 SKIP';await wait();check('카운트다운 제외',hits===0);
+ button.textContent='SKIP';await wait();check('활성화된 실제 SDK 형태의 버튼 클릭',hits===1);
+ await wait();check('매 검사마다 중복 클릭하지 않음',hits===1);
+ button.classList.add('hide');await wait();button.classList.remove('hide');source='ad2';await wait();check('다음 광고에서도 작동',hits===2);
+ wrapper.style.display='none';await wait();check('숨겨진 광고 제외',hits===2);
+ wrapper.style.display='block';ready=0;await wait();check('준비 전 광고 제외',hits===2);
+ ready=4;ended=true;await wait();check('종료된 광고 제외',hits===2);
+ ended=false;listeners.forEach(fn=>fn({features:{newValue:{adAutoSkip:false}}},'local'));await wait();check('설정 끄기 즉시 반영',hits===2);
+ listeners.forEach(fn=>fn({features:{newValue:{adAutoSkip:true}}},'local'));history.replaceState(null,'','/lives');await wait();check('목록 페이지와 일반 Skip은 건드리지 않음',hits===2&&otherHits===0);
+ history.replaceState(null,'','/video/123');await wait();check('다시보기 광고에서도 작동',hits===3);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>

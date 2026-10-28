@@ -105,7 +105,7 @@
     }).catch(() => toast("확장과 페이지를 새로고침해 주세요."));
   }, true);
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
-    if (message.type === "GET_TOOL_STATUS") { respond({ ok: true, codeVersion: "0.5.0" }); return; }
+    if (message.type === "GET_TOOL_STATUS") { respond({ ok: true, codeVersion: "0.5.1" }); return; }
     if (message.type === "MEDIA_FRAME_AVAILABLE") { remoteMediaUntil = message.available ? performance.now() + 9000 : 0; return; }
     if (!enabled) return;
     if (message.type === "MEDIA_SPEED_APPLY" && Number.isFinite(message.rate) && message.rate >= 0.1 && message.rate <= 16) {

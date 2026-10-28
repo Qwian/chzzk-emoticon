@@ -1,7 +1,7 @@
 (() => {
   const defaults = Object.freeze({
     koreanSearch: true, favorites: true, catchUp: true,
-    adMute: true, adSpeed: 4, adMini: true, mainAudio: true,
+    adMute: true, adSpeed: 4, adMini: true, mainAudio: true, adAutoSkip: true, adblockQuality: true,
     globalSpeed: true, listPreview: true, highestQuality: true, dismissAdNotice: true
   });
   const initials = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
@@ -66,5 +66,5 @@
   function channelId(path) {
     return path.match(/^\/(?:live\/)?([a-f0-9]{32})\/?$/i)?.[1]?.toLowerCase() || "";
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.5.0", defaults, features, koreanFromEnglish, planCatchUp, channelId });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.5.1", defaults, features, koreanFromEnglish, planCatchUp, channelId });
 })();
