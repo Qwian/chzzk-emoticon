@@ -32,8 +32,13 @@
     .ct-saved-link{display:flex;align-items:center;gap:8px;color:inherit;text-decoration:none;min-height:42px;padding:5px 30px 5px 8px;box-sizing:border-box;border-radius:6px}
     .ct-saved-link:hover{background:#8882}.ct-saved-link img{width:26px;height:26px;border-radius:50%;object-fit:cover}
     .ct-saved-link .ct-avatar{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:#8883;flex:none}
-    .ct-saved-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;min-width:0}
-    .ct-saved-state{display:block;font-size:10px;color:var(--color-content-03,#92949b)}
+    .ct-saved-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;min-width:0;flex:1}
+    .ct-saved-state{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--color-content-03,#92949b)}
+    .ct-saved-category{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+    .ct-saved-viewers{flex:none;margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .ct-saved-viewers[hidden]{display:none}
+    .ct-saved-tags{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:normal;font-size:10px;color:var(--color-content-03,#92949b);line-height:1.4}
+    .ct-saved-tags[hidden]{display:none}
     .ct-channel-row.ct-edit .ct-saved-link{padding-right:94px}
     .ct-bookmark{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;height:34px;padding:0 13px;border:1px solid #8884;border-radius:20px;background:var(--color-bg-layer-03,#292b30);color:var(--color-content-01,#f5f5f5);font:700 14px system-ui;cursor:pointer;white-space:nowrap;margin-right:8px}
     .ct-bookmark[aria-pressed="true"]{color:#00c985;border-color:#00c98588}.ct-bookmark svg{width:16px;height:16px}
@@ -195,16 +200,37 @@
     let item = addedRows.get(channel.id);
     if (!item) {
       const row = document.createElement("li"), link = document.createElement("a"); link.className = "ct-saved-link";
+      link.addEventListener("click", event => {
+        if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        const url = new URL(link.href, location.href);
+        if (url.origin !== location.origin || !core.channelId(url.pathname)) return;
+        event.preventDefault();
+        if (url.href === location.href) return;
+        const previous = history.state;
+        const state = { usr: null, key: crypto.randomUUID().slice(0, 8), idx: Number.isInteger(previous?.idx) ? previous.idx + 1 : 1 };
+        history.pushState(state, "", url.pathname + url.search + url.hash);
+        window.dispatchEvent(new PopStateEvent("popstate", { state }));
+      });
       const avatar = document.createElement("span"); avatar.className = "ct-avatar"; avatar.textContent = channel.name[0] || "□";
       const name = document.createElement("span"); name.className = "ct-saved-name";
-      const title = document.createElement("span"), badge = document.createElement("span"), state = document.createElement("small");
+      const title = document.createElement("span"), badge = document.createElement("span"), state = document.createElement("small"), tags = document.createElement("small");
+      const category = document.createElement("span"), viewers = document.createElement("span");
+      category.className = "ct-saved-category"; viewers.className = "ct-saved-viewers"; state.append(category, viewers);
       badge.className = "ct-saved-label"; badge.textContent = "보관"; state.className = "ct-saved-state";
-      name.append(title, badge, state); link.append(avatar, name); row.append(link); item = { id: channel.id, name: channel.name, row, link, avatar, title, state }; addedRows.set(channel.id, item);
+      tags.className = "ct-saved-tags";
+      name.append(title, badge, state, tags); link.append(avatar, name); row.append(link); item = { id: channel.id, name: channel.name, row, link, avatar, title, state, tags, category, viewers }; addedRows.set(channel.id, item);
     }
     const data = channelCache.get(channel.id)?.data || channel;
     item.followed = false; item.openLive = data.openLive === true;
     item.name = data.name || channel.name; text(item.title, item.name); item.link.href = data.openLive ? `/live/${channel.id}` : `/${channel.id}`;
-    text(item.state, data.openLive === true ? "LIVE" : data.openLive === false ? "오프라인" : "팔로우 없이 보관");
+    text(item.category, data.openLive === true ? ["LIVE", data.category].filter(Boolean).join(" · ") : data.openLive === false ? "오프라인" : "팔로우 없이 보관");
+    item.viewers.hidden = !data.openLive || !Number.isFinite(data.viewers);
+    text(item.viewers, Number.isFinite(data.viewers) ? `${data.viewers.toLocaleString("ko-KR")}명` : "");
+    const tags = Array.isArray(data.tags) ? data.tags : [];
+    item.tags.hidden = !data.openLive || !tags.length;
+    text(item.tags, tags.slice(0, 4).map(tag => `#${tag}`).join(" · "));
+    item.tags.title = tags.map(tag => `#${tag}`).join(" · ");
+    item.link.title = [data.title, data.category, item.tags.title].filter(Boolean).join("\n");
     const image = data.image || channel.image;
     if (typeof image === "string" && image.startsWith("https://") && item.avatar.dataset.image !== image) {
       const img = document.createElement("img"); img.src = image; img.alt = ""; item.avatar.replaceChildren(img); item.avatar.dataset.image = image;
@@ -212,15 +238,12 @@
     return item;
   }
   function refreshChannel(channel) {
-    if (publicRequests >= 3 || channelCache.get(channel.id)?.time > Date.now() - 90000) return;
+    if (document.hidden || publicRequests >= 3 || channelCache.get(channel.id)?.time > Date.now() - 30000) return;
     channelCache.set(channel.id, { ...channelCache.get(channel.id), time: Date.now() }); publicRequests++;
-    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 4000);
-    fetch(`https://api.chzzk.naver.com/service/v1/channels/${channel.id}`, { credentials: "omit", signal: controller.signal })
-      .then(response => response.ok ? response.json() : null).then(body => {
-        const data = body?.content;
-        if (body?.code !== 200 || data?.channelId !== channel.id) return;
-        channelCache.set(channel.id, { time: Date.now(), data: { name: String(data.channelName || channel.name).slice(0, 80), image: data.channelImageUrl, openLive: data.openLive } });
-      }).catch(() => {}).finally(() => { clearTimeout(timeout); publicRequests--; schedule(); });
+    globalThis.ChzzkChannels.get(channel.id).then(data => {
+      channelCache.set(channel.id, { time: Date.now(), data });
+    }).catch(() => { const previous = channelCache.get(channel.id); if (previous) previous.time = Date.now() - 20000; })
+      .finally(() => { publicRequests--; schedule(); });
   }
   function renderSidebar() {
     for (const list of lists) if (!list.isConnected) lists.delete(list);

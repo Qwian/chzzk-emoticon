@@ -1,0 +1,54 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>팔로잉·보관 소리 미리보기 검사</title>
+<style>body{font:14px system-ui;background:#171a1d;color:#e8eee9}#sidebar{width:220px}li{height:50px;position:relative}li a{display:block;padding:12px;color:inherit}.ct-row-actions{position:absolute;right:0;top:6px}</style>
+<body data-result="pending"><h1>사이드바 소리 재생 · 로컬 검사</h1><aside id="sidebar"><nav aria-label="팔로우"><ul>
+<li id="follow"><a href="/live/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"><strong data-channel-name="팔로잉 채널">팔로잉 채널</strong></a><span class="ct-row-actions"><button>별</button></span><div class="_tooltip_test">기존 그림 미리보기</div></li>
+<li id="saved"><a class="ct-saved-link" href="/live/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb">보관 채널</a></li>
+<li id="offline"><a href="/cccccccccccccccccccccccccccccccc">오프라인</a></li>
+</ul></nav></aside><pre id="result">pending</pre>
+<script>
+history.replaceState(null,'','/live/'+'d'.repeat(32));
+const requests=[],hls=[],listeners=[];let blockPlayback=false;
+window.chrome={storage:{local:{get:async()=>({features:{listPreview:true,sidebarPreview:true}})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+HTMLMediaElement.prototype.play=function(){if(blockPlayback)return Promise.reject(new DOMException('User gesture required','NotAllowedError'));this.dispatchEvent(new Event('playing'));return Promise.resolve()};
+HTMLMediaElement.prototype.pause=function(){};HTMLMediaElement.prototype.load=function(){};HTMLMediaElement.prototype.canPlayType=()=>'';
+window.Hls=class{static isSupported(){return true}static Events={ERROR:'error'};constructor(){hls.push(this)}loadSource(){}attachMedia(video){this.video=video}on(){}destroy(){this.closed=true}};
+window.fetch=async(url,options)=>{
+ requests.push(url);const id=url.match(/channels\/([a-f0-9]{32})/)?.[1];
+ if(url.endsWith('auto-play-info'))return{ok:true,json:async()=>({content:{previewPlaybackJson:JSON.stringify({media:[{mediaId:'HLS',path:'https://media.example.test/preview.m3u8'}]})}})};
+ const profile={channelId:id,channelName:id==='a'.repeat(32)?'팔로잉 채널':'보관 채널',openLive:true};
+ return{ok:true,json:async()=>({code:200,content:url.endsWith('/live-detail')?{channel:profile,status:'OPEN',liveId:id==='a'.repeat(32)?123:456,liveTitle:'현재 방송 제목',liveCategoryValue:'게임',tags:['태그하나','태그둘'],cvExposure:true,concurrentUserCount:1234}:profile})};
+};
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function hover(id,target='a'){document.querySelector('#'+id+' '+target).dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))}
+function leave(id,relatedTarget=document.body){document.querySelector('#'+id+' a').dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget}))}
+</script><script src="/channel-data.js"></script><script src="/list-preview.js"></script><script>
+(async()=>{const results=[],check=(name,passed)=>results.push({name,passed});
+ await wait(30);hover('follow');await wait(80);leave('follow');await wait(350);
+ check('짧게 스친 행은 재생/요청하지 않음',requests.length===0&&!document.querySelector('#chzzk-sidebar-preview'));
+ hover('offline');await wait(350);check('오프라인 행은 자동 재생하지 않음',requests.length===0);
+ hover('follow');await wait(450);let video=document.querySelector('#chzzk-sidebar-preview video');
+ check('본방 시청 페이지에서도 팔로잉 hover로 실제 영상 생성',Boolean(video)&&hls.length===1);
+ check('소리 켜짐과 100% 음량',video?.muted===false&&video?.volume===1);
+ check('방송 제목·카테고리·태그·공개 시청자 수 표시',document.querySelector('#chzzk-sidebar-preview').textContent.includes('현재 방송 제목')&&document.querySelector('#chzzk-sidebar-preview').textContent.includes('#태그하나')&&document.querySelector('#chzzk-sidebar-preview').textContent.includes('1,234명'));
+ check('기존 그림 툴팁과 겹치지 않음',getComputedStyle(document.querySelector('._tooltip_test')).display==='none');
+ hover('follow','strong');await wait(350);check('같은 행 안에서 움직여도 중복 재생하지 않음',hls.length===1);
+ const popup=document.querySelector('#chzzk-sidebar-preview');leave('follow',popup);await wait(30);check('미리보기 안으로 이동하면 재생 유지',Boolean(document.querySelector('#chzzk-sidebar-preview')));
+ popup.dispatchEvent(new PointerEvent('pointerleave',{relatedTarget:document.body}));await wait(30);
+ check('미리보기 밖으로 나가면 소리·연결 종료',!document.querySelector('#chzzk-sidebar-preview')&&hls[0].closed);
+ blockPlayback=true;hover('saved');await wait(450);
+ check('보관 채널도 hover로 같은 플레이어 사용',hls.length===2);
+ const start=[...document.querySelectorAll('#chzzk-sidebar-preview button')].find(button=>button.textContent==='소리 켜고 재생');
+ check('브라우저가 소리를 막으면 명시적 재생 버튼 표시',Boolean(start));
+ blockPlayback=false;start.click();await wait(30);check('버튼 동작 후 소리 재생·버튼 정리',!document.querySelector('#chzzk-sidebar-preview').textContent.includes('소리 켜고 재생')&&hls[1].video.volume===1);
+ listeners.forEach(fn=>fn({features:{newValue:{sidebarPreview:false,listPreview:true}}},'local'));await wait(30);
+ check('사이드바 자동 재생만 끄면 즉시 종료',!document.querySelector('#chzzk-sidebar-preview')&&hls[1].closed);
+ hover('follow');await wait(350);check('설정 꺼짐 상태에서는 hover해도 재생하지 않음',hls.length===2);
+ listeners.forEach(fn=>fn({features:{newValue:{sidebarPreview:true,listPreview:true}}},'local'));
+ hover('follow','button');await wait(350);check('별/정렬 버튼에 올리는 동작은 재생을 시작하지 않음',hls.length===2);
+ hover('follow');await wait(450);document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await wait(30);
+ check('Esc로 소리 미리보기 종료',!document.querySelector('#chzzk-sidebar-preview')&&hls.at(-1).closed);
+ hover('follow');await wait(450);const link=document.querySelector('#follow a');link.addEventListener('click',event=>event.preventDefault(),{once:true});link.click();await wait(30);
+ check('채널로 이동하는 클릭에서는 미리보기 소리 종료',!document.querySelector('#chzzk-sidebar-preview')&&hls.at(-1).closed);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>

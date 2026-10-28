@@ -154,7 +154,7 @@
     if (stopped) return;
     if (message.type === "GET_TOOL_STATUS") {
       document.dispatchEvent(new Event("chzzk-tools:quality-query"));
-      respond({ ok: true, codeVersion: "0.6.1", quality: globalThis.__chzzkQualityStatus,
+      respond({ ok: true, codeVersion: "0.7.0", quality: globalThis.__chzzkQualityStatus,
         videoHeight: bestVideo()?.videoHeight || 0 }); return;
     }
     if (message.type === "MEDIA_FRAME_AVAILABLE") { remoteMediaUntil = message.available ? performance.now() + 9000 : 0; return; }

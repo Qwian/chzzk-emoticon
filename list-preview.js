@@ -1,15 +1,21 @@
 (() => {
   if (globalThis.__chzzkListPreview) return;
   globalThis.__chzzkListPreview = true;
-  let enabled = true, active = null;
+  let enabled = false, sidebarEnabled = false, active = null, hoverCard = null, hoverTimer = 0;
+  const previewStyle = document.createElement("style");
+  previewStyle.textContent = ".ct-sidebar-previewing [class*='_tooltip_']{display:none!important}";
+  document.documentElement.append(previewStyle);
+  function cancelHover() { clearTimeout(hoverTimer); hoverTimer = 0; hoverCard = null; }
   function close() {
     const previous = active; active = null;
     if (!previous) return;
     clearTimeout(previous.timer); previous.abort?.abort(); previous.hls?.destroy();
     if (previous.owned) { previous.video.pause(); previous.video.removeAttribute("src"); previous.video.load(); }
     else { previous.video.muted = previous.muted; previous.video.volume = previous.volume; if (previous.paused) previous.video.pause(); }
-    previous.overlay?.remove(); previous.badge?.remove();
-    previous.card.removeEventListener("pointerleave", close);
+    previous.overlay?.remove(); previous.badge?.remove(); previous.playButton?.remove();
+    previous.popup?.remove(); previous.card.classList.remove("ct-sidebar-previewing");
+    previous.card.removeEventListener("pointerleave", previous.leave);
+    if (previous.sidebar && hoverCard === previous.card) cancelHover();
     if (previous.position !== undefined) previous.mount.style.position = previous.position;
     if (previous.soop) document.dispatchEvent(new CustomEvent("chzzk-tools:soop-preview", { detail: { action: "close" } }));
   }
@@ -42,20 +48,58 @@
     return null;
   }
   function badge(state, message) { if (state.badge) state.badge.textContent = message; }
+  function sidebarPanel(info) {
+    const popup = document.createElement("aside"); popup.id = "chzzk-sidebar-preview";
+    popup.setAttribute("aria-label", "채널 소리 미리보기");
+    popup.style.cssText = "position:fixed;width:min(360px,calc(100vw - 16px));background:#181c21;color:#edf4f0;border:1px solid #73807766;border-radius:10px;box-shadow:0 10px 30px #0008;z-index:2147483646;overflow:hidden;font:12px/1.5 system-ui";
+    const head = document.createElement("div"); head.style.cssText = "display:flex;align-items:center;padding:8px 10px;gap:10px";
+    const name = document.createElement("strong"); name.textContent = info.name || "방송 미리보기"; name.style.cssText = "flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    const button = document.createElement("button"); button.type = "button"; button.textContent = "×"; button.setAttribute("aria-label", "미리보기 닫기");
+    button.style.cssText = "border:0;border-radius:4px;color:inherit;background:#ffffff15;cursor:pointer;font:20px system-ui;width:26px;height:26px";
+    button.addEventListener("click", close); head.append(name, button);
+    const mount = document.createElement("div"); mount.style.cssText = "aspect-ratio:16/9;background:#000;position:relative";
+    const meta = document.createElement("div"); meta.style.cssText = "padding:9px 11px";
+    const title = document.createElement("div"), tags = document.createElement("div"); tags.style.cssText = "margin-top:4px;color:#a9bbb0;font-size:11px";
+    title.textContent = "방송 정보를 불러오는 중…"; meta.append(title, tags); popup.append(head, mount, meta); document.documentElement.append(popup);
+    const rect = info.card.getBoundingClientRect(), width = popup.getBoundingClientRect().width;
+    popup.style.left = `${Math.max(8, Math.min(innerWidth - width - 8, rect.right + 8))}px`;
+    popup.style.top = `${Math.max(8, Math.min(innerHeight - 320, rect.top))}px`;
+    popup.addEventListener("pointerleave", event => { if (!info.card.contains(event.relatedTarget)) close(); });
+    return { popup, mount, title, tags, name };
+  }
+  async function play(state) {
+    if (active !== state) return;
+    try {
+      state.video.muted = false; state.video.volume = 1;
+      await state.video.play();
+      if (active === state) { state.playButton?.remove(); state.playButton = null; badge(state, state.sidebar ? "소리 켜짐 · 음량 100%" : "소리 켜짐 · 우클릭 종료"); }
+    } catch {
+      if (active !== state) return;
+      badge(state, "소리 재생을 시작하려면 버튼을 눌러 주세요.");
+      if (!state.playButton) {
+        const button = document.createElement("button"); state.playButton = button; button.type = "button"; button.textContent = "소리 켜고 재생";
+        button.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:12;pointer-events:auto;border:0;border-radius:7px;padding:10px 14px;background:#00dc91;color:#08291d;font:700 13px system-ui;cursor:pointer;white-space:nowrap";
+        button.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); play(state); }); state.mount.append(button);
+      }
+    }
+  }
   async function open(info) {
     close();
-    const native = info.card.querySelector("video:not([id*='AD'])");
+    if (info.sidebar) Object.assign(info, sidebarPanel(info));
+    const native = !info.sidebar && info.card.querySelector("video:not([id*='AD'])");
     const state = { ...info, video: native || document.createElement("video"), owned: !native,
       paused: native?.paused, muted: native?.muted, volume: native?.volume, abort: new AbortController() };
     active = state;
-    info.card.addEventListener("pointerleave", close);
+    state.leave = event => { if (!state.popup?.contains(event.relatedTarget)) close(); };
+    info.card.addEventListener("pointerleave", state.leave);
+    if (info.sidebar) info.card.classList.add("ct-sidebar-previewing");
     const label = document.createElement("span"); state.badge = label;
     label.style.cssText = "position:absolute;left:5px;bottom:5px;z-index:8;background:#10271deb;color:#ccffe0;padding:3px 7px;border-radius:4px;font:11px system-ui;pointer-events:none";
     state.mount.append(label); badge(state, "소리 켜고 미리보기 준비 중…");
     if (getComputedStyle(state.mount).position === "static") { state.position = state.mount.style.position; state.mount.style.position = "relative"; }
     state.video.muted = false; state.video.volume = 1;
     if (native) {
-      try { await native.play(); badge(state, "소리 켜짐 · 우클릭 종료"); } catch { badge(state, "미리보기 재생이 허용되지 않았습니다."); }
+      await play(state);
       return;
     }
     const overlay = document.createElement("div"); state.overlay = overlay;
@@ -64,9 +108,17 @@
     state.video.id = `${overlay.id}-video`; state.video.playsInline = true;
     state.video.style.cssText = "width:100%;height:100%;object-fit:contain";
     overlay.append(state.video); state.mount.append(overlay);
-    state.video.addEventListener("playing", () => { if (active === state) badge(state, "소리 켜짐 · 우클릭 종료"); });
+    state.video.addEventListener("playing", () => { if (active === state) badge(state, state.sidebar ? "소리 켜짐 · 음량 100%" : "소리 켜짐 · 우클릭 종료"); });
     state.timer = setTimeout(() => { if (active === state && !state.video.readyState) badge(state, "이 방송의 미리보기를 불러오지 못했습니다."); }, 8000);
     try {
+      if (state.sidebar) {
+        const channel = await globalThis.ChzzkChannels.get(state.channelId, { signal: state.abort.signal });
+        if (active !== state) return;
+        state.name.textContent = channel.name; state.title.textContent = channel.title || channel.name;
+        state.tags.textContent = [channel.category, Number.isFinite(channel.viewers) ? `${channel.viewers.toLocaleString("ko-KR")}명` : "", ...channel.tags.map(tag => `#${tag}`)].filter(Boolean).join(" · ");
+        if (!channel.openLive || !channel.liveId) { badge(state, "현재 방송 중이 아닙니다."); return; }
+        state.liveId = channel.liveId;
+      }
       if (state.soop) {
         state.requestId = crypto.randomUUID();
         document.dispatchEvent(new CustomEvent("chzzk-tools:soop-preview", { detail: {
@@ -87,9 +139,37 @@
         state.hls.loadSource(source.path); state.hls.attachMedia(state.video);
         state.hls.on(globalThis.Hls.Events.ERROR, (_event, error) => { if (error.fatal && active === state) badge(state, "미리보기 재생 오류"); });
       } else throw new Error();
-      await state.video.play();
+      await play(state);
     } catch { if (active === state) badge(state, "이 방송은 목록 미리보기를 제공하지 않거나 재생이 제한돼 있습니다."); }
   }
+  function sidebarRow(target) {
+    if (!globalThis.ChzzkChannels || !sidebarEnabled || target.closest?.(".ct-row-actions,.ct-list-tools,button")) return null;
+    const section = target.closest?.("#sidebar nav[aria-label]");
+    if (!section || !/^(팔로우|팔로잉|Following|보관 채널)$/i.test(section.getAttribute("aria-label"))) return null;
+    const card = target.closest("li"); if (!card) return null;
+    const link = [...card.querySelectorAll("a[href]")].find(a => {
+      try { const url = new URL(a.href, location.href); return url.origin === location.origin && /^\/live\/[a-f0-9]{32}$/i.test(url.pathname); } catch { return false; }
+    });
+    if (!link) return null;
+    return { card, sidebar: true, channelId: new URL(link.href, location.href).pathname.split("/")[2],
+      name: (card.querySelector("[data-channel-name], [class*='_name_'], .ct-saved-name")?.textContent || "방송 미리보기").slice(0, 80) };
+  }
+  document.addEventListener("pointerover", event => {
+    const info = sidebarRow(event.target); if (!info || info.card === hoverCard) return;
+    cancelHover();
+    if (active?.sidebar) close();
+    hoverCard = info.card;
+    hoverTimer = setTimeout(() => { hoverTimer = 0; if (hoverCard === info.card && info.card.isConnected && sidebarEnabled) open(info); }, 300);
+  }, true);
+  document.addEventListener("pointerout", event => {
+    if (!hoverCard?.contains(event.target) || hoverCard.contains(event.relatedTarget) || active?.popup?.contains(event.relatedTarget)) return;
+    cancelHover(); if (active?.sidebar) close();
+  }, true);
+  document.addEventListener("click", event => {
+    if (event.button !== 0 || !event.target.closest?.("#sidebar a[href]")) return;
+    cancelHover(); if (active?.sidebar) close();
+  }, true);
+  window.addEventListener("popstate", () => { cancelHover(); if (active?.sidebar) close(); });
   window.addEventListener("contextmenu", event => {
     if (!enabled || event.shiftKey || event.ctrlKey || event.metaKey || event.target.closest?.("input,textarea,[contenteditable='true']")) return;
     const info = identify(event.target); if (!info) return;
@@ -100,13 +180,16 @@
     if (active?.requestId !== event.detail?.requestId) return;
     if (!event.detail.ok) badge(active, event.detail.message || "미리보기를 재생하지 못했습니다.");
   });
-  chrome.storage.local.get("features").then(data => { enabled = data.features?.listPreview !== false; });
+  chrome.storage.local.get("features").then(data => { enabled = data.features?.listPreview !== false; sidebarEnabled = data.features?.sidebarPreview !== false; });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.features) return;
-    enabled = changes.features.newValue?.listPreview !== false; if (!enabled) close();
+    enabled = changes.features.newValue?.listPreview !== false; sidebarEnabled = changes.features.newValue?.sidebarPreview !== false;
+    if (!sidebarEnabled) cancelHover();
+    if (active?.sidebar ? !sidebarEnabled : !enabled) close();
   });
-  document.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
-  window.addEventListener("pagehide", close);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) close(); });
-  window.setInterval(() => { if (active && !active.card.isConnected) close(); }, 1000);
+  document.addEventListener("keydown", event => { if (event.key === "Escape") { cancelHover(); close(); } });
+  document.addEventListener("dragstart", () => { if (active?.sidebar) { cancelHover(); close(); } }, true);
+  window.addEventListener("pagehide", () => { cancelHover(); close(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { cancelHover(); close(); } });
+  window.setInterval(() => { if (active && !active.card.isConnected) close(); if (hoverCard && !hoverCard.isConnected) cancelHover(); }, 1000);
 })();

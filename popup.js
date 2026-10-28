@@ -376,6 +376,7 @@ async function initializeFeatures() {
   const labels = {
     globalSpeed: "모든 사이트 속도·프레임 단축키",
     listPreview: "치지직·숲 목록 우클릭 소리 미리보기",
+    sidebarPreview: "팔로잉·보관 채널에 마우스를 올리면 소리 재생",
     highestQuality: "치지직에서 선택 가능한 최고 화질 자동 선택",
     adblockQuality: "광고 차단 감지로 인한 360p 제한 보정 (새로고침 필요)",
     dismissAdNotice: "치지직 광고 차단 안내 숨김",
