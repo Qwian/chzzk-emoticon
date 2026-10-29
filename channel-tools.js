@@ -62,6 +62,9 @@
   $("summary").addEventListener("pointerdown", event => {
     if (event.button === 0 && event.pointerType === "mouse") event.preventDefault();
   });
+  window.addEventListener("click", event => {
+    if (!stopped && $("details").open && !event.composedPath().includes(playerHost)) $("details").open = false;
+  }, true);
   const bookmarkButton = document.createElement("button");
   bookmarkButton.type = "button"; bookmarkButton.id = "chzzk-channel-save"; bookmarkButton.className = "ct-bookmark";
   bookmarkButton.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 3h10v14l-5-3-5 3z"/></svg><span></span>';
