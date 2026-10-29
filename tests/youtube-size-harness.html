@@ -1,0 +1,33 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>유튜브 내부 영상 크기 회귀 검사</title>
+<style>
+body{margin:0;background:#121212;color:#eee;font:14px system-ui}ytd-watch-flexy,ytd-player{display:block}#masthead-container{height:56px}#player-full-bleed-container{position:relative;height:320px;background:#000}#player-container{position:absolute;width:100%;height:320px}ytd-player,ytd-player>#container,#movie_player{width:100%;height:100%}.html5-video-container{position:relative;height:0}video{position:absolute;background:linear-gradient(135deg,#125b61,#35704f)}ytd-live-chat-frame{display:block;width:360px;height:300px;background:#e9e9e9}iframe{border:0}#result{position:fixed;bottom:0;left:0;max-height:100px;overflow:auto;z-index:2147483647;background:#111d;color:#fff;font-size:11px;pointer-events:none}
+</style><body data-result="pending">
+<div id="masthead-container">상단바</div><ytd-page-manager id="page-manager"><ytd-watch-flexy><div id="full-bleed-container"><div id="player-full-bleed-container"><div id="player-container"><ytd-player id="ytd-player"><div id="container"><div id="movie_player"><div class="html5-video-container"><video class="video-stream html5-main-video" style="width:320px;height:180px;left:143px;top:36px"></video></div><button class="ytp-size-button">극장 모드</button><button class="ytp-fullscreen-button">전체화면</button></div></div></ytd-player></div></div></div><section><ytd-live-chat-frame id="chat" collapsed><iframe id="chatframe" title="모사 채팅" srcdoc="<!doctype html><html><body>채팅</body></html>"></iframe></ytd-live-chat-frame></section></ytd-watch-flexy></ytd-page-manager><pre id="result">pending</pre>
+<script>
+const store={features:{youtubeWide:true}},listeners=new Set(),errors=[];let nativeResizes=0;
+window.addEventListener('error',event=>{errors.push({message:event.message,source:event.filename,line:event.lineno,stack:event.error?.stack});document.body.dataset.errors=JSON.stringify(errors)});
+history.replaceState(null,'','/watch?v=size-test');
+window.chrome={storage:{local:{get:async()=>structuredClone(store),set:async data=>{const changes={};for(const[k,v]of Object.entries(data)){changes[k]={newValue:v};store[k]=structuredClone(v)}queueMicrotask(()=>listeners.forEach(fn=>fn(changes,'local')))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+// The current YouTube DOM has a zero-height media wrapper and pixel-sized video styles.
+// Model the native player rewriting those styles during a layout notification.
+window.addEventListener('resize',()=>{nativeResizes++;document.querySelector('video').style.cssText='width:320px;height:180px;left:143px;top:36px'});
+const wait=()=>new Promise(resolve=>setTimeout(resolve,120));
+</script><script src="/layout-runtime.js?v=0.9.1"></script><script src="/youtube-layout.js?v=0.9.1-size"></script><script>
+document.querySelector('.ytp-size-button').onclick=()=>document.querySelector('ytd-watch-flexy').toggleAttribute('theater');
+(async()=>{
+ await wait();const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)}),video=document.querySelector('video'),stage=document.querySelector('#player-full-bleed-container'),chat=document.querySelector('#chat'),iframe=document.querySelector('iframe');
+ const fit=()=>{const a=video.getBoundingClientRect(),b=stage.getBoundingClientRect();return ['left','top','width','height'].every(key=>Math.abs(a[key]-b[key])<1)};
+ document.querySelector('.ytp-size-button').click();await wait();check('채팅 없는 극장 모드에서도 내부 영상이 전체 영역을 채움',fit()&&stage.getBoundingClientRect().height===innerHeight);
+ chat.removeAttribute('collapsed');await wait();check('옆 채팅에서도 내부 영상과 플레이어 크기가 일치',fit()&&Math.abs(stage.getBoundingClientRect().width-(innerWidth-368))<1);
+ const previous=nativeResizes,divider=document.querySelector('#ct-yt-divider');divider.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));await wait();check('채팅 폭을 바꿔도 내부 영상 크기·위치 일치',fit()&&Math.abs(stage.getBoundingClientRect().width-(innerWidth-388))<1);
+ check('영역 크기 변경을 기본 플레이어에도 알림',nativeResizes>previous);
+ check('기본 플레이어의 지연된 픽셀 크기 재설정에도 축소되지 않음',fit()&&video.style.width==='320px');
+ let capture=null;divider.setPointerCapture=id=>capture=id;divider.hasPointerCapture=id=>capture===id;divider.releasePointerCapture=()=>{capture=null};
+ divider.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerId:7,bubbles:true,cancelable:true}));divider.dispatchEvent(new PointerEvent('pointermove',{pointerId:7,clientX:innerWidth-100,bubbles:true}));await wait();check('드래그 중 기본 resize 알림이 저장 전 채팅 폭을 되돌리지 않음',Math.abs(chat.getBoundingClientRect().width-96)<1&&fit());divider.dispatchEvent(new PointerEvent('pointerup',{pointerId:7,bubbles:true}));await wait();
+ check('영상 비율은 contain으로 보존',getComputedStyle(video).objectFit==='contain');
+ check('채팅 iframe을 재생성하지 않음',iframe===document.querySelector('iframe'));
+ const measured={stage:stage.getBoundingClientRect().toJSON(),video:video.getBoundingClientRect().toJSON(),nativeResizes};
+ await chrome.storage.local.set({features:{youtubeWide:false}});await wait();check('기능을 끄면 기본 픽셀 크기·위치 복원',Math.abs(video.getBoundingClientRect().width-320)<1&&getComputedStyle(video).left==='143px'&&!document.querySelector('#ct-yt-style'));
+ document.querySelector('#result').textContent=JSON.stringify({viewport:[innerWidth,innerHeight],results,measured,errors},null,2);document.body.dataset.result=results.every(r=>r.passed)&&!errors.length?'pass':'fail';
+})().catch(error=>{document.querySelector('#result').textContent=error.stack;document.body.dataset.result='fail'});
+</script></body></html>

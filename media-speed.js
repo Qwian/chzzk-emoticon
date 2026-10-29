@@ -63,7 +63,7 @@
     const usable = right > left && bottom > top;
     const areaWidth = usable ? right - left : width, areaHeight = usable ? bottom - top : height;
     const gap = Math.round(Math.max(8, Math.min(24, Math.min(areaWidth, areaHeight) * 0.045)));
-    element.style.fontSize = `${Math.max(18, Math.min(36, areaWidth * 0.055, areaHeight * 0.12))}px`;
+    element.style.fontSize = `${Math.max(18, Math.min(24, areaWidth * 0.0375, areaHeight * 0.08))}px`;
     element.style.maxWidth = `${Math.max(1, Math.min(width - gap * 2, Math.max(120, areaWidth - gap * 2)))}px`;
     element.style.maxHeight = `${Math.max(1, height - gap * 2)}px`;
     element.style.left = "0px"; element.style.top = "0px";
@@ -84,7 +84,7 @@
     let element = document.querySelector("#media-speed-toast");
     if (!element) {
       element = document.createElement("div"); element.id = "media-speed-toast"; element.setAttribute("role", "status");
-      element.style.cssText = "position:fixed;inset:auto;margin:0;z-index:2147483647;box-sizing:border-box;background:#101b18ed;color:#eafff6;border:1px solid #80ffd54d;box-shadow:0 6px 28px #0006;padding:12px 22px;border-radius:14px;font:800 36px/1.2 system-ui;font-variant-numeric:tabular-nums;text-align:center;overflow:hidden;pointer-events:none";
+      element.style.cssText = "position:fixed;inset:auto;margin:0;z-index:2147483647;box-sizing:border-box;background:#101b18ed;color:#eafff6;border:1px solid #80ffd54d;box-shadow:0 4px 18px #0006;padding:8px 14px;border-radius:10px;font:700 24px/1.2 system-ui;font-variant-numeric:tabular-nums;text-align:center;overflow:hidden;pointer-events:none";
       document.documentElement.append(element);
       const style = document.createElement("style"); style.id = "media-speed-toast-style";
       style.textContent = "#media-speed-toast::backdrop{background:transparent;pointer-events:none}"; document.documentElement.append(style);
@@ -203,7 +203,7 @@
     if (stopped) return;
     if (message.type === "GET_TOOL_STATUS") {
       document.dispatchEvent(new Event("chzzk-tools:quality-query"));
-      respond({ ok: true, codeVersion: "0.9.0", quality: globalThis.__chzzkQualityStatus,
+      respond({ ok: true, codeVersion: "0.9.1", quality: globalThis.__chzzkQualityStatus,
         videoHeight: bestVideo()?.videoHeight || 0 }); return;
     }
     if (message.type === "MEDIA_FRAME_AVAILABLE") { remoteMediaUntil = message.available ? performance.now() + 9000 : 0; return; }

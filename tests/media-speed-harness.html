@@ -21,7 +21,7 @@
   video.pause=()=>{paused=true};video.requestVideoFrameCallback=cb=>{frameCallback=cb};
   const delay=ms=>new Promise(r=>setTimeout(r,ms));
   const press=(code,shiftKey=false,target=document.body)=>{const e=new KeyboardEvent('keydown',{code,shiftKey,bubbles:true,cancelable:true,composed:true});target.dispatchEvent(e);return e;};
-</script><script src="../media-speed.js?v=0.8.2-corner"></script>
+</script><script src="../media-speed.js?v=0.9.1"></script>
 <script>
   (async()=>{
     const results=[],check=(name,passed)=>results.push({name,passed});await delay(120);
@@ -34,7 +34,7 @@
     press('Period');await delay(120);check('마침표로 0.1배 증가',video.playbackRate===1.1);
     check('단축키 배속이 아이콘 숫자로 반영',badge()==='1.1');
     const toast=document.querySelector('#media-speed-toast'),box=toast.getBoundingClientRect(),videoBox=video.getBoundingClientRect();
-    check('배속 안내는 영상 왼쪽 위에 같은 가로·세로 여백으로 크게 표시',Math.abs(box.left-videoBox.left-box.top+videoBox.top)<1&&box.left-videoBox.left>=12&&box.left-videoBox.left<=24&&parseFloat(getComputedStyle(toast).fontSize)>=32);
+    check('배속 안내는 왼쪽 위 동일 여백과 24px 글자·작은 상자로 표시',Math.abs(box.left-videoBox.left-box.top+videoBox.top)<1&&box.left-videoBox.left>=12&&box.left-videoBox.left<=24&&parseFloat(getComputedStyle(toast).fontSize)===24&&box.height<50);
     check('안내는 클릭이나 포커스를 가로채지 않음',getComputedStyle(toast).pointerEvents==='none'&&document.activeElement!==toast);
     const originalVideoStyle=video.style.cssText;video.style.cssText=`position:fixed;left:${innerWidth-80}px;top:${innerHeight-45}px;width:160px;height:90px`;window.dispatchEvent(new Event('resize'));
     const small=toast.getBoundingClientRect();check('작거나 화면 경계에 걸린 영상도 안내가 화면 안에 유지',small.left>=0&&small.top>=0&&small.right<=innerWidth&&small.bottom<=innerHeight);

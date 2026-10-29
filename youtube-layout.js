@@ -7,6 +7,7 @@
   function create(initial, persist) {
     const root = document.documentElement, body = document.body, life = new AbortController(), signal = life.signal;
     let preferredWidth = Number(initial?.chatWidth) || 360, frame = 0, peekTimer = 0, disposed = false, nativeClick = false;
+    let resizeFrame = 0, notifyingResize = false;
     let watch = null, chat = null, player = null;
     const tags = new Set(), pressed = new Set();
     const style = document.createElement("style"); style.id = "ct-yt-style";
@@ -15,6 +16,10 @@
       body.ct-yt-wide.ct-yt-peek #masthead-container{transform:translateY(0)!important}
       body.ct-yt-wide ytd-page-manager#page-manager{margin-top:0!important}
       body.ct-yt-wide ytd-watch-flexy[theater] :is(#player-full-bleed-container,#player-container-outer,#player-container-inner,#full-bleed-container){height:100vh!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important}
+      body.ct-yt-wide ytd-watch-flexy[theater] #player-full-bleed-container :is(#player-container,ytd-player,ytd-player > #container,#movie_player){width:100%!important;height:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;max-height:none!important}
+      body.ct-yt-wide ytd-watch-flexy[theater] #player-full-bleed-container #player-container{inset:0!important}
+      body.ct-yt-wide ytd-watch-flexy[theater] #movie_player .html5-video-container{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
+      body.ct-yt-wide ytd-watch-flexy[theater] #movie_player video.html5-main-video{width:100%!important;height:100%!important;left:0!important;top:0!important;object-fit:contain!important;object-position:center!important}
       body.ct-yt-wide{overflow-x:hidden!important;scrollbar-width:none!important}
       body.ct-yt-wide::-webkit-scrollbar,html:has(body.ct-yt-wide)::-webkit-scrollbar{display:none!important;width:0!important}
       html:has(body.ct-yt-wide){scrollbar-width:none!important}
@@ -32,6 +37,15 @@
     `;
     document.head.append(style);
     const active = () => body.classList.contains("ct-yt-wide");
+    // The native player keeps pixel-sized video/control layouts. Notify it when our stage changes.
+    const sizes = new ResizeObserver(() => {
+      if (!active() || resizeFrame) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0; if (disposed || !active()) return;
+        notifyingResize = true;
+        try { window.dispatchEvent(new Event("resize")); } finally { notifyingResize = false; }
+      });
+    });
     const width = () => parseFloat(root.style.getPropertyValue("--ct-yt-chat-width")) || preferredWidth;
     function applyWidth(value, store = false) {
       const actual = Math.round(Math.max(1, Math.min(Math.max(1, innerWidth - 9), value)));
@@ -48,7 +62,10 @@
       const nextWatch = location.pathname === "/watch" ? document.querySelector("ytd-watch-flexy") : null;
       const nextChat = nextWatch?.querySelector("ytd-live-chat-frame#chat, ytd-live-chat-frame");
       const nextPlayer = nextWatch?.querySelector("#player-full-bleed-container");
-      if (watch !== nextWatch || chat !== nextChat || player !== nextPlayer) { clearTags(); watch = nextWatch; chat = nextChat; player = nextPlayer; }
+      if (watch !== nextWatch || chat !== nextChat || player !== nextPlayer) {
+        clearTags(); sizes.disconnect(); watch = nextWatch; chat = nextChat; player = nextPlayer;
+        if (player) sizes.observe(player);
+      }
       const on = Boolean(watch?.hasAttribute("theater") && !document.fullscreenElement);
       const dock = Boolean(on && player?.isConnected && chat?.isConnected && !chat.hasAttribute("collapsed") && !chat.hidden);
       body.classList.toggle("ct-yt-wide", on); body.classList.toggle("ct-yt-chat", dock);
@@ -66,7 +83,7 @@
     document.addEventListener("pointerover", event => { if (active() && masthead(event.target)) { clearTimeout(peekTimer); body.classList.add("ct-yt-peek"); } }, { capture: true, signal });
     document.addEventListener("pointerout", event => { if (active() && masthead(event.target) && !masthead(event.relatedTarget)) armHide(); }, { capture: true, signal });
     for (const name of ["yt-navigate-finish", "yt-page-data-updated"]) window.addEventListener(name, schedule, { signal });
-    window.addEventListener("popstate", schedule, { signal }); window.addEventListener("resize", () => applyWidth(preferredWidth), { signal });
+    window.addEventListener("popstate", schedule, { signal }); window.addEventListener("resize", () => { if (!notifyingResize) applyWidth(preferredWidth); }, { signal });
     document.addEventListener("fullscreenchange", schedule, { signal });
     const relevant = "ytd-watch-flexy,ytd-live-chat-frame,#player-full-bleed-container";
     const observer = new MutationObserver(records => {
@@ -90,7 +107,7 @@
         const size = document.querySelector(".ytp-size-button"); if (!size) return;
         consume(event); size.click();
       },
-      stop() { disposed = true; cancelAnimationFrame(frame); clearTimeout(peekTimer); pressed.clear(); life.abort(); observer.disconnect(); clearTags(); body.classList.remove("ct-yt-wide", "ct-yt-peek", "ct-yt-chat"); root.style.removeProperty("--ct-yt-chat-width"); divider.remove(); style.remove(); }
+      stop() { disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(resizeFrame); sizes.disconnect(); clearTimeout(peekTimer); pressed.clear(); life.abort(); observer.disconnect(); clearTags(); body.classList.remove("ct-yt-wide", "ct-yt-peek", "ct-yt-chat"); root.style.removeProperty("--ct-yt-chat-width"); divider.remove(); style.remove(); }
     };
   }
 })();
