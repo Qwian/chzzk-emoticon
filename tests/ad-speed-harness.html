@@ -14,7 +14,7 @@ ad.play=()=>{plays++;return Promise.resolve()};ad.pause=()=>{restarts++};ad.load
 document.addEventListener('chzzk-tools:player-status',event=>document.querySelector('#status').textContent=event.detail.text);
 const tick=(seconds=1,progress=0)=>{now+=seconds*1000;time+=progress;timers.forEach(fn=>fn())};
 const next=()=>{source='ad'+(Number(source.slice(2))+1);time=0;ready=4;paused=false;ended=false;bufferEnd=duration;rate=1;ad.dispatchEvent(new Event('loadedmetadata'));tick()};
-</script><script src="/tools-core.js?v=0.8.1"></script><script src="/player-tools.js?v=0.8.1"></script><script>
+</script><script src="/tools-core.js?v=0.9.0"></script><script src="/player-tools.js?v=0.9.0-audio-final"></script><script>
 (async()=>{
  await Promise.resolve();const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});
  tick();check('정상적으로 재생되는 광고는 지정한 4배속',rate===4);

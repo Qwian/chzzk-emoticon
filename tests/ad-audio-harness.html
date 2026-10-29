@@ -1,0 +1,27 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>광고 종료 후 소리 복원 검사</title><body data-result="pending">
+<video class="webplayer-internal-video" style="width:640px;height:360px"></video><div id="midAdPlayerWrapper" style="display:none"><div id="midAdVideoContainer"><video id="ad"></video></div></div>
+<button id="start">광고 시작</button><button id="skip">광고 종료</button><button class="pzp-pc__volume-control" id="user-mute">사용자 음소거</button><button id="late">뒤늦은 SDK 음소거</button><button id="clock">상태 갱신</button><output id="audio"></output><pre id="result">pending</pre>
+<script>
+const preview=new URLSearchParams(location.search).has('preview');history.replaceState(null,'','/live/'+'a'.repeat(32));
+const timers=[],listeners=[],features={adMute:true,adSpeed:1,catchUp:false,mainAudio:true};let now=100000;
+Object.defineProperty(performance,'now',{value:()=>now});window.setInterval=fn=>{timers.push(fn);return timers.length};
+window.chrome={storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+let main=document.querySelector('video'),adEnded=false;const wrapper=document.querySelector('#midAdPlayerWrapper'),ad=document.querySelector('#ad');
+Object.defineProperty(ad,'ended',{get:()=>adEnded});
+function prepare(video){Object.defineProperties(video,{paused:{get:()=>false},readyState:{get:()=>4}})}prepare(main);prepare(ad);main.volume=.4;
+const tick=(ms=1000)=>{now+=ms;timers.forEach(fn=>fn());document.querySelector('#audio').textContent=`muted=${main.muted}, volume=${main.volume}`};
+const start=()=>{wrapper.style.display='block';tick()},skip=()=>{wrapper.style.display='none';tick()};
+document.querySelector('#start').onclick=start;document.querySelector('#skip').onclick=skip;document.querySelector('#user-mute').onclick=()=>{main.muted=true;tick()};document.querySelector('#late').onclick=()=>{main.muted=true;main.volume=0;tick()};document.querySelector('#clock').onclick=()=>tick();
+</script><script src="/tools-core.js?v=0.9.0"></script><script src="/player-tools.js?v=0.9.0-audio-final"></script><script>
+(async()=>{await Promise.resolve();const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});tick();
+ if(preview){document.body.dataset.result='preview';return}
+ start();skip();main.muted=true;main.volume=0;tick(400);check('Skip 뒤 지연된 SDK 음소거와 0 음량 복원',!main.muted&&main.volume===.4);
+ tick(6000);main.muted=true;main.volume=.3;tick();check('복원 시간창 이후 사용자가 바꾼 값 유지',main.muted&&main.volume===.3);
+ main.muted=false;main.volume=.4;tick();start();adEnded=true;main.muted=true;main.volume=0;tick();check('종료된 광고 영상의 래퍼가 남아도 본방 소리 복원',!main.muted&&main.volume===.4);wrapper.style.display='none';adEnded=false;tick(6000);main.muted=true;main.volume=.3;tick();
+ start();skip();main.muted=false;tick(300);check('원래 음소거한 사용자는 광고 뒤에도 음소거 유지',main.muted);
+ tick(6000);main.muted=false;main.volume=.6;tick();start();skip();const replacement=document.createElement('video');replacement.className='webplayer-internal-video';replacement.style.width='640px';prepare(replacement);replacement.muted=true;replacement.volume=0;main.replaceWith(replacement);main=replacement;tick(300);check('Skip 뒤 본방 요소가 교체돼도 이전 소리 복원',!main.muted&&main.volume===.6);
+ tick(6000);main.muted=false;main.volume=.5;tick();start();main.remove();skip();main.muted=true;main.volume=0;document.body.prepend(main);tick(300);check('광고 종료 순간 본방이 없어도 다시 연결되면 소리 복원',!main.muted&&main.volume===.5);
+ tick(6000);main.muted=false;main.volume=.4;tick();start();skip();history.replaceState(null,'','/live/'+'b'.repeat(32));main.muted=true;main.volume=.2;tick();check('다른 채널로 이동하면 이전 광고 복원 중단',main.muted&&main.volume===.2);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.querySelector('#result').textContent=error.stack;document.body.dataset.result='fail'});
+</script></body></html>

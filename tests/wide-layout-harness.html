@@ -1,0 +1,69 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>유튜브·넥슨 큰 영상과 옆 채팅 검사</title>
+<style>body{margin:0;background:#172129;color:#eee;font:14px system-ui}ytd-watch-flexy,ytd-live-chat-frame,ytd-page-manager{display:block}#masthead-container{height:56px;background:#25454a}#player-full-bleed-container{height:320px;background:#0e1d24}#player-full-bleed-container video{width:100%;height:100%}ytd-live-chat-frame{height:250px;width:360px;background:#eee}iframe{box-sizing:border-box}main{margin:0}.Viewport_content__test{display:flex}.Content_root__test{flex:1}.AspectRatio_root__test,.Content_inner__test{height:320px}.AspectRatio_inner__test,.VideoOverlay_root__test,video{width:100%;height:100%}.SideContent_root__test{width:360px}.Chat_root__test,.ChatPanel_root__test,.ReplayChatPanel_root__test{height:320px;background:#eee;color:#111}.ChatPanel_content__test{height:250px}#result{position:fixed;bottom:8px;left:8px;z-index:2147483647;max-height:120px;overflow:auto;background:#111c;color:#ddd;font:11px monospace;pointer-events:none}</style>
+<body data-result="pending"><div id="fixture"></div><pre id="result">pending</pre><script>
+const params=new URLSearchParams(location.search),nexon=params.has('nexon'),modern=params.has('modern'),legacyFirst=params.has('legacy'),preview=params.has('preview');
+const originalTimeout=window.setTimeout.bind(window);window.setTimeout=(fn,ms,...args)=>originalTimeout(fn,ms===2000?40:ms,...args);window.requestAnimationFrame=fn=>originalTimeout(()=>fn(performance.now()),0);window.cancelAnimationFrame=clearTimeout;
+const store={features:{youtubeWide:true,nexonWide:true},unrelated:'keep'},listeners=new Set(),writes=[];
+window.chrome={storage:{local:{get:async()=>structuredClone(store),set:async data=>{const changes={};for(const[key,value]of Object.entries(data)){changes[key]={newValue:value,oldValue:store[key]};store[key]=structuredClone(value)}writes.push(data);queueMicrotask(()=>listeners.forEach(fn=>fn(changes,'local')))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+const input='<textarea id="draft">작성 중 메시지</textarea>',chatPanel='<div class="ChatPanel_root__test" data-state="closed"><header class="ChatPanel_header__test"><button id="expand" aria-expanded="false">채팅 펼치기</button></header><div class="ChatPanel_content__test"><div class="Chat_root__test">'+input+'</div></div></div>';
+if(nexon){
+ history.replaceState(null,'','/replays/test');localStorage.setItem('nlf.width','146');localStorage.setItem('nlf.enabled','true');
+ document.querySelector('#fixture').innerHTML=modern?'<div class="GlobalNavBar_root__test">메뉴</div><div class="Viewport_content__test"><main class="Content_root__test"><div class="Content_inner__test"><div class="VideoOverlay_root__test"><video></video><button aria-label="전체화면">전체화면</button></div></div><h1>제목</h1></main></div><div class="SheetPortal_slot__test"><div class="Chat_root__test"><div class="ReplayChatPanel_root__test">'+input+'</div></div></div>':'<div class="GlobalNavBar_root__test">메뉴</div><div class="Viewport_content__test"><main class="Content_root__test"><div class="AspectRatio_root__test"><div class="AspectRatio_inner__test"><video></video><button aria-label="전체화면">전체화면</button></div></div><h1>제목</h1></main><aside class="SideContent_root__test">'+chatPanel+'</aside></div>';
+ document.querySelector('#expand')?.addEventListener('click',event=>{event.currentTarget.setAttribute('aria-expanded','true');event.currentTarget.closest('[data-state]').setAttribute('data-state','open')});
+}else{
+ history.replaceState(null,'','/watch?v=test');
+ document.querySelector('#fixture').innerHTML='<div id="masthead-container"><input id="search" aria-label="검색"></div><ytd-page-manager id="page-manager"><ytd-watch-flexy><div id="player-full-bleed-container"><div id="player-container-outer"><div id="player-container-inner"><video></video><button class="ytp-size-button">극장 모드</button><button class="ytp-fullscreen-button">전체화면</button></div></div></div><section id="secondary"><ytd-live-chat-frame id="chat"><iframe id="chatframe" title="모사 채팅" srcdoc="<textarea>작성 중 메시지</textarea>"></iframe><div id="show-hide-button">채팅 숨기기</div></ytd-live-chat-frame></section></ytd-watch-flexy></ytd-page-manager>';
+}
+let fullscreenElement=null,fullscreenRequests=0,sizeClicks=0,fullClicks=0,nativeKeys=0,iframeLoads=0;
+Object.defineProperty(document,'fullscreenElement',{get:()=>fullscreenElement});HTMLElement.prototype.requestFullscreen=async function(){fullscreenRequests++;fullscreenElement=this;document.dispatchEvent(new Event('fullscreenchange'))};document.exitFullscreen=async()=>{fullscreenElement=null;document.dispatchEvent(new Event('fullscreenchange'))};
+const legacyStyle=()=>{const style=document.createElement('style');if(nexon)style.id='nlf-style';else style.textContent='body.fakefs-on #masthead-container { color:inherit }';return style};
+if(legacyFirst)document.head.append(legacyStyle());
+const captures=new WeakMap();Element.prototype.setPointerCapture=function(id){captures.set(this,id)};Element.prototype.hasPointerCapture=function(id){return captures.get(this)===id};Element.prototype.releasePointerCapture=function(){captures.delete(this)};
+const wait=ms=>new Promise(r=>originalTimeout(r,ms));
+const press=(code,target=document.body,extra={})=>{const e=new KeyboardEvent('keydown',{code,key:code==='KeyF'?'f':code==='KeyT'?'t':code,bubbles:true,cancelable:true,composed:true,...extra});target.dispatchEvent(e);target.dispatchEvent(new KeyboardEvent('keyup',{code,bubbles:true,cancelable:true}));return e};
+const drag=(element,desired)=>{element.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerId:4,bubbles:true,cancelable:true}));element.dispatchEvent(new PointerEvent('pointermove',{button:0,pointerId:4,clientX:innerWidth-desired-4,bubbles:true}));element.dispatchEvent(new PointerEvent('pointerup',{button:0,pointerId:4,bubbles:true}));};
+document.querySelector('iframe')?.addEventListener('load',()=>iframeLoads++);
+</script><script src="/layout-runtime.js?v=0.9.0"></script><script>document.write('<script src="/'+(nexon?'nexon-layout.js':'youtube-layout.js')+'?v=0.9.0"><\/script>')</script><script>
+window.addEventListener('keydown',event=>{if(['KeyF','KeyT'].includes(event.code)&&!event.defaultPrevented)nativeKeys++},true);
+if(!nexon){document.querySelector('.ytp-size-button').onclick=()=>{sizeClicks++;document.querySelector('ytd-watch-flexy').toggleAttribute('theater')};document.querySelector('.ytp-fullscreen-button').onclick=()=>{fullClicks++;if(fullscreenElement)document.exitFullscreen();else document.querySelector('#player-full-bleed-container').requestFullscreen()}}
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});await wait(100);
+ const feature=nexon?'nexonWide':'youtubeWide',key=nexon?'nexonWideLayout':'youtubeWideLayout';
+ const ownStyle=()=>document.querySelector(nexon?'#ctnlf-style':'#ct-yt-style');
+ if(legacyFirst){check('기존 사용자 스크립트가 먼저 실행되면 확장은 대기',!ownStyle());if(nexon)document.querySelector('#nlf-style')?.remove();else [...document.querySelectorAll('style')].find(s=>s.textContent.includes('body.fakefs-on'))?.remove();await wait(90)}
+ const originalEditor=document.querySelector('#draft'),iframe=document.querySelector('iframe'),iframeDocument=iframe?.contentDocument,originalLoads=iframeLoads;
+ if(preview){if(!nexon)press('KeyF');document.body.dataset.result='preview';return}
+ if(!nexon){
+  check('일반 유튜브 화면은 배치 변경 없음',!document.body.classList.contains('ct-yt-wide'));
+  press('KeyF');await wait(70);check('F는 큰 극장 모드로 한 번만 전환',sizeClicks===1&&fullClicks===0&&document.body.classList.contains('ct-yt-wide'));
+  check('유튜브 기본 F 핸들러와 중복 실행하지 않음',nativeKeys===0);
+ }else{check('넥슨 영상과 채팅이 있으면 큰 배치',document.documentElement.hasAttribute('data-ctnlf-active'));check('기존 사이트 저장 폭을 복사해 적용',Math.abs(document.querySelector('[data-ctnlf-side]').getBoundingClientRect().width-146)<1);}
+ const divider=document.querySelector(nexon?'#ctnlf-divider':'#ct-yt-divider');const side=()=>document.querySelector(nexon?'[data-ctnlf-side]':'[data-ct-yt-chat]');
+ check('채팅은 오른쪽에서 화면 높이를 채움',Math.abs(side().getBoundingClientRect().right-innerWidth)<1&&Math.abs(side().getBoundingClientRect().height-innerHeight)<1);
+ drag(divider,96);await wait(70);check('96px까지 줄이고 확장 저장소에 저장',Math.abs(side().getBoundingClientRect().width-96)<1&&(nexon?store[key]?.width:store[key]?.chatWidth)===96);
+ divider.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));await wait(50);check('경계 키보드 조절',Math.abs(side().getBoundingClientRect().width-116)<1);
+ divider.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));await wait(50);check('두 번 클릭하면 기본 폭 복원',Math.abs(side().getBoundingClientRect().width-360)<1);
+ drag(divider,96);await wait(50);
+ if(!nexon){
+  check('채팅 iframe과 문서를 재생성·이동하지 않음',document.querySelector('iframe')===iframe&&iframe.contentDocument===iframeDocument&&iframeLoads===originalLoads&&iframe.contentDocument.querySelector('textarea').value==='작성 중 메시지');
+  const before=sizeClicks;press('KeyF',document.querySelector('#search'));check('검색창 F는 가로채지 않음',sizeClicks===before);
+  press('KeyF',document.body,{repeat:true});await wait(40);check('길게 눌러도 극장 모드를 반복 전환하지 않음',sizeClicks===before);
+  press('KeyT');await wait(70);check('T는 클릭 가로채기를 우회해 실제 전체화면',fullClicks===1&&fullscreenRequests===1&&fullscreenElement&&!document.body.classList.contains('ct-yt-wide'));
+  press('KeyT');await wait(70);check('T로 전체화면을 끝내면 옆 채팅 배치 복귀',!fullscreenElement&&document.body.classList.contains('ct-yt-chat'));
+  document.querySelector('.ytp-fullscreen-button').click();await wait(70);check('마우스 전체화면 버튼은 극장 모드 전환',!document.body.classList.contains('ct-yt-wide')&&fullClicks===2);
+  press('KeyF');await wait(70);window.dispatchEvent(new WheelEvent('wheel',{deltaY:-1}));check('위로 스크롤하면 상단바 잠깐 표시',document.body.classList.contains('ct-yt-peek'));await wait(70);check('상단바는 타이머 후 숨김',!document.body.classList.contains('ct-yt-peek'));
+  const header=document.querySelector('#masthead-container');header.dispatchEvent(new PointerEvent('pointerover',{bubbles:true}));await wait(70);check('상단바에 마우스가 있으면 표시 유지',document.body.classList.contains('ct-yt-peek'));header.dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:document.body}));await wait(70);check('상단바를 벗어나면 다시 숨김',!document.body.classList.contains('ct-yt-peek'));
+  const chat=document.querySelector('ytd-live-chat-frame');chat.setAttribute('collapsed','');await wait(70);check('접힌 채팅은 강제로 펼치거나 공간을 차지하지 않음',!document.body.classList.contains('ct-yt-chat')&&chat.hasAttribute('collapsed'));chat.removeAttribute('collapsed');await wait(70);
+ }else{
+  check('원본 채팅 입력창·작성 내용 유지',document.querySelector('#draft')===originalEditor&&originalEditor.value==='작성 중 메시지');
+  press('KeyF');await wait(30);check('넥슨 F는 영상과 채팅을 함께 전체화면',fullscreenElement===document.documentElement);await document.exitFullscreen();
+  press('KeyM',document.body,{altKey:true,shiftKey:true});check('Alt+Shift+M으로 원래 배치 복귀',!document.documentElement.hasAttribute('data-ctnlf-active'));press('KeyM',document.body,{altKey:true,shiftKey:true});check('넥슨 큰 배치 다시 켜기',document.documentElement.hasAttribute('data-ctnlf-active'));
+ }
+ await chrome.storage.local.set({features:{...store.features,[feature]:false}});await wait(70);check('팝업 설정을 끄면 스타일과 경계 정리',!ownStyle()&&!divider.isConnected);
+ await chrome.storage.local.set({features:{...store.features,[feature]:true}});await wait(70);check('다시 켜면 작은 저장 폭 유지',Math.abs(side().getBoundingClientRect().width-96)<1);
+ const legacy=legacyStyle();document.head.append(legacy);await wait(70);check('기존 사용자 스크립트의 늦은 실행도 중복 적용 방지',!ownStyle()&&legacy.isConnected);legacy.remove();await wait(70);check('기존 스크립트가 없어지면 확장 배치 재개',!!ownStyle());
+ if(!nexon){const old=document.querySelector('ytd-watch-flexy'),next=old.cloneNode(true);next.querySelector('iframe').removeAttribute('srcdoc');old.replaceWith(next);window.dispatchEvent(new Event('yt-navigate-finish'));await wait(100);check('SPA에서 교체된 watch와 채팅에 다시 연결',document.querySelector('[data-ct-yt-player]')===next.querySelector('#player-full-bleed-container')&&document.querySelectorAll('#ct-yt-divider').length===1);history.replaceState(null,'','/');window.dispatchEvent(new Event('yt-navigate-finish'));await wait(70);check('홈으로 이동하면 영상 배치 해제',!document.body.classList.contains('ct-yt-wide'));}
+ check('다른 설정 데이터 보존',store.unrelated==='keep');
+ document.querySelector('#result').textContent=JSON.stringify({site:nexon?'NEXON':'YouTube',modern,results},null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.querySelector('#result').textContent=error.stack;document.body.dataset.result='fail'});
+</script></body></html>

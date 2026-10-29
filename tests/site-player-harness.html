@@ -29,7 +29,7 @@
   main.muted=false;main.volume=.4;
   const delay = ms=>new Promise(resolve=>setTimeout(resolve,ms));
 </script>
-<script src="/tools-core.js"></script><script src="/player-tools.js"></script><script src="/site-tools.js"></script><script src="/channel-data.js"></script><script src="/channel-tools.js"></script>
+<script src="/tools-core.js"></script><script src="/player-tools.js?v=0.9.0-audio-final"></script><script src="/site-tools.js"></script><script src="/channel-data.js"></script><script src="/channel-tools.js"></script>
 <script>
   (async()=>{
     await delay(1200);
@@ -51,6 +51,9 @@
     check('광고 종료 뒤 속도 음소거 배치 원복',ad.playbackRate===1&&!ad.muted&&!main.muted&&!document.querySelector('.chzzk-tools-ad-mini'));
     const catchToggle=panel.querySelector('#catch-up');catchToggle.checked=false;catchToggle.dispatchEvent(new Event('change'));await delay(50);
     check('기능별 설정 저장',state.features.catchUp===false);
+    // This case is a pre-existing mute for the next ad, outside the previous ad's transition.
+    // Trusted mute input inside that transition is checked with the manual audio harness.
+    now+=6000;await delay(1100);
     main.muted=true;
     now+=1000;await delay(1100);
     document.querySelector('#midAdPlayerWrapper').style.display='block';

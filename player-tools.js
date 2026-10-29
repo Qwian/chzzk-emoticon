@@ -10,7 +10,7 @@
   const patches = new Map();
   const adRates = new Map();
   const localAdMute = new WeakMap();
-  let beforeAdAudio = null, userChangedAdAudio = false;
+  let beforeAdAudio = null, userChangedAdAudio = false, audioRecovery = null;
   let status = "플레이어 대기";
 
   function markAdMute(video, value) {
@@ -24,13 +24,21 @@
     if (owned && owned.until > performance.now() && event.target.muted === owned.value) event.stopImmediatePropagation();
   }, true);
   document.addEventListener("pointerdown", event => {
-    if (adActive && event.isTrusted && event.target.closest?.(".pzp-pc__volume-control,button[aria-label*='음소거']")) userChangedAdAudio = true;
+    if ((adActive || audioRecovery) && event.isTrusted && event.target.closest?.(".pzp-pc__volume-control,button[aria-label*='음소거']")) { userChangedAdAudio = true; audioRecovery = null; }
   }, true);
   document.addEventListener("keydown", event => {
-    if (!adActive || !event.isTrusted || event.target.closest?.("input,textarea,[contenteditable='true']")) return;
+    if ((!adActive && !audioRecovery) || !event.isTrusted || event.target.closest?.("input,textarea,[contenteditable='true']")) return;
     if (event.code === "KeyM" && !event.ctrlKey && !event.altKey && !event.metaKey ||
-        event.target.closest?.(".pzp-pc__volume-control")) userChangedAdAudio = true;
+        event.target.closest?.(".pzp-pc__volume-control")) { userChangedAdAudio = true; audioRecovery = null; }
   }, true);
+  function repairAudio() {
+    if (!audioRecovery) return;
+    if (performance.now() > audioRecovery.until || userChangedAdAudio || !settings.adMute) { audioRecovery = null; return; }
+    if (adActive || !activeMain) return;
+    const audio = audioRecovery.audio;
+    if (activeMain.muted !== audio.muted) activeMain.muted = audio.muted;
+    if (activeMain.volume !== audio.volume) activeMain.volume = audio.volume;
+  }
 
   function ranges(value) {
     return Array.from({ length: value.length }, (_, i) => [value.start(i), value.end(i)]);
@@ -104,9 +112,10 @@
       activeMain.removeEventListener("seeking", seeking);
       activeMain.removeEventListener("seeked", seeked);
       activeMain.removeEventListener("loadedmetadata", sourceChanged);
+      activeMain.removeEventListener("volumechange", repairAudio);
     }
     activeMain = main; margin = 1.5; lastNormal = null;
-    beforeAdAudio = null;
+    if (!adActive) beforeAdAudio = null;
     cooldown = performance.now() + 5000;
     stableSince = performance.now();
     ownSeekTarget = null;
@@ -116,6 +125,7 @@
       main.addEventListener("seeking", seeking);
       main.addEventListener("seeked", seeked);
       main.addEventListener("loadedmetadata", sourceChanged);
+      main.addEventListener("volumechange", repairAudio);
     }
   }
   const style = document.createElement("style");
@@ -193,6 +203,7 @@
   }
   function tick(force = false) {
     if (lastUrl !== location.href) {
+      audioRecovery = null; beforeAdAudio = null;
       restorePatches(); restoreRate(); bind(null); lastUrl = location.href;
       adActive = false; heldUntil = 0; lastSeek = -Infinity;
     }
@@ -206,15 +217,19 @@
     const adVideos = wrapper => [...wrapper.querySelectorAll("#midAdVideoContainer video, #preAdVideoContainer video")];
     const visibleAdWrappers = [...document.querySelectorAll("#midAdPlayerWrapper, #preAdPlayerWrapper")]
       .filter(el => getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden");
+    const pendingAdWrappers = visibleAdWrappers.filter(wrapper => {
+      const videos = adVideos(wrapper); return !videos.length || videos.some(video => !video.ended);
+    });
     const observedAds = new Set(visibleAdWrappers.flatMap(adVideos).filter(video => !video.ended));
     for (const video of adRates.keys()) if (!observedAds.has(video) || settings.adSpeed === 1) releaseAdRate(video);
     const speedNotes = settings.adSpeed === 1 ? [] : [...observedAds].map(adRate).filter(Boolean);
     const wrappers = visibleAdWrappers.filter(el => adVideos(el).some(v => !v.ended && v.readyState >= 2));
-    if (visibleAdWrappers.length && !adActive) {
+    if (pendingAdWrappers.length && !adActive) {
+      audioRecovery = null;
       beforeAdAudio = lastNormal ? { ...lastNormal } : main ? { muted: main.muted, volume: main.volume } : null;
       userChangedAdAudio = false; restoreRate(); adActive = true;
     }
-    if (visibleAdWrappers.length && !wrappers.length) { announce(["광고 준비 중", ...new Set(speedNotes)].join(" · ")); return; }
+    if (pendingAdWrappers.length && !wrappers.length) { announce(["광고 준비 중", ...new Set(speedNotes)].join(" · ")); return; }
     if (wrappers.length) {
       for (const wrapper of wrappers) {
         for (const video of adVideos(wrapper)) {
@@ -233,13 +248,15 @@
     }
     if (adActive) {
       restorePatches(); adActive = false;
-      if (settings.adMute && main && beforeAdAudio && !userChangedAdAudio) {
-        main.muted = beforeAdAudio.muted;
+      if (settings.adMute && beforeAdAudio && !userChangedAdAudio) {
+        audioRecovery = { audio: { ...beforeAdAudio }, until: performance.now() + 5000 };
+        repairAudio();
       }
       beforeAdAudio = null;
       suspend("광고 종료 · 재생 안정화 중", 5000);
     }
     if (!main) { announce("플레이어 대기"); return; }
+    repairAudio();
     lastNormal = { muted: main.muted, volume: main.volume };
     if (!settings.catchUp) { restoreRate(); announce("자동 따라잡기 꺼짐"); return; }
     if (main.dataset.chzzkToolsManualRate) { restoreRate(); announce("수동 배속 사용 중 · 자동 따라잡기 대기"); return; }
@@ -263,6 +280,7 @@
     if (area !== "local" || !changes.features) return;
     restorePatches(); restoreRate();
     settings = core.features(changes.features.newValue);
+    if (!settings.adMute) audioRecovery = null;
   });
   document.addEventListener("chzzk-tools:catch-up", () => {
     heldUntil = 0; cooldown = 0; lastSeek = -Infinity; tick(true);
@@ -273,5 +291,5 @@
     restoreRate(); heldUntil = performance.now() + 30000; status = "되감기 · 30초 대기";
   }, true);
   window.setInterval(() => { try { tick(); } catch { restoreRate(); announce("플레이어 연결 대기"); } }, 1000);
-  window.addEventListener("pagehide", () => { restorePatches(); restoreRate(); });
+  window.addEventListener("pagehide", () => { audioRecovery = null; restorePatches(); restoreRate(); });
 })();
