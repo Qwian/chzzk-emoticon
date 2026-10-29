@@ -5,7 +5,9 @@
 <li id="soop" data-broadcast-id="456"><div class="thumbs-box"><a href="https://play.sooplive.com/streamer/456">숲 썸네일</a></div><a class="title" href="https://play.sooplive.com/streamer/456">숲 제목</a><a class="streamer" href="https://ch.sooplive.com/streamer">숲 스트리머</a></li>
 <li id="old-soop" data-broadcast-id="789"><div class="thumbs-box"><a href="https://play.sooplive.co.kr/streamer2/789">숲 이전 주소</a></div></li>
 <li id="native-chzzk" data-nlog-area="live_list.item" data-nlog-params='{"content_id":"321"}'><a href="https://chzzk.naver.com/live/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"><div class="thumbnail-native"><video></video></div></a></li>
-<li id="ordinary"><a href="https://example.org/">일반 링크</a></li></ul><pre id="result">pending</pre>
+<li id="ordinary"><a href="https://example.org/">일반 링크</a></li>
+<li id="custom-chzzk" data-nlog-area="live_list.item" data-nlog-params='{"content_id":"654"}'><a class="_thumbnail_direct" href="https://chzzk.naver.com/live/cccccccccccccccccccccccccccccccc"><img alt="직접 올린 썸네일" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><span class="badge">LIVE <svg><path d="M0 0"></path></svg></span></a><a class="title" href="https://chzzk.naver.com/live/cccccccccccccccccccccccccccccccc">직접 올린 썸네일 방송 제목</a></li>
+</ul><pre id="result">pending</pre>
 <script>
  const requests=[],instances=[],nativePlayers=[];
  window.chrome={storage:{local:{get:async()=>({features:{listPreview:true}})},onChanged:{addListener:()=>{}}}};
@@ -14,7 +16,7 @@
  window.Hls=class{static isSupported(){return true}static Events={ERROR:'error',MANIFEST_PARSED:'manifest'};constructor(){this.events={};this.levels=[{height:1080}];instances.push(this)}loadSource(url){this.url=url}attachMedia(video){this.events.manifest?.()}on(name,fn){this.events[name]=fn}startLoad(){}destroy(){this.closed=true}};
  window.fetch=async url=>{requests.push(url);return{ok:true,json:async()=>({content:{livePlaybackJson:JSON.stringify({media:[{mediaId:'HLS',path:'https://media.example.test/live.m3u8'}]})}})}};
  window.PreviewPlayer=class{constructor(config){this.config=config;nativePlayers.push(this)}addEventListener(){}async loadPreview(streamer,broadcast){this.streamer=streamer;this.broadcast=broadcast}async play(){document.getElementById(this.config.id)?.dispatchEvent(new Event('playing'))}async close(){this.closed=true}};
-</script><script src="../preview-bridge.js?v=0.8.0"></script><script src="../list-preview.js?v=0.8.0"></script>
+</script><script src="../preview-bridge.js?v=0.8.0"></script><script src="../list-preview.js?v=0.9.2-fixed"></script>
 <script>
  (async()=>{
   const results=[],check=(name,passed)=>results.push({name,passed}),delay=()=>new Promise(r=>setTimeout(r,40));
@@ -35,6 +37,10 @@
   right('old-soop');await delay();check('숲 이전 도메인도 지원하고 이전 재생 종료',nativePlayers[0].closed&&nativePlayers[1]?.broadcast==='789');
   document.querySelector('#old-soop').dispatchEvent(new Event('pointerleave'));await delay();
   check('마우스를 빼면 소리와 재생 종료',nativePlayers[1].closed&&!document.querySelector('#old-soop video'));
+  const beforeCustom=requests.length;const custom=right('custom-chzzk',false,'img');await delay();check('직접 올린 이미지와 썸네일 자체 링크도 미리보기 시작',custom.defaultPrevented&&requests[beforeCustom]?.endsWith('/live/654/auto-play-info')&&document.querySelector('#custom-chzzk video')?.volume===1);
+  const onCustom=requests.length;check('직접 올린 썸네일 방송도 제목 우클릭은 원래 메뉴',!right('custom-chzzk',false,'.title').defaultPrevented&&requests.length===onCustom);
+  check('직접 올린 썸네일도 Shift+우클릭은 원래 메뉴',!right('custom-chzzk',true,'img').defaultPrevented);
+  const customBadge=right('custom-chzzk',false,'.badge svg path');await delay();check('썸네일 배지의 SVG 우클릭도 같은 방송 종료',customBadge.defaultPrevented&&!document.querySelector('#custom-chzzk video')&&requests.length===onCustom);
   document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
  })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});
 </script></body></html>

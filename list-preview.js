@@ -45,9 +45,10 @@
     for (const link of links) {
       const url = new URL(link.href, location.href);
       if (url.hostname === "chzzk.naver.com" && /^\/live\/[a-f0-9]{32}$/i.test(url.pathname)) {
-        const image = card.querySelector("img[src*='/thumbnail/']");
+        const image = link.querySelector("img[src*='/thumbnail/']");
+        // Uploaded stills use a different image host/path, and the thumbnail can be the link itself.
         const region = image?.parentElement.closest('[class*="thumbnail"], [class*="thumb"]') ||
-          card.querySelector('a[href*="/live/"] [class*="thumbnail"]');
+          (link.matches('[class*="thumbnail"], [class*="thumb"]') ? link : link.querySelector('[class*="thumbnail"], [class*="thumb"]'));
         if (!region || !region.contains(target)) continue;
         const metadata = card.querySelector("[data-nlog-params]") || card.closest("[data-nlog-params]") || card;
         let liveId;
