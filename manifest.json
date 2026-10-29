@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "치지직 Caps Lock 이모티콘",
   "description": "치지직 검색·채팅·광고 도구, 치지직·숲 자유 배치 채팅, 유튜브·넥슨 라이브 큰 영상과 옆 채팅, 모든 사이트 영상 속도·프레임 이동을 지원합니다.",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "background": { "service_worker": "media-background.js" },
   "icons": {
     "16": "icons/icon16.png",

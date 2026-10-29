@@ -4,10 +4,14 @@
 </style><body data-result="pending">
 <header id="top-header" hidden></header><header id="header"><p style="color:#00efa4;font-weight:800;font-size:20px">CHZZK <small style="color:#8a919b;font-size:10px">로컬 UI 검사</small></p>
 <nav aria-label="팔로우"><div><strong>팔로잉 채널</strong><button id="collapse" aria-label="목록 펼치기" aria-expanded="false">⌄</button></div><ul id="native-list"></ul><div><button id="more" aria-label="더보기" aria-expanded="false">더보기</button></div></nav></header>
-<main><h1 style="font-size:19px">채널 목록 · 플레이어 도구</h1><div class="player"><p>실제 방송·채팅을 사용하지 않는 검사 화면</p><div class="controls"><span>Ⅱ　◖))　◷ 실시간</span><div class="right"><button class="custom__clip-button" aria-label="클립 만들기">✂</button><button>⚙</button><button>⛶</button></div></div></div>
+<main><h1 style="font-size:19px">채널 목록 · 플레이어 도구</h1><div class="player pzp pzp-pc pzp-pc--controls"><p>실제 방송·채팅을 사용하지 않는 검사 화면</p><div class="controls"><span>Ⅱ　◖))　◷ 실시간</span><div class="right"><button class="custom__clip-button pzp-pc__setting-button" aria-label="클립 만들기">✂</button><button>⚙</button><button>⛶</button></div></div></div>
 <div class="actions"><a id="current-channel" href="/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" style="margin-right:auto;color:inherit;text-decoration:none;font-size:18px;font-weight:700">가람</a><div class="_has_tooltip_box_mock"><button id="follow" style="height:34px;min-width:89px;border-radius:20px;font-weight:700">♥ 팔로잉</button></div><button>＋ 구독</button><button style="background:#5943d5">구독 선물</button></div><pre id="result">pending</pre></main>
 <script>
 const preview=new URLSearchParams(location.search).has('preview');
+if(new URLSearchParams(location.search).has('controls')){
+ const nativeStyle=document.createElement('style');nativeStyle.textContent='.pzp-pc__setting-button{opacity:0;transition:opacity .2s ease-in}.pzp-pc.pzp-pc--controls .pzp-pc__setting-button{opacity:1}';document.head.append(nativeStyle);
+ for(const [label,show]of [['기본 컨트롤 표시',true],['기본 컨트롤 숨김',false]]){const button=document.createElement('button');button.textContent=label;button.onclick=()=>document.querySelector('.pzp-pc').classList.toggle('pzp-pc--controls',show);document.querySelector('main').append(button)}
+}
 document.querySelector('#header').id='sidebar';document.querySelector('#top-header').id='header';
 const sidebarStyle=document.createElement('style');sidebarStyle.textContent='#sidebar{position:fixed;left:0;top:0;bottom:0;width:230px;background:#1d1e21;padding:18px 10px}';document.head.append(sidebarStyle);
 history.replaceState(null,'','/live/'+'a'.repeat(32));
