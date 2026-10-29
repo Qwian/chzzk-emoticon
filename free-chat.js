@@ -78,9 +78,9 @@
           if (profile && geometryKeys.every(name => Number.isFinite(profile[name])) &&
               Number.isFinite(profile.screenWidth) && profile.screenWidth > 0 &&
               Number.isFinite(profile.screenHeight) && profile.screenHeight > 0) {
-            monitors[key] = { width: clamp(profile.width, 240, 5000), height: clamp(profile.height, 180, 5000),
+            monitors[key] = { width: clamp(profile.width, 1, 5000), height: clamp(profile.height, 180, 5000),
               xRatio: clamp(profile.xRatio, 0, 1), yRatio: clamp(profile.yRatio, 0, 1),
-              dockWidth: clamp(number(profile.dockWidth, defaults.dockWidth), 240, 5000),
+              dockWidth: clamp(number(profile.dockWidth, defaults.dockWidth), 1, 5000),
               screenWidth: profile.screenWidth, screenHeight: profile.screenHeight };
           }
         }
@@ -88,19 +88,19 @@
       savedMonitor = typeof saved.lastMonitor === 'string' ? saved.lastMonitor : null;
     }
   } catch (_) { /* 저장소가 제한되어도 현재 페이지에서 사용 가능 */ }
-  settings.width = clamp(settings.width, 240, 5000);
+  settings.width = clamp(settings.width, 1, 5000);
   settings.height = clamp(settings.height, 180, 5000);
   settings.xRatio = clamp(settings.xRatio, 0, 1);
   settings.yRatio = clamp(settings.yRatio, 0, 1);
   settings.opacity = clamp(settings.opacity, 0, 1);
-  settings.dockWidth = clamp(settings.dockWidth, 240, 5000);
+  settings.dockWidth = clamp(settings.dockWidth, 1, 5000);
   if (monitors[currentMonitor.key]) {
     for (const key of layoutKeys) settings[key] = monitors[currentMonitor.key][key];
   } else if (savedMonitor && monitors[savedMonitor]) {
     const previous = monitors[savedMonitor];
-    settings.width = clamp(previous.width * currentMonitor.width / previous.screenWidth, 240, 5000);
+    settings.width = clamp(previous.width * currentMonitor.width / previous.screenWidth, 1, 5000);
     settings.height = clamp(previous.height * currentMonitor.height / previous.screenHeight, 180, 5000);
-    settings.dockWidth = clamp(previous.dockWidth * currentMonitor.width / previous.screenWidth, 240, 5000);
+    settings.dockWidth = clamp(previous.dockWidth * currentMonitor.width / previous.screenWidth, 1, 5000);
     settings.xRatio = previous.xRatio;
     settings.yRatio = previous.yRatio;
   }
@@ -130,10 +130,23 @@
     body.screen_mode #webplayer.ctfc-soop-docked :is(.chatting_box,#chatting_area,#chatbox) {
       width: 100% !important; min-width: 0 !important; max-width: none !important;
     }
-    body.screen_mode #webplayer.ctfc-soop-docked .ctfc-dock-handle {
+    .ctfc-chzzk-docked #aside-chatting {
+      width: var(--ctfc-dock-w) !important; flex: 0 0 var(--ctfc-dock-w) !important;
+      min-width: 0 !important; max-width: none !important; box-sizing: border-box !important;
+    }
+    .ctfc-chzzk-docked .ctfc-chzzk-main {
+      width: calc(100% - var(--ctfc-dock-w)) !important; flex: 1 1 0 !important;
+      min-width: 0 !important; max-width: none !important;
+    }
+    .ctfc-chzzk-docked #aside-chatting > div,
+    .ctfc-chzzk-active #aside-chatting > div,
+    body.screen_mode #webplayer.ctfc-enabled.chat_open :is(.chatting_box,#chatting_area,#chatbox) {
+      min-width: 0 !important; max-width: 100% !important;
+    }
+    body.screen_mode #webplayer.ctfc-soop-docked .ctfc-dock-handle,
+    .ctfc-chzzk-docked .ctfc-dock-handle {
       display: block !important; position: fixed !important;
-      left: calc(100vw - var(--ctfc-dock-w) - 4px) !important;
-      top: 0 !important; bottom: 0 !important; width: 8px !important;
+      width: 8px !important;
       z-index: 2002 !important; cursor: ew-resize !important;
       touch-action: none; user-select: none; background: transparent;
     }
@@ -294,9 +307,9 @@
     if (existing) {
       for (const key of layoutKeys) settings[key] = existing[key];
     } else {
-      settings.width = clamp(settings.width * next.width / currentMonitor.width, 240, 5000);
+      settings.width = clamp(settings.width * next.width / currentMonitor.width, 1, 5000);
       settings.height = clamp(settings.height * next.height / currentMonitor.height, 180, 5000);
-      settings.dockWidth = clamp(settings.dockWidth * next.width / currentMonitor.width, 240, 5000);
+      settings.dockWidth = clamp(settings.dockWidth * next.width / currentMonitor.width, 1, 5000);
     }
     currentMonitor = next;
     save();
@@ -306,7 +319,7 @@
   function limits() {
     const width = Math.max(1, window.innerWidth - GAP * 2);
     const height = Math.max(1, window.innerHeight - GAP * 2);
-    return { width, height, minWidth: Math.min(240, width), minHeight: Math.min(180, height) };
+    return { width, height, minWidth: 1, minHeight: Math.min(180, height) };
   }
 
   function savedRect() {
@@ -345,14 +358,19 @@
   }
 
   function dockLimits() {
-    const maxWidth = Math.max(1, window.innerWidth - 500);
-    return { minWidth: Math.min(240, maxWidth), maxWidth };
+    const available = mount?.player.getBoundingClientRect().width || window.innerWidth;
+    const maxWidth = Math.max(1, available - 1);
+    return { minWidth: 1, maxWidth };
   }
 
   function applyDockWidth(width) {
-    if (!mount || isChzzk) return;
+    if (!mount) return;
     const limit = dockLimits();
     mount.player.style.setProperty('--ctfc-dock-w', `${clamp(width, limit.minWidth, limit.maxWidth)}px`);
+    const bounds = mount.side.getBoundingClientRect();
+    mount.dockHandle.style.left = `${bounds.left - 4}px`;
+    mount.dockHandle.style.top = `${bounds.top}px`;
+    mount.dockHandle.style.height = `${bounds.height}px`;
   }
 
   function rememberRect(rect, edge) {
@@ -375,10 +393,11 @@
     if (isChzzk) {
       mount.player.classList.toggle('ctfc-chzzk-wide', wide);
       mount.player.classList.toggle('ctfc-chzzk-active', active);
+      mount.player.classList.toggle('ctfc-chzzk-docked', !settings.enabled && chatOpen);
     } else {
       mount.player.classList.toggle('ctfc-soop-docked', !settings.enabled && wide && chatOpen);
-      if (gesture?.edge !== 'dock') applyDockWidth(settings.dockWidth);
     }
+    if (gesture?.edge !== 'dock') applyDockWidth(settings.dockWidth);
     mount.toggle.textContent = settings.enabled ? '채팅 겹치기 켬' : '채팅 겹치기 끔';
     mount.toggle.setAttribute('aria-pressed', String(settings.enabled));
     mount.side.style.setProperty('--ctfc-opacity', settings.opacity.toFixed(2));
@@ -402,7 +421,7 @@
     if (event.button !== 0 || !mount) return;
     if (syncMonitor()) render();
     const active = edge === 'dock'
-      ? !isChzzk && mount.player.classList.contains('ctfc-soop-docked')
+      ? mount.player.classList.contains(isChzzk ? 'ctfc-chzzk-docked' : 'ctfc-soop-docked')
       : settings.enabled && (isChzzk ? mount.player.classList.contains('ctfc-chzzk-active') : document.body.classList.contains('screen_mode') && mount.player.classList.contains('chat_open'));
     if (!active) return;
     if (gesture) return;
@@ -425,7 +444,7 @@
     if (g.edge === 'dock') {
       const limit = dockLimits();
       w = clamp(old.w - dx, limit.minWidth, limit.maxWidth);
-      g.current = { x: window.innerWidth - w, y, w, h };
+      g.current = { x: old.x + old.w - w, y, w, h };
       applyDockWidth(w);
       return;
     } else if (g.edge === 'move') {
@@ -487,15 +506,12 @@
     toggle.type = 'button';
     toggle.title = '채팅 겹치기 켜기/끄기 · Alt+Shift+C';
     player.append(toggle);
-    let dockHandle = null;
-    if (!isChzzk) {
-      dockHandle = document.createElement('div');
-      dockHandle.className = 'ctfc-dock-handle';
-      dockHandle.title = '좌우로 드래그해서 채팅창 폭 조절';
-      dockHandle.setAttribute('aria-hidden', 'true');
-      player.append(dockHandle);
-      on(dockHandle, 'pointerdown', event => pointerDown(event, 'dock'));
-    }
+    const dockHandle = document.createElement('div');
+    dockHandle.className = 'ctfc-dock-handle';
+    dockHandle.title = '좌우로 드래그해서 채팅창 폭 조절';
+    dockHandle.setAttribute('aria-hidden', 'true');
+    player.append(dockHandle);
+    on(dockHandle, 'pointerdown', event => pointerDown(event, 'dock'));
     side.prepend(toolbar);
     const panel = toolbar.querySelector('.ctfc-settings');
     const alpha = toolbar.querySelector('input');
@@ -508,7 +524,9 @@
       observer.observe(side, { attributes: true, attributeFilter: ['class'] });
       observer.observe(videoMain, { attributes: true, attributeFilter: ['class'] });
     }
-    mount = { player, side, videoMain, toolbar, toggle, dockHandle, panel, alpha, output, handles, abort, observer };
+    const geometryObserver = new ResizeObserver(schedule);
+    mount = { player, side, videoMain, toolbar, toggle, dockHandle, panel, alpha, output, handles, abort, observer, geometryObserver };
+    geometryObserver.observe(player); geometryObserver.observe(side);
     on(toolbar.querySelector('.ctfc-grip'), 'pointerdown', event => pointerDown(event, 'move'));
     on(opacityButton, 'click', event => {
       event.stopPropagation();
@@ -545,12 +563,12 @@
 
   function teardownMount() {
     if (!mount) return;
-    mount.abort.abort(); mount.observer.disconnect();
+    mount.abort.abort(); mount.observer.disconnect(); mount.geometryObserver.disconnect();
     if (gesture?.target.hasPointerCapture(gesture.id)) gesture.target.releasePointerCapture(gesture.id);
     gesture = null;
     mount.toolbar.remove(); mount.toggle.remove(); mount.dockHandle?.remove();
     mount.handles.forEach(handle => handle.remove());
-    mount.player.classList.remove('ctfc-enabled', 'ctfc-soop-docked', 'ctfc-controls-inset', 'ctfc-chzzk-wide', 'ctfc-chzzk-active');
+    mount.player.classList.remove('ctfc-enabled', 'ctfc-soop-docked', 'ctfc-controls-inset', 'ctfc-chzzk-wide', 'ctfc-chzzk-active', 'ctfc-chzzk-docked');
     mount.videoMain?.classList.remove('ctfc-chzzk-main');
     for (const element of [mount.side, mount.player]) for (const name of ['x', 'y', 'w', 'h', 'opacity', 'dock-w', 'controls-left', 'controls-right']) element.style.removeProperty(`--ctfc-${name}`);
     mount = null;
@@ -565,6 +583,7 @@
     schedule();
   });
   listen(window, 'focus', schedule);
+  listen(window, 'scroll', schedule);
   listen(document, 'visibilitychange', () => { if (!document.hidden) schedule(); });
   listen(document, 'keydown', event => {
     if (event.key === 'Escape' && mount && !mount.panel.hidden) {

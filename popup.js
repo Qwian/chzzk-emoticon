@@ -399,7 +399,7 @@ async function initializeFeatures() {
     input.addEventListener("change", () => saveFeature(key, input.checked));
   }
   const chatNote = document.createElement("p"); chatNote.className = "intro";
-  chatNote.textContent = "자유 배치 채팅: 치지직 넓은 화면·숲 스크린모드에서 이동·크기·투명도를 조절합니다. Alt+Shift+C로 겹치기를 전환합니다. 기존 템퍼몽키 자유 배치 스크립트가 실행 중이면 확장 쪽은 대기합니다. 대체해서 쓰려면 기존 스크립트를 끄고 탭을 새로고침하세요. 기존 배치값은 자동 이전되지 않습니다.";
+  chatNote.textContent = "자유 배치 채팅: 치지직 넓은 화면·숲 스크린모드에서 이동·크기·투명도를 조절합니다. 겹치기를 끄면 두 사이트 모두 채팅 왼쪽 경계로 폭을 조절합니다. 240px 최소 폭 제한은 없습니다. Alt+Shift+C로 겹치기를 전환합니다. 기존 템퍼몽키 자유 배치 스크립트가 실행 중이면 확장 쪽은 대기합니다. 대체해서 쓰려면 기존 스크립트를 끄고 탭을 새로고침하세요. 기존 배치값은 자동 이전되지 않습니다.";
   panel.append(chatNote);
   const speedLabel = document.createElement("label"), speed = document.createElement("select");
   speedLabel.className = "send-option"; speedLabel.append(document.createTextNode("광고 재생 속도 "));
@@ -411,6 +411,9 @@ async function initializeFeatures() {
   }
   speed.value = String(features.adSpeed); speedLabel.append(speed); panel.append(speedLabel); controls.set("adSpeed", speed);
   speed.addEventListener("change", () => saveFeature("adSpeed", Number(speed.value)));
+  const adSpeedNote = document.createElement("p"); adSpeedNote.className = "intro";
+  adSpeedNote.textContent = "광고 속도는 상한입니다. 버퍼가 부족하면 감속하고, 재생이 멈추면 해당 광고는 1배속으로 복구합니다. 플레이어가 배속을 반복 복원하면 강제 적용을 중단합니다.";
+  panel.append(adSpeedNote);
   const note = document.createElement("p");
   note.className = "intro";
   note.textContent = ", / . : 0.1배 감소 / 증가 · / : 1배 · Shift+, / Shift+. : 이전 / 다음 프레임. 입력창에서는 작동하지 않습니다. FPS를 아직 읽지 못했으면 30fps로 추정합니다. 썸네일 우클릭으로 소리 미리보기, 다시 우클릭하거나 마우스를 빼면 종료합니다. 치즈 플래터의 자동 따라잡기는 끄고 사용하세요. 고화질 설치·로그인 조건과 실제 광고 차단 프로그램 설정은 자동 변경하지 않습니다.";

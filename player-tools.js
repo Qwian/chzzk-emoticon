@@ -8,6 +8,7 @@
   let heldUntil = 0, ownedRate = null;
   let ownSeekTarget = null;
   const patches = new Map();
+  const adRates = new Map();
   const localAdMute = new WeakMap();
   let beforeAdAudio = null, userChangedAdAudio = false;
   let status = "플레이어 대기";
@@ -46,6 +47,7 @@
     entry.written = value;
   }
   function restorePatches() {
+    for (const video of adRates.keys()) releaseAdRate(video);
     for (const [el, entries] of patches) for (const [key, entry] of entries) {
       if (el[key] === entry.written) {
         if (key === "muted") markAdMute(el, entry.original);
@@ -129,6 +131,66 @@
     const detail = { text };
     document.dispatchEvent(new CustomEvent("chzzk-tools:player-status", { detail }));
   }
+  function releaseAdRate(video) {
+    adRates.get(video)?.abort.abort(); adRates.delete(video);
+    delete video.dataset.chzzkToolsAdSpeedState;
+  }
+  function writeAdRate(video, state, rate) {
+    try {
+      patch(video, "playbackRate", rate); state.lastWritten = rate;
+      if (Math.abs(video.playbackRate - rate) > 0.001) { state.released = true; state.reason = "플레이어 배속 유지"; }
+    } catch {
+      state.safe = true; state.reason = "배속 적용 실패 · 1배속";
+      try { patch(video, "playbackRate", 1); state.lastWritten = 1; }
+      catch { state.released = true; state.reason = "플레이어 배속 유지"; }
+    }
+    video.dataset.chzzkToolsAdSpeedState = state.reason;
+  }
+  function adRate(video) {
+    const now = performance.now(), time = video.currentTime;
+    let state = adRates.get(video);
+    if (state && (state.source !== video.currentSrc || state.reset)) { releaseAdRate(video); state = null; }
+    if (!state) {
+      state = { source: video.currentSrc, time, progressAt: now, waitingAt: null, safe: false,
+        conflicts: 0, lastWritten: null, released: false, reason: "", abort: new AbortController() };
+      adRates.set(video, state);
+      video.addEventListener("waiting", () => {
+        if (state.released || video.paused || video.seeking || video.ended) return;
+        state.waitingAt ??= performance.now(); state.reason = "버퍼 대기 · 1배속";
+        writeAdRate(video, state, 1);
+      }, { signal: state.abort.signal });
+      for (const name of ["loadedmetadata", "emptied"]) video.addEventListener(name, () => { state.reset = true; }, { signal: state.abort.signal });
+    }
+    if (state.lastWritten !== null && Math.abs(video.playbackRate - state.lastWritten) > 0.001) {
+      state.conflicts++;
+      if (state.conflicts >= 2) { state.released = true; state.reason = "플레이어의 배속 변경 반복 · 강제 배속 중단"; }
+    }
+    if (video.paused || video.seeking) { state.progressAt = now; state.waitingAt = null; }
+    else {
+      if (Number.isFinite(time) && time > state.time + 0.01) { state.progressAt = now; state.waitingAt = null; }
+      if (!state.safe && (now - state.progressAt >= 2000 || state.waitingAt !== null && now - state.waitingAt >= 1000)) {
+        state.safe = true; state.reason = "재생 멈춤 감지 · 이 광고는 1배속";
+      }
+    }
+    state.time = time;
+    if (state.released) { video.dataset.chzzkToolsAdSpeedState = state.reason; return state.reason; }
+    let rate = settings.adSpeed;
+    if (state.safe || video.readyState < 3 || state.waitingAt !== null) {
+      rate = 1;
+      if (!state.safe) state.reason = "버퍼 대기 · 1배속";
+    } else {
+      state.reason = "";
+      const buffer = ranges(video.buffered).find(([start, end]) => start <= time + 0.05 && end >= time);
+      const complete = buffer && Number.isFinite(video.duration) && video.duration > 0 && buffer[1] >= video.duration - 0.15;
+      if (buffer && !complete) {
+        const ahead = buffer[1] - time;
+        while (rate > 1 && ahead < rate * 2) rate = Math.max(1, rate / 2);
+        if (rate < settings.adSpeed) state.reason = `버퍼 여유에 맞춰 ${rate}배속`;
+      }
+    }
+    writeAdRate(video, state, rate);
+    return state.reason;
+  }
   function tick(force = false) {
     if (lastUrl !== location.href) {
       restorePatches(); restoreRate(); bind(null); lastUrl = location.href;
@@ -144,19 +206,19 @@
     const adVideos = wrapper => [...wrapper.querySelectorAll("#midAdVideoContainer video, #preAdVideoContainer video")];
     const visibleAdWrappers = [...document.querySelectorAll("#midAdPlayerWrapper, #preAdPlayerWrapper")]
       .filter(el => getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden");
+    const observedAds = new Set(visibleAdWrappers.flatMap(adVideos).filter(video => !video.ended));
+    for (const video of adRates.keys()) if (!observedAds.has(video) || settings.adSpeed === 1) releaseAdRate(video);
+    const speedNotes = settings.adSpeed === 1 ? [] : [...observedAds].map(adRate).filter(Boolean);
     const wrappers = visibleAdWrappers.filter(el => adVideos(el).some(v => !v.ended && v.readyState >= 2));
     if (visibleAdWrappers.length && !adActive) {
       beforeAdAudio = lastNormal ? { ...lastNormal } : main ? { muted: main.muted, volume: main.volume } : null;
       userChangedAdAudio = false; restoreRate(); adActive = true;
     }
-    if (visibleAdWrappers.length && !wrappers.length) { announce("광고 준비 중"); return; }
+    if (visibleAdWrappers.length && !wrappers.length) { announce(["광고 준비 중", ...new Set(speedNotes)].join(" · ")); return; }
     if (wrappers.length) {
       for (const wrapper of wrappers) {
         for (const video of adVideos(wrapper)) {
           if (settings.adMute) patch(video, "muted", true);
-          if (settings.adSpeed !== 1) {
-            try { patch(video, "playbackRate", settings.adSpeed); } catch { /* unsupported ad player */ }
-          }
         }
         if (settings.adMini && main && !main.paused && main.readyState >= 2) {
           wrapper.classList.add("chzzk-tools-ad-mini");
@@ -166,7 +228,7 @@
       if (settings.mainAudio && main && beforeAdAudio && !beforeAdAudio.muted && !userChangedAdAudio) {
         main.muted = false;
       }
-      status = main?.paused ? "광고 처리 중 · 본방 재생 대기" : "광고 처리 중";
+      status = [main?.paused ? "광고 처리 중 · 본방 재생 대기" : "광고 처리 중", ...new Set(speedNotes)].join(" · ");
       announce(status); return;
     }
     if (adActive) {

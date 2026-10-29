@@ -1,0 +1,44 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>광고 배속 멈춤 복구 검사</title>
+<body data-result="pending"><h1>광고 배속 · 재생 진행 관측</h1><video class="webplayer-internal-video" style="width:640px;height:360px"></video>
+<div id="midAdPlayerWrapper"><video id="midPlayer"></video><div id="midAdVideoContainer"><video id="ad"></video></div></div>
+<pre id="result">pending</pre><output id="status"></output><script>
+history.replaceState(null,'','/live/'+'a'.repeat(32));
+const timers=[],listeners=[],writes=[];let now=1000,time=0,ready=4,paused=false,ended=false,source='ad1',duration=100,bufferEnd=100,rate=1,rejectRate=false,seeks=0,plays=0,restarts=0;
+Object.defineProperty(performance,'now',{value:()=>now});window.setInterval=fn=>{timers.push(fn);return timers.length};
+const features={catchUp:false,adMute:true,adSpeed:4,adMini:false,mainAudio:true};
+window.chrome={storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+const ad=document.querySelector('#ad'),main=document.querySelector('.webplayer-internal-video'),wrapper=document.querySelector('#midAdPlayerWrapper');
+Object.defineProperties(main,{readyState:{get:()=>4},paused:{get:()=>false}});main.volume=.4;
+Object.defineProperties(ad,{currentTime:{get:()=>time,set:()=>seeks++},currentSrc:{get:()=>source},duration:{get:()=>duration},readyState:{get:()=>ready},paused:{get:()=>paused},ended:{get:()=>ended},seeking:{get:()=>false},buffered:{get:()=>({length:1,start:()=>0,end:()=>bufferEnd})},playbackRate:{get:()=>rate,set:value=>{if(rejectRate&&value>1)throw Error('Unsupported playback rate');rate=value;writes.push(value)}}});
+ad.play=()=>{plays++;return Promise.resolve()};ad.pause=()=>{restarts++};ad.load=()=>{restarts++};
+document.addEventListener('chzzk-tools:player-status',event=>document.querySelector('#status').textContent=event.detail.text);
+const tick=(seconds=1,progress=0)=>{now+=seconds*1000;time+=progress;timers.forEach(fn=>fn())};
+const next=()=>{source='ad'+(Number(source.slice(2))+1);time=0;ready=4;paused=false;ended=false;bufferEnd=duration;rate=1;ad.dispatchEvent(new Event('loadedmetadata'));tick()};
+</script><script src="/tools-core.js?v=0.8.1"></script><script src="/player-tools.js?v=0.8.1"></script><script>
+(async()=>{
+ await Promise.resolve();const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});
+ tick();check('정상적으로 재생되는 광고는 지정한 4배속',rate===4);
+ tick(1,4);tick(1,4);check('재생 위치가 진행되면 4배속 유지',rate===4);
+ next();for(let n=0;n<5;n++)tick(1,rate<=2?rate:0);
+ check('높은 배속에서 위치가 멈추면 1배속으로 내려 재생 회복',rate===1&&time>0);
+ tick(1,1);check('같은 광고에서는 복구 직후 다시 고배속을 강제하지 않음',rate===1);
+ next();check('다음 광고는 사용자가 지정한 배속으로 새로 시작',rate===4);
+ ready=2;ad.dispatchEvent(new Event('waiting'));check('버퍼 대기 이벤트에서 즉시 1배속',rate===1);
+ tick(1,0);ready=4;tick(1,1);check('버퍼 대기가 지속된 광고는 안정 배속 유지',rate===1);
+ next();duration=100;bufferEnd=time+2;tick(1,1);check('충분히 받지 못한 광고를 고배속으로 소진하지 않음',rate===1);
+ bufferEnd=time+20;tick(1,1);check('멈춘 적 없이 버퍼가 충분해지면 지정 배속 허용',rate===4);
+ time=99.5;bufferEnd=duration;tick(.1,0);check('끝까지 받은 광고의 마지막 부분은 불필요하게 감속하지 않음',rate===4);
+ next();paused=true;tick(10,0);paused=false;tick(1,1);check('의도적으로 정지한 광고를 멈춤으로 오인하지 않음',rate===4);
+ next();rate=1;tick(1,1);rate=1;tick(1,1);const conflicts=writes.length;tick(1,1);
+ check('SDK가 배속을 반복 복원하면 변경 경쟁 중단',rate===1&&writes.length===conflicts);
+ next();rejectRate=true;tick(1,1);next();check('고배속을 거부하는 플레이어에서는 1배속으로 복구',rate===1);rejectRate=false;
+ next();ready=1;tick(1,0);check('광고 준비 상태로 되돌아가도 고배속을 낮춤',rate===1);
+ ready=4;tick(1,1);wrapper.style.display='none';tick();check('광고 종료 후 원래 배속·음소거 복원',rate===1&&!ad.muted&&main.volume===.4);
+ const closedRate=rate;ad.dispatchEvent(new Event('waiting'));check('종료 후 광고 이벤트 감시 해제',rate===closedRate&&!ad.hasAttribute('data-chzzk-tools-ad-speed-state'));
+ wrapper.style.display='block';next();listeners.forEach(fn=>fn({features:{newValue:{...features,adSpeed:1}}},'local'));tick();
+ check('광고 속도를 1배로 설정하면 배속 제어 해제',rate===1&&!ad.hasAttribute('data-chzzk-tools-ad-speed-state'));
+ check('본방과 광고 외 영상에는 광고 배속을 적용하지 않음',main.playbackRate===1&&document.querySelector('#midPlayer').playbackRate===1);
+ check('복구를 위해 광고를 탐색·재시작·강제 재생하지 않음',seeks===0&&plays===0&&restarts===0);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.querySelector('#result').textContent=error.stack;document.body.dataset.result='fail'});
+</script></body></html>

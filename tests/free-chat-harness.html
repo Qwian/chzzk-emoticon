@@ -21,7 +21,7 @@ const editor=document.querySelector('[contenteditable]'),initialParent=editor.pa
 const captures=new WeakMap();Element.prototype.setPointerCapture=function(id){captures.set(this,id)};Element.prototype.hasPointerCapture=function(id){return captures.get(this)===id};Element.prototype.releasePointerCapture=function(){captures.delete(this)};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['pointermove',dx,dy],['pointerup',dx,dy]])element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:77,button:0,clientX:x,clientY:y}))};
-</script><script src="../free-chat.js?v=0.8.0-final"></script><script>
+</script><script src="../free-chat.js?v=0.8.1"></script><script>
 (async()=>{
  const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});await wait(100);
  if(params.has('legacy')){check('기존 템퍼몽키 스크립트가 먼저 있으면 확장은 중복 적용하지 않음',!document.querySelector('.ctfc-toolbar')&&document.querySelector('#sfc-style'));document.querySelector('#sfc-style').remove();await wait(100)}
@@ -39,6 +39,8 @@ const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['p
  gesture(document.querySelector('.ctfc-grip'),-80,30);await wait(60);const moved=chat().getBoundingClientRect();
  check('드래그 이동과 비율 저장',moved.left<original.left&&store[key].xRatio<1&&store[key].yRatio>0);
  check('자기 저장 이벤트로 도구 재설치하지 않음',document.querySelector('.ctfc-toolbar')===toolbar);
+ gesture(document.querySelector('.ctfc-handle[data-edge="e"]'),96-chat().getBoundingClientRect().width,0);await wait(60);
+ check('겹친 채팅도 240px 제한 없이 96px까지 축소·저장',Math.abs(chat().getBoundingClientRect().width-96)<1&&store[key].width===96);
  gesture(document.querySelector('.ctfc-grip'),innerWidth,innerHeight);await wait(60);
  const player=soop?document.querySelector('#webplayer'):document.querySelector('section');
  check('겹친 오른쪽 채팅만큼 재생 컨트롤 안쪽 배치',parseFloat(player.style.getPropertyValue('--ctfc-controls-right'))>0);
@@ -48,15 +50,34 @@ const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['p
  check('이전 모니터 배치 복원',Math.abs(store[key].width-priorWidth)<1);
  document.querySelector('.ctfc-disable').click();await wait(70);
  check('원래 배치 복귀',getComputedStyle(chat()).position!=='fixed'&&store[key].enabled===false);
- if(soop){const before=chat().getBoundingClientRect().width;gesture(document.querySelector('.ctfc-dock-handle'),-70,0);await wait(60);check('숲 원래 배치에서도 채팅 폭 조절·저장',chat().getBoundingClientRect().width>before&&Math.abs(store[key].dockWidth-chat().getBoundingClientRect().width)<1)}
+ const dockHandle=document.querySelector('.ctfc-dock-handle');
+ check('겹치기를 끄면 채팅 왼쪽 경계에 폭 조절 손잡이 표시',dockHandle&&getComputedStyle(dockHandle).display!=='none');
+ if(dockHandle){
+  const before=chat().getBoundingClientRect().width;gesture(dockHandle,-70,0);await wait(60);
+  check('원래 배치에서도 채팅 폭 조절·저장',chat().getBoundingClientRect().width>before&&Math.abs(store[key].dockWidth-chat().getBoundingClientRect().width)<1);
+  check('폭 조절 손잡이가 실제 채팅 경계에 맞음',Math.abs(dockHandle.getBoundingClientRect().left-(chat().getBoundingClientRect().left-4))<1);
+  check('채팅 폭을 바꿔도 입력창·작성 문장 유지',document.querySelector('[contenteditable]')===editor&&editor.textContent==='작성 중 문장');
+  gesture(dockHandle,chat().getBoundingClientRect().width-80,0);await wait(60);
+  check('원래 배치도 240px 제한 없이 80px까지 축소·저장',Math.abs(chat().getBoundingClientRect().width-80)<1&&Math.abs(store[key].dockWidth-80)<1);
+  gesture(dockHandle,-innerWidth,0);await wait(60);const available=player.getBoundingClientRect().width;
+  check('영상에 강제 500px를 남기는 폭 제한도 없음',Math.abs(chat().getBoundingClientRect().width-(available-1))<1);
+  gesture(dockHandle,chat().getBoundingClientRect().width-80,0);await wait(60);
+ }
  document.querySelector('#ctfc-toggle').click();await wait(70);check('겹치기 다시 켜기',getComputedStyle(chat()).position==='fixed');
  const chord=(extra={})=>{const event=new KeyboardEvent('keydown',{bubbles:true,cancelable:true,code:'KeyC',altKey:true,shiftKey:true,...extra});editor.dispatchEvent(event);return event};
  const shortcut=chord();await wait(70);check('Alt+Shift+C로 원래 배치 전환',shortcut.defaultPrevented&&getComputedStyle(chat()).position!=='fixed');
+ if(dockHandle)check('겹치기 재전환 후 저장한 채팅 폭 복원',Math.abs(chat().getBoundingClientRect().width-store[key].dockWidth)<1);
  chord({repeat:true});await wait(40);check('키를 길게 눌러도 배치가 연속 전환되지 않음',getComputedStyle(chat()).position!=='fixed');
  chord();await wait(70);check('같은 단축키로 겹치기 재개',getComputedStyle(chat()).position==='fixed');
  check('일반 C 키와 IME 조합 중에는 가로채지 않음',!chord({altKey:false,shiftKey:false}).defaultPrevented&&!chord({isComposing:true}).defaultPrevented);
  if(soop)document.body.classList.remove('screen_mode');else document.querySelector('main').classList.remove('_is_large_test');await wait(70);
  check('일반 화면에서는 기본 배치',getComputedStyle(chat()).position!=='fixed');
+ if(!soop&&dockHandle){
+  chord();await wait(60);const before=chat().getBoundingClientRect().width;gesture(dockHandle,30,0);await wait(60);
+  check('치지직 일반 화면도 겹치기 끈 상태에서 채팅 폭 조절',getComputedStyle(dockHandle).display!=='none'&&chat().getBoundingClientRect().width<before);
+  chat().classList.add('_is_folded_test');await wait(60);check('접힌 채팅에는 폭 조절 손잡이 숨김',getComputedStyle(dockHandle).display==='none');
+  chat().classList.remove('_is_folded_test');await wait(60);chord();await wait(60);
+ }
  if(soop)document.body.classList.add('screen_mode');else document.querySelector('main').classList.add('_is_large_test');await wait(70);
  if(soop)player.classList.remove('chat_open');else chat().classList.add('_is_folded_test');await wait(70);
  check('채팅 접힘 상태에는 겹치기 비활성',getComputedStyle(chat()).position!=='fixed');
@@ -64,6 +85,7 @@ const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['p
  await chrome.storage.local.set({features:{freeChat:false}});await wait(70);
  check('팝업 설정을 끄면 도구·스타일·배치 모두 정리',!document.querySelector('#ctfc-style')&&!document.querySelector('.ctfc-toolbar')&&!chat().style.getPropertyValue('--ctfc-w')&&getComputedStyle(chat()).position!=='fixed');
  await chrome.storage.local.set({features:{freeChat:true}});await wait(70);check('다시 켜면 저장한 투명도 복원',chat().style.getPropertyValue('--ctfc-opacity')==='0.60');
+ check('작은 폭의 저장값을 불러와도 240px로 되돌리지 않음',Math.abs(chat().getBoundingClientRect().width-96)<1);
  const legacy=document.createElement('style');legacy.id='sfc-style';document.head.append(legacy);await wait(70);
  check('기존 스크립트가 나중에 실행돼도 확장 도구만 정리',legacy.isConnected&&!document.querySelector('#ctfc-style')&&!document.querySelector('.ctfc-toolbar')&&document.querySelector('[contenteditable]')===editor);
  legacy.remove();await wait(70);check('기존 스크립트가 없어지면 확장 도구 재개',document.querySelectorAll('.ctfc-toolbar').length===1);
