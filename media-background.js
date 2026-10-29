@@ -1,13 +1,16 @@
 const mediaTabs = new Map();
 let speedQueue = Promise.resolve();
 function tabState(id) {
-  if (!mediaTabs.has(id)) mediaTabs.set(id, { rate: null, frames: new Map(), badgeQueue: Promise.resolve(), badgeText: null });
+  if (!mediaTabs.has(id)) mediaTabs.set(id, { rate: null, resumeRate: null, frames: new Map(), badgeQueue: Promise.resolve(), badgeText: null });
   return mediaTabs.get(id);
 }
-function updateBadge(tabId, state) {
+function primaryFrame(state) {
   const frames = [...state.frames.values()].filter(info => Date.now() - info.time < 15000 && info.rate !== null);
   frames.sort((a, b) => b.mediaScore - a.mediaScore);
-  const rate = frames[0]?.rate;
+  return frames[0];
+}
+function updateBadge(tabId, state) {
+  const rate = primaryFrame(state)?.rate;
   const text = rate == null ? "" : String(Math.round(rate * 100) / 100);
   if (state.badgeText === text) return state.badgeQueue;
   state.badgeText = text;
@@ -55,8 +58,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       return await chrome.tabs.sendMessage(tabId, { type: "MEDIA_FRAME_STEP", direction: message.direction === -1 ? -1 : 1 }, { frameId });
     }
     if (!["increase", "decrease", "reset"].includes(message.action)) return { ok: false };
-    const current = state.rate ?? (Number.isFinite(message.currentRate) ? message.currentRate : 1);
-    state.rate = message.action === "reset" ? 1 : Math.max(0.1, Math.min(16, Math.round((current + (message.action === "increase" ? 0.1 : -0.1)) * 10) / 10));
+    const observed = message.hasMedia === false ? primaryFrame(state)?.rate : message.currentRate;
+    const current = state.rate ?? (Number.isFinite(observed) ? observed : 1);
+    if (message.action === "reset") {
+      if (Math.abs(current - 1) > 0.001) { state.resumeRate = Math.max(0.1, Math.min(16, current)); state.rate = 1; }
+      else state.rate = state.resumeRate ?? 1;
+    } else {
+      state.rate = Math.max(0.1, Math.min(16, Math.round((current + (message.action === "increase" ? 0.1 : -0.1)) * 10) / 10));
+      if (Math.abs(state.rate - 1) > 0.001) state.resumeRate = state.rate;
+      else if (Math.abs(current - 1) > 0.001) state.resumeRate = current;
+    }
     await chrome.tabs.sendMessage(tabId, { type: "MEDIA_SPEED_APPLY", rate: state.rate }).catch(() => {});
     return { ok: true, rate: state.rate };
   });

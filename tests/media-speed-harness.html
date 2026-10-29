@@ -1,5 +1,6 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><title>모든 사이트 속도 단축키 검사</title>
-<body data-result="pending"><h1>속도 · 프레임 단축키</h1><video style="width:640px;height:360px"></video><input id="typing"><pre id="result">pending</pre>
+<style>#media-preview-player{display:inline-block;background:linear-gradient(135deg,#192f29,#273b50)}#media-preview-player:fullscreen{width:100vw;height:100vh;display:grid;place-items:center}#media-preview-player:fullscreen video{width:100%!important;height:100%!important}</style>
+<body data-result="pending"><h1>속도 · 프레임 단축키</h1><div id="media-preview-player"><video style="width:640px;height:360px"></video></div><input id="typing"><button id="fullscreen-container">플레이어 전체화면 검사</button><button id="fullscreen-video">영상 전체화면 검사</button><pre id="result">pending</pre>
 <script>
   const worker=new Worker('/tests/media-background-worker.js'),pending=new Map(),mediaListeners=[],storageListeners=[],deliveries=[];
   let serial=0; const actions=[];
@@ -14,14 +15,17 @@
   const request=(message,frameId=0)=>new Promise(resolve=>{const id=++serial;pending.set(id,resolve);worker.postMessage({kind:'request',id,message,frameId})});
   window.chrome={runtime:{id:'test',sendMessage:request,onMessage:{addListener:fn=>mediaListeners.push(fn)}},storage:{local:{get:async()=>({features:{globalSpeed:true}})},onChanged:{addListener:fn=>storageListeners.push(fn)}}};
   const video=document.querySelector('video');let current=10,paused=false,frameCallback;
+  document.querySelector('#fullscreen-container').onclick=()=>document.querySelector('#media-preview-player').requestFullscreen();
+  document.querySelector('#fullscreen-video').onclick=()=>video.requestFullscreen();
   Object.defineProperties(video,{readyState:{get:()=>4},duration:{get:()=>100},paused:{get:()=>paused},currentTime:{get:()=>current,set:value=>current=value},seekable:{get:()=>({length:1,start:()=>0,end:()=>100})}});
   video.pause=()=>{paused=true};video.requestVideoFrameCallback=cb=>{frameCallback=cb};
   const delay=ms=>new Promise(r=>setTimeout(r,ms));
   const press=(code,shiftKey=false,target=document.body)=>{const e=new KeyboardEvent('keydown',{code,shiftKey,bubbles:true,cancelable:true,composed:true});target.dispatchEvent(e);return e;};
-</script><script src="../media-speed.js"></script>
+</script><script src="../media-speed.js?v=0.8.2-corner"></script>
 <script>
   (async()=>{
     const results=[],check=(name,passed)=>results.push({name,passed});await delay(120);
+    if(new URLSearchParams(location.search).has('preview')){document.body.dataset.result='preview';document.querySelector('#result').textContent='로컬 미리보기 · . / , 로 배속 조작, / 로 1배속과 직전 배속 전환';return;}
     const badge=()=>actions.filter(a=>a.method==='setBadgeText').at(-1)?.details.text;
     check('일반 재생은 아이콘에 1 표시',badge()==='1');
     video.playbackRate=1.5;await delay(120);check('사이트에서 바꾼 실제 배속도 아이콘 반영',badge()==='1.5');
@@ -29,8 +33,18 @@
     video.playbackRate=1;await delay(120);
     press('Period');await delay(120);check('마침표로 0.1배 증가',video.playbackRate===1.1);
     check('단축키 배속이 아이콘 숫자로 반영',badge()==='1.1');
+    const toast=document.querySelector('#media-speed-toast'),box=toast.getBoundingClientRect(),videoBox=video.getBoundingClientRect();
+    check('배속 안내는 영상 왼쪽 위에 같은 가로·세로 여백으로 크게 표시',Math.abs(box.left-videoBox.left-box.top+videoBox.top)<1&&box.left-videoBox.left>=12&&box.left-videoBox.left<=24&&parseFloat(getComputedStyle(toast).fontSize)>=32);
+    check('안내는 클릭이나 포커스를 가로채지 않음',getComputedStyle(toast).pointerEvents==='none'&&document.activeElement!==toast);
+    const originalVideoStyle=video.style.cssText;video.style.cssText=`position:fixed;left:${innerWidth-80}px;top:${innerHeight-45}px;width:160px;height:90px`;window.dispatchEvent(new Event('resize'));
+    const small=toast.getBoundingClientRect();check('작거나 화면 경계에 걸린 영상도 안내가 화면 안에 유지',small.left>=0&&small.top>=0&&small.right<=innerWidth&&small.bottom<=innerHeight);
+    video.style.cssText=originalVideoStyle;window.dispatchEvent(new Event('resize'));
     press('Comma');await delay(50);check('쉼표로 0.1배 감소',video.playbackRate===1);
     press('Period');press('Period');await delay(80);press('Slash');await delay(50);check('슬래시로 1배 복귀',video.playbackRate===1);
+    press('Slash');await delay(80);check('슬래시를 다시 누르면 직전 1.2배속 복원',video.playbackRate===1.2);
+    press('Slash');await delay(80);check('슬래시를 반복 누르면 1배속과 직전 배속 전환',video.playbackRate===1);
+    const repeat=new KeyboardEvent('keydown',{code:'Slash',repeat:true,bubbles:true,cancelable:true});document.body.dispatchEvent(repeat);await delay(50);
+    check('슬래시를 길게 눌러도 반복 전환하지 않음',repeat.defaultPrevented&&video.playbackRate===1);
     for(let n=0;n<5;n++)frameCallback(n*16.666,{mediaTime:n/60,presentedFrames:n+1});
     const before=current;press('Period',true);await delay(50);check('Shift+마침표는 60fps 기준 한 프레임 전진하고 정지',Math.abs(current-before-1/60)<.00001&&paused);
     press('Comma',true);await delay(50);check('Shift+쉼표는 한 프레임 후진',Math.abs(current-before)<.00001);

@@ -3,6 +3,7 @@
   globalThis.__chzzkMediaSpeed = true;
   const media = new Set(), roots = new WeakSet(), frameInfo = new WeakMap(), observers = new Set();
   let enabled = true, desiredRate = null, toastTimer = 0, remoteMediaUntil = 0, reportTimer = 0, reportSoonTimer = 0, reportedMedia = false, stopped = false;
+  let toastAnchor = null;
   const mediaEvents = ["loadedmetadata", "ratechange", "play", "pause", "emptied"];
   function unwatch(element) {
     mediaEvents.forEach(name => element.removeEventListener(name, onMediaEvent));
@@ -17,9 +18,13 @@
     stopped = true; enabled = false; desiredRate = null; remoteMediaUntil = 0;
     clearInterval(reportTimer); clearTimeout(reportSoonTimer); clearTimeout(toastTimer);
     window.removeEventListener("keydown", onKeydown, true);
+    window.removeEventListener("resize", positionToast);
+    window.removeEventListener("scroll", positionToast, true);
+    document.removeEventListener("fullscreenchange", positionToast);
     observers.forEach(observer => observer.disconnect()); observers.clear();
     [...media].forEach(unwatch);
     document.querySelector("#media-speed-toast")?.remove();
+    document.querySelector("#media-speed-toast-style")?.remove();
     // Chrome may reject even listener removal after an extension reload.
     try { chrome.runtime.onMessage.removeListener(onMessage); } catch { /* already invalidated */ }
     try { chrome.storage.onChanged.removeListener(onStorageChange); } catch { /* already invalidated */ }
@@ -48,16 +53,49 @@
     return [...media].filter(v => v.isConnected && v.tagName === "VIDEO" && visible(v) && !isAd(v))
       .sort((a, b) => { const area = v => { const r = v.getBoundingClientRect(); return r.width * r.height * (v.paused ? 1 : 2); }; return area(b) - area(a); })[0];
   }
-  function toast(text) {
+  function positionToast() {
+    const element = document.querySelector("#media-speed-toast");
+    if (!element || element.hidden || stopped) return;
+    const width = document.documentElement.clientWidth || innerWidth, height = document.documentElement.clientHeight || innerHeight;
+    const rect = toastAnchor?.isConnected ? toastAnchor.getBoundingClientRect() : null;
+    const left = Math.max(0, rect?.left ?? 0), top = Math.max(0, rect?.top ?? 0);
+    const right = Math.min(width, rect?.right ?? width), bottom = Math.min(height, rect?.bottom ?? height);
+    const usable = right > left && bottom > top;
+    const areaWidth = usable ? right - left : width, areaHeight = usable ? bottom - top : height;
+    const gap = Math.round(Math.max(8, Math.min(24, Math.min(areaWidth, areaHeight) * 0.045)));
+    element.style.fontSize = `${Math.max(18, Math.min(36, areaWidth * 0.055, areaHeight * 0.12))}px`;
+    element.style.maxWidth = `${Math.max(1, Math.min(width - gap * 2, Math.max(120, areaWidth - gap * 2)))}px`;
+    element.style.maxHeight = `${Math.max(1, height - gap * 2)}px`;
+    element.style.left = "0px"; element.style.top = "0px";
+    const fullscreen = document.fullscreenElement;
+    const canPopover = typeof element.showPopover === "function";
+    const container = !canPopover && fullscreen && !fullscreen.matches("video,iframe") ? fullscreen : document.documentElement;
+    if (element.parentElement !== container) container.append(element);
+    if (canPopover) {
+      try { element.setAttribute("popover", "manual"); if (!element.matches(":popover-open")) element.showPopover(); }
+      catch { element.removeAttribute("popover"); }
+    }
+    const box = element.getBoundingClientRect();
+    element.style.left = `${Math.max(gap, Math.min(width - box.width - gap, (usable ? left : 0) + gap))}px`;
+    element.style.top = `${Math.max(gap, Math.min(height - box.height - gap, (usable ? top : 0) + gap))}px`;
+  }
+  function toast(text, anchor = bestVideo()) {
     if (stopped) return;
     let element = document.querySelector("#media-speed-toast");
     if (!element) {
       element = document.createElement("div"); element.id = "media-speed-toast"; element.setAttribute("role", "status");
-      element.style.cssText = "position:fixed;left:24px;top:80px;z-index:2147483647;background:#102019ed;color:#b5ffdc;padding:10px 16px;border-radius:8px;font:700 15px system-ui;pointer-events:none";
-      (document.fullscreenElement || document.documentElement).append(element);
+      element.style.cssText = "position:fixed;inset:auto;margin:0;z-index:2147483647;box-sizing:border-box;background:#101b18ed;color:#eafff6;border:1px solid #80ffd54d;box-shadow:0 6px 28px #0006;padding:12px 22px;border-radius:14px;font:800 36px/1.2 system-ui;font-variant-numeric:tabular-nums;text-align:center;overflow:hidden;pointer-events:none";
+      document.documentElement.append(element);
+      const style = document.createElement("style"); style.id = "media-speed-toast-style";
+      style.textContent = "#media-speed-toast::backdrop{background:transparent;pointer-events:none}"; document.documentElement.append(style);
     }
+    toastAnchor = anchor || [...document.querySelectorAll("iframe")].filter(visible).sort((a, b) => b.getBoundingClientRect().width * b.getBoundingClientRect().height - a.getBoundingClientRect().width * a.getBoundingClientRect().height)[0] || null;
     element.textContent = text; element.hidden = false;
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => { element.hidden = true; }, 1600);
+    positionToast();
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => {
+      try { if (element.matches(":popover-open")) element.hidePopover(); } catch { /* already removed */ }
+      element.hidden = true; toastAnchor = null;
+    }, 1600);
   }
   function applyRate(element) {
     if (!enabled || desiredRate === null || isAd(element)) return;
@@ -154,17 +192,18 @@
     const frame = !video && performance.now() < remoteMediaUntil && document.querySelector("iframe");
     if (!video && !audio && !frame || event.shiftKey && !video && !frame) return;
     event.preventDefault(); event.stopImmediatePropagation();
+    if (event.code === "Slash" && event.repeat) return;
     const message = event.shiftKey ? { action: "step", direction: event.code === "Comma" ? -1 : 1, hasVideo: Boolean(video) } :
-      { action: event.code === "Slash" ? "reset" : event.code === "Comma" ? "decrease" : "increase", currentRate: (video || audio)?.playbackRate || 1 };
+      { action: event.code === "Slash" ? "reset" : event.code === "Comma" ? "decrease" : "increase", hasMedia: Boolean(video || audio), currentRate: (video || audio)?.playbackRate || 1 };
     send({ type: "MEDIA_SPEED_COMMAND", ...message }, true).then(response => {
-      if (!stopped && response?.rate != null) toast(`${response.rate.toFixed(1)}배`);
+      if (!stopped && response?.rate != null) toast(`${Number(response.rate.toFixed(2))}배`, video);
     });
   }
   function onMessage(message, _sender, respond) {
     if (stopped) return;
     if (message.type === "GET_TOOL_STATUS") {
       document.dispatchEvent(new Event("chzzk-tools:quality-query"));
-      respond({ ok: true, codeVersion: "0.8.1", quality: globalThis.__chzzkQualityStatus,
+      respond({ ok: true, codeVersion: "0.8.2", quality: globalThis.__chzzkQualityStatus,
         videoHeight: bestVideo()?.videoHeight || 0 }); return;
     }
     if (message.type === "MEDIA_FRAME_AVAILABLE") { remoteMediaUntil = message.available ? performance.now() + 9000 : 0; return; }
@@ -181,6 +220,9 @@
   }
   if (!connected()) return;
   window.addEventListener("keydown", onKeydown, true);
+  window.addEventListener("resize", positionToast);
+  window.addEventListener("scroll", positionToast, true);
+  document.addEventListener("fullscreenchange", positionToast);
   try {
     chrome.runtime.onMessage.addListener(onMessage);
     chrome.storage.onChanged.addListener(onStorageChange);

@@ -416,7 +416,7 @@ async function initializeFeatures() {
   panel.append(adSpeedNote);
   const note = document.createElement("p");
   note.className = "intro";
-  note.textContent = ", / . : 0.1배 감소 / 증가 · / : 1배 · Shift+, / Shift+. : 이전 / 다음 프레임. 입력창에서는 작동하지 않습니다. FPS를 아직 읽지 못했으면 30fps로 추정합니다. 썸네일 우클릭으로 소리 미리보기, 다시 우클릭하거나 마우스를 빼면 종료합니다. 치즈 플래터의 자동 따라잡기는 끄고 사용하세요. 고화질 설치·로그인 조건과 실제 광고 차단 프로그램 설정은 자동 변경하지 않습니다.";
+  note.textContent = ", / . : 0.1배 감소 / 증가 · / : 1배속 ↔ 직전 배속 · Shift+, / Shift+. : 이전 / 다음 프레임. 배속 안내는 영상 왼쪽 위에 같은 가로·세로 여백으로 크게 표시합니다. 입력창에서는 작동하지 않습니다. FPS를 아직 읽지 못했으면 30fps로 추정합니다. 썸네일 우클릭으로 소리 미리보기, 다시 우클릭하거나 마우스를 빼면 종료합니다. 치즈 플래터의 자동 따라잡기는 끄고 사용하세요. 고화질 설치·로그인 조건과 실제 광고 차단 프로그램 설정은 자동 변경하지 않습니다.";
   panel.append(note); diagnosticsPanel.before(panel);
   async function saveFeature(key, value) {
     try {

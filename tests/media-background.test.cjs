@@ -90,3 +90,30 @@ test("closed-tab API failures are contained and a later report can retry", async
   b.reject(false); await b.report(1); assert.equal(b.badges.get(1), "1");
   b.events.remove(1); await b.report(2); assert.equal(b.badges.get(1), "2");
 });
+test("slash toggles between normal speed and the previous speed, independently per tab", async () => {
+  const b = background();
+  const reset = (currentRate, tab = 1) => b.message({ type: "MEDIA_SPEED_COMMAND", action: "reset", currentRate }, tab);
+  assert.equal((await reset(1.7)).rate, 1);
+  assert.equal((await reset(1)).rate, 1.7);
+  assert.equal((await reset(1.7)).rate, 1);
+  assert.equal((await reset(0.8, 2)).rate, 1);
+  assert.equal((await reset(1, 2)).rate, 0.8);
+  assert.equal((await reset(1)).rate, 1.7);
+  assert.equal((await reset(1, 3)).rate, 1);
+});
+test("slash retains the latest manually adjusted non-normal speed and serializes rapid toggles", async () => {
+  const b = background(), command = action => b.message({ type: "MEDIA_SPEED_COMMAND", action, currentRate: 1 });
+  assert.equal((await command("increase")).rate, 1.1);
+  assert.equal((await command("increase")).rate, 1.2);
+  const [normal, previous] = await Promise.all([command("reset"), command("reset")]);
+  assert.equal(normal.rate, 1); assert.equal(previous.rate, 1.2);
+  assert.equal((await command("decrease")).rate, 1.1);
+  assert.equal((await command("decrease")).rate, 1);
+  assert.equal((await command("reset")).rate, 1.1);
+});
+test("a top-frame slash remembers the observed iframe speed without rounding native rates", async () => {
+  const b = background(); await b.report(1.75, 1, 17, 1000000);
+  const message = { type: "MEDIA_SPEED_COMMAND", action: "reset", hasMedia: false, currentRate: 1 };
+  assert.equal((await b.message(message)).rate, 1);
+  assert.equal((await b.message(message)).rate, 1.75);
+});

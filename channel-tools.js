@@ -49,7 +49,7 @@
   const playerUi = playerHost.attachShadow({ mode: "open" });
   playerUi.innerHTML = `<style>
     :host{display:inline-flex;position:relative;align-items:center;height:100%;color:inherit;font:12px system-ui;vertical-align:middle}
-    details{position:relative}summary{display:flex;align-items:center;gap:5px;cursor:pointer;list-style:none;padding:8px;color:inherit;white-space:nowrap;font-weight:600}summary::-webkit-details-marker{display:none}summary:hover{color:#00efa4}
+    details{position:relative}summary{display:flex;align-items:center;gap:5px;cursor:pointer;list-style:none;padding:8px;color:inherit;white-space:nowrap;font-weight:600;opacity:.35;transition:opacity .15s}summary::-webkit-details-marker{display:none}summary:hover,summary:focus-visible{color:#00efa4;opacity:1}
     summary svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
     section{position:absolute;right:0;bottom:42px;width:255px;box-sizing:border-box;padding:14px;background:#1d2026f5;border:1px solid #ffffff2b;border-radius:10px;color:#f3f5f7;box-shadow:0 8px 26px #0005;line-height:1.5;z-index:100}
     label{display:flex;gap:8px;align-items:center;font-weight:600}input{accent-color:#00dc91}button{border:0;border-radius:6px;background:#00dc91;color:#07231a;padding:7px 12px;font:700 12px system-ui;cursor:pointer;margin-top:10px}button:disabled{opacity:.4;cursor:default}p{font-size:11px;color:#b5bbc6;margin:10px 0 0}
@@ -58,6 +58,10 @@
     <button id="catch-now" type="button">지금 따라잡기</button><p id="player-status" role="status"></p>
   </section></details>`;
   const $ = selector => playerUi.querySelector(selector);
+  // Mouse clicks still toggle details, without retaining focus in the player's controls.
+  $("summary").addEventListener("pointerdown", event => {
+    if (event.button === 0 && event.pointerType === "mouse") event.preventDefault();
+  });
   const bookmarkButton = document.createElement("button");
   bookmarkButton.type = "button"; bookmarkButton.id = "chzzk-channel-save"; bookmarkButton.className = "ct-bookmark";
   bookmarkButton.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 3h10v14l-5-3-5 3z"/></svg><span></span>';
