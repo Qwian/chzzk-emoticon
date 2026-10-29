@@ -2,10 +2,10 @@
   if (globalThis.__chzzkMediaSpeed) return;
   globalThis.__chzzkMediaSpeed = true;
   const media = new Set(), roots = new WeakSet(), frameInfo = new WeakMap(), observers = new Set();
-  let enabled = true, desiredRate = null, toastTimer = 0, remoteMediaUntil = 0, reportTimer = 0, stopped = false;
+  let enabled = true, desiredRate = null, toastTimer = 0, remoteMediaUntil = 0, reportTimer = 0, reportSoonTimer = 0, reportedMedia = false, stopped = false;
+  const mediaEvents = ["loadedmetadata", "ratechange", "play", "pause", "emptied"];
   function unwatch(element) {
-    element.removeEventListener("loadedmetadata", onMediaEvent);
-    element.removeEventListener("ratechange", onMediaEvent);
+    mediaEvents.forEach(name => element.removeEventListener(name, onMediaEvent));
     const info = frameInfo.get(element);
     if (info?.callback != null) element.cancelVideoFrameCallback?.(info.callback);
     frameInfo.delete(element);
@@ -15,7 +15,7 @@
   function stop() {
     if (stopped) return;
     stopped = true; enabled = false; desiredRate = null; remoteMediaUntil = 0;
-    clearInterval(reportTimer); clearTimeout(toastTimer);
+    clearInterval(reportTimer); clearTimeout(reportSoonTimer); clearTimeout(toastTimer);
     window.removeEventListener("keydown", onKeydown, true);
     observers.forEach(observer => observer.disconnect()); observers.clear();
     [...media].forEach(unwatch);
@@ -85,13 +85,16 @@
     }
     info.callback = video.requestVideoFrameCallback(sample);
   }
-  function onMediaEvent(event) { applyRate(event.currentTarget); }
+  function scheduleReport() {
+    if (stopped || reportSoonTimer) return;
+    reportSoonTimer = setTimeout(() => { reportSoonTimer = 0; report(true); }, 50);
+  }
+  function onMediaEvent(event) { applyRate(event.currentTarget); scheduleReport(); }
   function register(element) {
     if (stopped || media.has(element)) return;
     media.add(element); if (element.tagName === "VIDEO") watchFrames(element);
-    element.addEventListener("loadedmetadata", onMediaEvent);
-    element.addEventListener("ratechange", onMediaEvent);
-    applyRate(element);
+    mediaEvents.forEach(name => element.addEventListener(name, onMediaEvent));
+    applyRate(element); scheduleReport();
   }
   function scan(root) {
     if (root.matches?.("video,audio")) register(root);
@@ -102,9 +105,11 @@
   function observe(root) {
     if (roots.has(root)) return;
     roots.add(root); scan(root);
-    const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
-      if (node.nodeType === 1) scan(node);
-    })));
+    const observer = new MutationObserver(records => {
+      records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1) scan(node); }));
+      if (records.some(record => [...record.removedNodes].some(node => node.matches?.("iframe") || node.querySelector?.("iframe"))) ||
+          records.some(record => record.removedNodes.length) && [...media].some(element => !element.isConnected)) scheduleReport();
+    });
     observers.add(observer); observer.observe(root, { childList: true, subtree: true });
   }
   function step(direction) {
@@ -126,13 +131,18 @@
     toast(`${direction > 0 ? "다음" : "이전"} 프레임${samples.length < 3 ? " · 30fps 추정" : ""}`);
     return { ok: true, fps, estimated: samples.length < 3 };
   }
-  function report() {
+  function report(force = false) {
     if (!connected()) return;
     for (const element of media) if (!element.isConnected) unwatch(element);
-    if (!media.size && !document.querySelector("iframe")) return;
+    const hasIframes = Boolean(document.querySelector("iframe"));
+    if (!force && !media.size && !hasIframes && !reportedMedia) return;
     const video = bestVideo(), rect = video?.getBoundingClientRect();
-    send({ type: "MEDIA_FRAME_REPORT", score: rect ? rect.width * rect.height : 0 }).then(response => {
-      if (!stopped && response?.rate != null && desiredRate === null) { desiredRate = response.rate; media.forEach(applyRate); }
+    const audio = [...media].filter(element => element.tagName === "AUDIO" && !isAd(element)).sort((a, b) => Number(a.paused) - Number(b.paused))[0];
+    const primary = video || audio, score = rect ? rect.width * rect.height : 0;
+    reportedMedia = media.size > 0 || hasIframes;
+    send({ type: "MEDIA_FRAME_REPORT", score, mediaScore: video ? score * (video.paused ? 1 : 2) : audio ? 1 : 0,
+      rate: primary?.playbackRate ?? null, enabled, hasIframes }).then(response => {
+      if (!stopped && enabled && response?.rate != null && desiredRate === null) { desiredRate = response.rate; media.forEach(applyRate); }
     });
   }
   function onKeydown(event) {
@@ -154,7 +164,7 @@
     if (stopped) return;
     if (message.type === "GET_TOOL_STATUS") {
       document.dispatchEvent(new Event("chzzk-tools:quality-query"));
-      respond({ ok: true, codeVersion: "0.7.2", quality: globalThis.__chzzkQualityStatus,
+      respond({ ok: true, codeVersion: "0.7.3", quality: globalThis.__chzzkQualityStatus,
         videoHeight: bestVideo()?.videoHeight || 0 }); return;
     }
     if (message.type === "MEDIA_FRAME_AVAILABLE") { remoteMediaUntil = message.available ? performance.now() + 9000 : 0; return; }
@@ -167,6 +177,7 @@
     if (stopped || area !== "local" || !changes.features) return;
     enabled = changes.features.newValue?.globalSpeed !== false;
     if (!enabled) { desiredRate = null; media.forEach(element => delete element.dataset.chzzkToolsManualRate); }
+    scheduleReport();
   }
   if (!connected()) return;
   window.addEventListener("keydown", onKeydown, true);
@@ -178,5 +189,5 @@
     }).catch(apiFailure);
   } catch (error) { apiFailure(error); }
   if (stopped) return;
-  observe(document); reportTimer = setInterval(report, 4000); report();
+  observe(document); reportTimer = setInterval(report, 4000); report(true);
 })();

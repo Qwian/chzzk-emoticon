@@ -2,9 +2,10 @@
 <body data-result="pending"><h1>속도 · 프레임 단축키</h1><video style="width:640px;height:360px"></video><input id="typing"><pre id="result">pending</pre>
 <script>
   const worker=new Worker('/tests/media-background-worker.js'),pending=new Map(),mediaListeners=[],storageListeners=[],deliveries=[];
-  let serial=0;
+  let serial=0; const actions=[];
   worker.onmessage=event=>{
     const data=event.data;
+    if(data.kind==='action'){actions.push(data);return;}
     if(data.kind==='result'){pending.get(data.id)?.(data.result);pending.delete(data.id);return;}
     deliveries.push(data);
     let result={ok:true};mediaListeners.forEach(fn=>fn(data.message,{},value=>{result=value}));
@@ -21,7 +22,13 @@
 <script>
   (async()=>{
     const results=[],check=(name,passed)=>results.push({name,passed});await delay(120);
-    press('Period');await delay(50);check('마침표로 0.1배 증가',video.playbackRate===1.1);
+    const badge=()=>actions.filter(a=>a.method==='setBadgeText').at(-1)?.details.text;
+    check('일반 재생은 아이콘에 1 표시',badge()==='1');
+    video.playbackRate=1.5;await delay(120);check('사이트에서 바꾼 실제 배속도 아이콘 반영',badge()==='1.5');
+    video.playbackRate=1.03;await delay(120);check('자동 따라잡기의 소수 둘째 자리도 반영',badge()==='1.03');
+    video.playbackRate=1;await delay(120);
+    press('Period');await delay(120);check('마침표로 0.1배 증가',video.playbackRate===1.1);
+    check('단축키 배속이 아이콘 숫자로 반영',badge()==='1.1');
     press('Comma');await delay(50);check('쉼표로 0.1배 감소',video.playbackRate===1);
     press('Period');press('Period');await delay(80);press('Slash');await delay(50);check('슬래시로 1배 복귀',video.playbackRate===1);
     for(let n=0;n<5;n++)frameCallback(n*16.666,{mediaTime:n/60,presentedFrames:n+1});
@@ -35,6 +42,17 @@
     check('상위 페이지 명령은 영상 iframe으로 전달',deliveries.some(d=>d.message.type==='MEDIA_FRAME_STEP'&&d.options?.frameId===17));
     storageListeners.forEach(fn=>fn({features:{newValue:{globalSpeed:false}}},'local'));
     check('기능을 끄면 단축키 통과',!press('Period').defaultPrevented);
+    video.playbackRate=2;await delay(120);check('단축키를 꺼도 실제 재생 배속 표시',badge()==='2');
+    const ad=document.createElement('div');ad.id='midAdPlayerWrapper';ad.innerHTML='<video style="width:800px;height:600px"></video>';document.body.append(ad);
+    ad.querySelector('video').playbackRate=4;await delay(120);check('더 큰 광고 영상의 배속은 아이콘에 표시하지 않음',badge()==='2');
+    video.remove();await delay(120);check('본방 제거 후 광고만 남으면 아이콘 숫자 숨김',badge()==='');
+    const audio=document.createElement('audio');document.body.append(audio);audio.playbackRate=0.8;await delay(120);
+    check('오디오만 있는 페이지도 현재 배속 표시',badge()==='0.8');
+    audio.remove();ad.remove();await delay(120);check('모든 미디어 제거 시 숫자 숨김',badge()==='');
+    const iframe=document.createElement('iframe');document.body.append(iframe);
+    await request({type:'MEDIA_FRAME_REPORT',rate:2,score:1000000,mediaScore:1000000},17);await delay(80);
+    check('iframe의 실제 배속도 아이콘 표시',badge()==='2');
+    iframe.remove();await delay(120);check('마지막 iframe 제거 시 이전 배속 숫자 숨김',badge()==='');
     document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';worker.terminate();
   })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});
 </script></body></html>
