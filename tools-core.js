@@ -2,7 +2,7 @@
   const defaults = Object.freeze({
     koreanSearch: true, favorites: true, catchUp: true, followingExpanded: true, followingRefresh: true,
     adMute: true, adSpeed: 4, adMini: true, mainAudio: true, adAutoSkip: true, adblockQuality: true,
-    globalSpeed: true, listPreview: true, sidebarPreview: true, highestQuality: true, dismissAdNotice: true
+    globalSpeed: true, listPreview: true, sidebarPreview: true, freeChat: true, highestQuality: true, dismissAdNotice: true
   });
   const initials = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
   const vowels = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
@@ -75,5 +75,5 @@
     return [...items].sort((a, b) => channelGroup(a, favorites) - channelGroup(b, favorites) ||
       (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.7.3", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels, channelGroup });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.8.0", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels, channelGroup });
 })();

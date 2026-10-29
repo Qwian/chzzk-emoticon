@@ -26,10 +26,10 @@
   function close() {
     const previous = active; active = null;
     if (!previous) { syncSuppression(); return; }
-    clearTimeout(previous.timer); previous.abort?.abort(); previous.hls?.destroy();
+    clearTimeout(previous.timer); clearTimeout(previous.retryTimer); previous.abort?.abort(); previous.hls?.destroy();
     if (previous.owned) { previous.video.pause(); previous.video.removeAttribute("src"); previous.video.load(); }
     else { previous.video.muted = previous.muted; previous.video.volume = previous.volume; if (previous.paused) previous.video.pause(); }
-    previous.overlay?.remove(); previous.badge?.remove(); previous.playButton?.remove();
+    previous.overlay?.remove(); previous.badge?.remove(); previous.playButton?.remove(); previous.retryButton?.remove();
     previous.popup?.remove(); previous.card.classList.remove("ct-sidebar-previewing");
     previous.card.removeEventListener("pointerleave", previous.leave);
     if (previous.sidebar && hoverCard === previous.card) cancelHover();
@@ -66,6 +66,26 @@
     return null;
   }
   function badge(state, message) { if (state.badge) state.badge.textContent = message; }
+  function failed(state, message = "미리보기를 불러오지 못했습니다.") {
+    if (active !== state || state.retryTimer) return;
+    clearTimeout(state.timer); state.attempt++; state.abort.abort(); state.hls?.destroy(); state.hls = null;
+    if (state.owned) { state.video.pause(); state.video.removeAttribute("src"); state.video.load(); }
+    state.playButton?.remove(); state.playButton = null;
+    if (state.soop) document.dispatchEvent(new CustomEvent("chzzk-tools:soop-preview", { detail: { action: "close" } }));
+    if (state.retries < 2) {
+      state.retries++;
+      badge(state, `${message} 다시 불러오는 중… (${state.retries}/2)`);
+      state.retryTimer = setTimeout(() => { state.retryTimer = 0; prepare(state); }, 400 * state.retries);
+      return;
+    }
+    badge(state, `${message} 다시 시도해 주세요.`);
+    if (state.retryButton) return;
+    const button = document.createElement("button"); state.retryButton = button;
+    button.type = "button"; button.textContent = "미리보기 다시 시도";
+    button.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:12;pointer-events:auto;border:0;border-radius:7px;padding:10px 14px;background:#00dc91;color:#08291d;font:700 13px system-ui;cursor:pointer;white-space:nowrap";
+    button.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); button.remove(); state.retryButton = null; state.retries = 0; prepare(state); });
+    state.mount.append(button);
+  }
   function sidebarPanel(info) {
     const popup = document.createElement("aside"); popup.id = "chzzk-sidebar-preview";
     popup.setAttribute("aria-label", "채널 소리 미리보기");
@@ -87,12 +107,14 @@
   }
   async function play(state) {
     if (active !== state) return;
+    const attempt = state.attempt, current = () => active === state && state.attempt === attempt;
     try {
       state.video.muted = false; state.video.volume = 1;
       await state.video.play();
-      if (active === state) { state.playButton?.remove(); state.playButton = null; badge(state, state.sidebar ? "소리 켜짐 · 음량 100%" : "소리 켜짐 · 우클릭 종료"); }
+      if (current()) { clearTimeout(state.timer); state.playButton?.remove(); state.playButton = null; badge(state, state.sidebar ? "소리 켜짐 · 음량 100%" : "소리 켜짐 · 우클릭 종료"); }
     } catch {
-      if (active !== state) return;
+      if (!current()) return;
+      clearTimeout(state.timer);
       badge(state, "소리 재생을 시작하려면 버튼을 눌러 주세요.");
       if (!state.playButton) {
         const button = document.createElement("button"); state.playButton = button; button.type = "button"; button.textContent = "소리 켜고 재생";
@@ -105,7 +127,7 @@
     close();
     const native = !info.sidebar && info.card.querySelector("video:not([id*='AD'])");
     const state = { ...info, video: native || document.createElement("video"), owned: !native,
-      paused: native?.paused, muted: native?.muted, volume: native?.volume, abort: new AbortController() };
+      paused: native?.paused, muted: native?.muted, volume: native?.volume, abort: new AbortController(), retries: 0, attempt: 0 };
     active = state;
     if (info.sidebar) {
       Object.assign(state, sidebarPanel(info));
@@ -129,36 +151,46 @@
     state.video.id = `${overlay.id}-video`; state.video.playsInline = true;
     state.video.style.cssText = "width:100%;height:100%;object-fit:contain";
     overlay.append(state.video); state.mount.append(overlay);
-    state.video.addEventListener("playing", () => { if (active === state) badge(state, state.sidebar ? "소리 켜짐 · 음량 100%" : "소리 켜짐 · 우클릭 종료"); });
-    state.timer = setTimeout(() => { if (active === state && !state.video.readyState) badge(state, "이 방송의 미리보기를 불러오지 못했습니다."); }, 8000);
+    state.video.addEventListener("playing", () => { if (active === state) { clearTimeout(state.timer); badge(state, state.sidebar ? "소리 켜짐 · 음량 100%" : "소리 켜짐 · 우클릭 종료"); } });
+    await prepare(state);
+  }
+  async function prepare(state) {
+    if (active !== state) return;
+    const attempt = ++state.attempt, current = () => active === state && state.attempt === attempt;
+    state.abort = new AbortController(); state.retryButton?.remove(); state.retryButton = null;
+    badge(state, "소리 켜고 미리보기 준비 중…");
+    clearTimeout(state.timer);
+    state.timer = setTimeout(() => { if (current() && !state.video.readyState) failed(state); }, 8000);
     try {
       if (state.sidebar) {
         const channel = await globalThis.ChzzkChannels.get(state.channelId, { signal: state.abort.signal });
-        if (active !== state) return;
+        if (!current()) return;
         if (state.nameElement) state.nameElement.textContent = channel.name;
         if (state.title) state.title.textContent = channel.title || channel.name;
         if (state.tags) state.tags.textContent = [channel.category, Number.isFinite(channel.viewers) ? `${channel.viewers.toLocaleString("ko-KR")}명` : ""].filter(Boolean).join(" · ");
-        if (!channel.openLive || !channel.liveId) { badge(state, "현재 방송 중이 아닙니다."); return; }
+        if (!channel.openLive || !channel.liveId) { clearTimeout(state.timer); badge(state, "현재 방송 중이 아닙니다."); return; }
         state.liveId = channel.liveId;
       }
       if (state.soop) {
         state.requestId = crypto.randomUUID();
         document.dispatchEvent(new CustomEvent("chzzk-tools:soop-preview", { detail: {
-          action: "open", requestId: state.requestId, parentId: overlay.id, videoId: state.video.id,
+          action: "open", requestId: state.requestId, parentId: state.overlay.id, videoId: state.video.id,
           streamer: state.streamer, broadcast: state.broadcast
         } }));
         return;
       }
-      const response = await fetch(`https://api.chzzk.naver.com/service/v1/live/${state.liveId}/auto-play-info`, { credentials: "include", signal: state.abort.signal });
+      const response = await fetch(`https://api.chzzk.naver.com/service/v1/live/${state.liveId}/auto-play-info`, { credentials: "include", cache: "no-store", signal: state.abort.signal });
+      if (!current()) return;
       if (!response.ok) throw new Error();
       const body = await response.json(), data = body.content;
+      if (!current()) return;
       const playback = JSON.parse(data?.livePlaybackJson || data?.previewPlaybackJson || "{}");
       const source = playback.media?.find(media => media.mediaId === "HLS") || playback.media?.find(media => media.protocol === "HLS");
-      if (!source?.path || !source.path.startsWith("https://") || active !== state) throw new Error();
+      if (!source?.path || !source.path.startsWith("https://")) throw new Error();
       if (globalThis.Hls?.isSupported()) {
         state.hls = new globalThis.Hls({ enableWorker: false, maxBufferLength: 8, backBufferLength: 4, capLevelToPlayerSize: false, autoStartLoad: false });
         state.hls.on(globalThis.Hls.Events.MANIFEST_PARSED, () => {
-          if (active !== state) return;
+          if (!current()) return;
           const levels = state.hls.levels;
           const best = levels.reduce((chosen, level, index) => {
             const current = levels[chosen];
@@ -169,11 +201,11 @@
           if (best >= 0) state.hls.startLevel = best;
           state.hls.startLoad(); play(state);
         });
-        state.hls.on(globalThis.Hls.Events.ERROR, (_event, error) => { if (error.fatal && active === state) badge(state, "미리보기 재생 오류"); });
+        state.hls.on(globalThis.Hls.Events.ERROR, (_event, error) => { if (error.fatal && current()) failed(state, "미리보기 재생 중 오류가 발생했습니다."); });
         state.hls.loadSource(source.path); state.hls.attachMedia(state.video);
       } else if (state.video.canPlayType("application/vnd.apple.mpegurl")) { state.video.src = source.path; await play(state); }
       else throw new Error();
-    } catch { if (active === state) badge(state, "이 방송은 목록 미리보기를 제공하지 않거나 재생이 제한돼 있습니다."); }
+    } catch { if (current()) failed(state); }
   }
   function sidebarRow(target) {
     if (!globalThis.ChzzkChannels || !sidebarEnabled || target.closest?.(".ct-row-actions,.ct-list-tools,button")) return null;
@@ -214,7 +246,8 @@
   }, true);
   document.addEventListener("chzzk-tools:soop-preview-result", event => {
     if (active?.requestId !== event.detail?.requestId) return;
-    if (!event.detail.ok) badge(active, event.detail.message || "미리보기를 재생하지 못했습니다.");
+    if (event.detail.ok) clearTimeout(active.timer);
+    else failed(active, event.detail.message || "미리보기를 재생하지 못했습니다.");
   });
   chrome.storage.local.get("features").then(data => { enabled = data.features?.listPreview !== false; sidebarEnabled = data.features?.sidebarPreview !== false; });
   chrome.storage.onChanged.addListener((changes, area) => {

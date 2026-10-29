@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "치지직 Caps Lock 이모티콘",
-  "description": "치지직 검색·채팅·광고 편의, 치지직·숲 목록 미리보기, 모든 웹사이트의 영상 속도와 프레임 이동을 지원합니다.",
-  "version": "0.7.3",
+  "description": "치지직 검색·채팅·광고 편의, 치지직·숲 자유 배치 채팅과 목록 미리보기, 모든 웹사이트의 영상 속도와 프레임 이동을 지원합니다.",
+  "version": "0.8.0",
   "background": { "service_worker": "media-background.js" },
   "icons": {
     "16": "icons/icon16.png",
@@ -33,7 +33,7 @@
     },
     {
       "matches": ["https://chzzk.naver.com/*"],
-      "js": ["tools-core.js", "content.js", "player-tools.js", "ad-skip.js", "site-tools.js", "channel-data.js", "channel-tools.js", "chzzk-quality.js", "vendor/hls.min.js", "list-preview.js"],
+      "js": ["tools-core.js", "content.js", "player-tools.js", "ad-skip.js", "site-tools.js", "channel-data.js", "channel-tools.js", "chzzk-quality.js", "vendor/hls.min.js", "list-preview.js", "free-chat.js"],
       "run_at": "document_idle"
     },
     {
@@ -45,6 +45,11 @@
     {
       "matches": ["https://*.sooplive.com/*", "https://*.sooplive.co.kr/*", "https://sooplive.com/*", "https://sooplive.co.kr/*"],
       "js": ["list-preview.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://play.sooplive.com/*", "https://play.sooplive.co.kr/*"],
+      "js": ["free-chat.js"],
       "run_at": "document_idle"
     },
     {

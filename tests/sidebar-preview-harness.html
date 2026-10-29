@@ -21,7 +21,7 @@ window.fetch=async(url,options)=>{
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function hover(id,target='a'){document.querySelector('#'+id+' '+target).dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))}
 function leave(id,relatedTarget=document.body){document.querySelector('#'+id+' a').dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget}))}
-</script><script src="/channel-data.js"></script><script src="/list-preview.js"></script><script>
+</script><script src="/channel-data.js"></script><script src="/list-preview.js?v=0.8.0"></script><script>
 (async()=>{const results=[],check=(name,passed)=>results.push({name,passed});
  await wait(30);hover('follow');await wait(80);
  check('재생 대기 시간에도 기존 큰 사진을 숨김',getComputedStyle(document.querySelector('._tooltip_test')).display==='none');

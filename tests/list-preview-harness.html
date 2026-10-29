@@ -14,7 +14,7 @@
  window.Hls=class{static isSupported(){return true}static Events={ERROR:'error',MANIFEST_PARSED:'manifest'};constructor(){this.events={};this.levels=[{height:1080}];instances.push(this)}loadSource(url){this.url=url}attachMedia(video){this.events.manifest?.()}on(name,fn){this.events[name]=fn}startLoad(){}destroy(){this.closed=true}};
  window.fetch=async url=>{requests.push(url);return{ok:true,json:async()=>({content:{livePlaybackJson:JSON.stringify({media:[{mediaId:'HLS',path:'https://media.example.test/live.m3u8'}]})}})}};
  window.PreviewPlayer=class{constructor(config){this.config=config;nativePlayers.push(this)}addEventListener(){}async loadPreview(streamer,broadcast){this.streamer=streamer;this.broadcast=broadcast}async play(){document.getElementById(this.config.id)?.dispatchEvent(new Event('playing'))}async close(){this.closed=true}};
-</script><script src="../preview-bridge.js"></script><script src="../list-preview.js"></script>
+</script><script src="../preview-bridge.js?v=0.8.0"></script><script src="../list-preview.js?v=0.8.0"></script>
 <script>
  (async()=>{
   const results=[],check=(name,passed)=>results.push({name,passed}),delay=()=>new Promise(r=>setTimeout(r,40));

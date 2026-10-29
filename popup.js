@@ -377,6 +377,7 @@ async function initializeFeatures() {
     globalSpeed: "모든 사이트 속도·프레임 단축키",
     listPreview: "치지직·숲 목록 우클릭 소리 미리보기",
     sidebarPreview: "팔로잉·보관 채널에 마우스를 올리면 소리 재생",
+    freeChat: "치지직·숲 자유 배치 채팅 (이동·크기·투명도 저장)",
     highestQuality: "치지직에서 선택 가능한 최고 화질 자동 선택",
     adblockQuality: "광고 차단 감지로 인한 360p 제한 보정 (새로고침 필요)",
     dismissAdNotice: "치지직 광고 차단 안내 숨김",
@@ -397,6 +398,9 @@ async function initializeFeatures() {
     label.append(input, document.createTextNode(text)); panel.append(label); controls.set(key, input);
     input.addEventListener("change", () => saveFeature(key, input.checked));
   }
+  const chatNote = document.createElement("p"); chatNote.className = "intro";
+  chatNote.textContent = "자유 배치 채팅: 치지직 넓은 화면·숲 스크린모드에서 이동·크기·투명도를 조절합니다. Alt+Shift+C로 겹치기를 전환합니다. 기존 템퍼몽키 자유 배치 스크립트가 실행 중이면 확장 쪽은 대기합니다. 대체해서 쓰려면 기존 스크립트를 끄고 탭을 새로고침하세요. 기존 배치값은 자동 이전되지 않습니다.";
+  panel.append(chatNote);
   const speedLabel = document.createElement("label"), speed = document.createElement("select");
   speedLabel.className = "send-option"; speedLabel.append(document.createTextNode("광고 재생 속도 "));
   speed.id = "feature-adSpeed";

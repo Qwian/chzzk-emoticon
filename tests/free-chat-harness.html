@@ -1,0 +1,77 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>자유 배치 채팅 검사</title>
+<style>
+body{margin:0;background:#172329;color:#eee;font:14px system-ui}section,#webplayer{position:relative;min-height:100vh;display:flex}main,#player_area{flex:1;min-width:0}#live_player_layout,#player{position:relative;height:100vh;background:linear-gradient(135deg,#1a453c,#233b5b)}#aside-chatting,.wrapping.side{width:340px;background:#282b33;box-sizing:border-box}#webplayer_contents{display:flex;width:100%}#chatting_area{height:100%;display:flex;flex-direction:column}#chatbox{flex:1}#result{position:fixed;left:8px;bottom:8px;z-index:99999;background:#111e;padding:8px;max-height:150px;overflow:auto;font:11px monospace;max-width:70vw;pointer-events:none}.pzp-pc__bottom,.player_ctrlBox{position:absolute;bottom:0;left:0;right:0;height:50px;background:#0006}
+</style><body data-result="pending"><div id="fixture"></div><pre id="result">pending</pre>
+<script>
+const params=new URLSearchParams(location.search),soop=params.has('soop'),listeners=new Set(),writes=[];
+// Hidden test tabs can suspend animation frames. Keep layout scheduling deterministic.
+window.requestAnimationFrame=callback=>setTimeout(()=>callback(performance.now()),0);
+window.cancelAnimationFrame=clearTimeout;
+let screenWidth=1920,screenHeight=1080;
+Object.defineProperties(window.screen,{width:{get:()=>screenWidth},height:{get:()=>screenHeight}});
+const store={features:{freeChat:true},unrelated:'preserved'};
+window.chrome={storage:{local:{get:async()=>({...store}),set:async data=>{const changes={};for(const [key,value] of Object.entries(data)){changes[key]={oldValue:store[key],newValue:value};store[key]=structuredClone(value)}writes.push(data);queueMicrotask(()=>listeners.forEach(fn=>fn(changes,'local')))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+const key=soop?'soopFreeChatLayout':'chzzkFreeChatLayout';
+const chat=()=>soop?document.querySelector('.wrapping.side'):document.querySelector('#aside-chatting');
+const sideHTML=()=>soop?'<aside class="wrapping side"><div class="chatting_box"><div id="chatting_area"><div id="chatbox">모사 채팅 목록</div><div id="actionbox"><div id="chat_write"><div id="write_area" contenteditable="true">작성 중 문장</div></div></div></div></div></aside>':'<aside id="aside-chatting"><div><h2>모사 채팅</h2><div role="log">모사 채팅 목록</div><div contenteditable="true">작성 중 문장</div></div></aside>';
+document.querySelector('#fixture').innerHTML=soop?'<div id="webplayer" class="chat_open"><div id="webplayer_contents"><div id="player_area"><div id="player"><div class="player_ctrlBox">재생 컨트롤</div></div></div>'+sideHTML()+'</div></div>':'<section><main class="_is_large_test"><div id="live_player_layout"><div class="pzp-pc__bottom">재생 컨트롤</div></div></main>'+sideHTML()+'</section>';
+if(soop)document.body.classList.add('screen_mode');
+if(params.has('legacy')){const style=document.createElement('style');style.id='sfc-style';document.head.append(style)}
+const editor=document.querySelector('[contenteditable]'),initialParent=editor.parentElement;
+const captures=new WeakMap();Element.prototype.setPointerCapture=function(id){captures.set(this,id)};Element.prototype.hasPointerCapture=function(id){return captures.get(this)===id};Element.prototype.releasePointerCapture=function(){captures.delete(this)};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['pointermove',dx,dy],['pointerup',dx,dy]])element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:77,button:0,clientX:x,clientY:y}))};
+</script><script src="../free-chat.js?v=0.8.0-final"></script><script>
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});await wait(100);
+ if(params.has('legacy')){check('기존 템퍼몽키 스크립트가 먼저 있으면 확장은 중복 적용하지 않음',!document.querySelector('.ctfc-toolbar')&&document.querySelector('#sfc-style'));document.querySelector('#sfc-style').remove();await wait(100)}
+ check('채팅 도구는 한 번만 설치',document.querySelectorAll('.ctfc-toolbar').length===1);
+ check('넓은 화면 또는 숲 스크린모드에서 영상 위 배치',getComputedStyle(chat()).position==='fixed');
+ const original=chat().getBoundingClientRect();check('초기 배치는 화면 안에 유지',original.left>=0&&original.top>=0&&original.right<=innerWidth+1&&original.bottom<=innerHeight+1);
+ check('채팅 입력창과 작성 중 문장은 원본 유지',document.querySelector('[contenteditable]')===editor&&editor.parentElement===initialParent&&editor.textContent==='작성 중 문장');
+ check('여덟 방향 크기 조절 손잡이',document.querySelectorAll('.ctfc-handle').length===8);
+ editor.focus();document.querySelector('.ctfc-opacity').click();check('투명도 패널 열기',!document.querySelector('.ctfc-settings').hidden);
+ const alpha=document.querySelector('#ctfc-alpha');alpha.value='60';alpha.dispatchEvent(new Event('input',{bubbles:true}));alpha.dispatchEvent(new Event('change',{bubbles:true}));await wait(70);
+ check('배경 농도 저장',store[key]?.opacity===0.6&&chat().style.getPropertyValue('--ctfc-opacity')==='0.60');
+ check('설정 저장 때 원본 입력창 재생성·포커스 변경 없음',document.querySelector('[contenteditable]')===editor&&document.activeElement===editor);
+ const toolbar=document.querySelector('.ctfc-toolbar');gesture(document.querySelector('.ctfc-handle[data-edge="se"]'),-40,-200);await wait(60);
+ const resized=chat().getBoundingClientRect();check('드래그로 크기 축소와 저장',resized.width<original.width&&resized.height<original.height&&store[key].width===resized.width);
+ gesture(document.querySelector('.ctfc-grip'),-80,30);await wait(60);const moved=chat().getBoundingClientRect();
+ check('드래그 이동과 비율 저장',moved.left<original.left&&store[key].xRatio<1&&store[key].yRatio>0);
+ check('자기 저장 이벤트로 도구 재설치하지 않음',document.querySelector('.ctfc-toolbar')===toolbar);
+ gesture(document.querySelector('.ctfc-grip'),innerWidth,innerHeight);await wait(60);
+ const player=soop?document.querySelector('#webplayer'):document.querySelector('section');
+ check('겹친 오른쪽 채팅만큼 재생 컨트롤 안쪽 배치',parseFloat(player.style.getPropertyValue('--ctfc-controls-right'))>0);
+ const priorWidth=store[key].width;screenWidth=2560;screenHeight=1440;window.dispatchEvent(new Event('resize'));await wait(100);
+ check('다른 모니터에서 크기 비례 조정과 별도 저장',Object.keys(store[key].monitors).length===2&&Math.abs(store[key].width-priorWidth*4/3)<1);
+ screenWidth=1920;screenHeight=1080;window.dispatchEvent(new Event('resize'));await wait(100);
+ check('이전 모니터 배치 복원',Math.abs(store[key].width-priorWidth)<1);
+ document.querySelector('.ctfc-disable').click();await wait(70);
+ check('원래 배치 복귀',getComputedStyle(chat()).position!=='fixed'&&store[key].enabled===false);
+ if(soop){const before=chat().getBoundingClientRect().width;gesture(document.querySelector('.ctfc-dock-handle'),-70,0);await wait(60);check('숲 원래 배치에서도 채팅 폭 조절·저장',chat().getBoundingClientRect().width>before&&Math.abs(store[key].dockWidth-chat().getBoundingClientRect().width)<1)}
+ document.querySelector('#ctfc-toggle').click();await wait(70);check('겹치기 다시 켜기',getComputedStyle(chat()).position==='fixed');
+ const chord=(extra={})=>{const event=new KeyboardEvent('keydown',{bubbles:true,cancelable:true,code:'KeyC',altKey:true,shiftKey:true,...extra});editor.dispatchEvent(event);return event};
+ const shortcut=chord();await wait(70);check('Alt+Shift+C로 원래 배치 전환',shortcut.defaultPrevented&&getComputedStyle(chat()).position!=='fixed');
+ chord({repeat:true});await wait(40);check('키를 길게 눌러도 배치가 연속 전환되지 않음',getComputedStyle(chat()).position!=='fixed');
+ chord();await wait(70);check('같은 단축키로 겹치기 재개',getComputedStyle(chat()).position==='fixed');
+ check('일반 C 키와 IME 조합 중에는 가로채지 않음',!chord({altKey:false,shiftKey:false}).defaultPrevented&&!chord({isComposing:true}).defaultPrevented);
+ if(soop)document.body.classList.remove('screen_mode');else document.querySelector('main').classList.remove('_is_large_test');await wait(70);
+ check('일반 화면에서는 기본 배치',getComputedStyle(chat()).position!=='fixed');
+ if(soop)document.body.classList.add('screen_mode');else document.querySelector('main').classList.add('_is_large_test');await wait(70);
+ if(soop)player.classList.remove('chat_open');else chat().classList.add('_is_folded_test');await wait(70);
+ check('채팅 접힘 상태에는 겹치기 비활성',getComputedStyle(chat()).position!=='fixed');
+ if(soop)player.classList.add('chat_open');else chat().classList.remove('_is_folded_test');await wait(70);
+ await chrome.storage.local.set({features:{freeChat:false}});await wait(70);
+ check('팝업 설정을 끄면 도구·스타일·배치 모두 정리',!document.querySelector('#ctfc-style')&&!document.querySelector('.ctfc-toolbar')&&!chat().style.getPropertyValue('--ctfc-w')&&getComputedStyle(chat()).position!=='fixed');
+ await chrome.storage.local.set({features:{freeChat:true}});await wait(70);check('다시 켜면 저장한 투명도 복원',chat().style.getPropertyValue('--ctfc-opacity')==='0.60');
+ const legacy=document.createElement('style');legacy.id='sfc-style';document.head.append(legacy);await wait(70);
+ check('기존 스크립트가 나중에 실행돼도 확장 도구만 정리',legacy.isConnected&&!document.querySelector('#ctfc-style')&&!document.querySelector('.ctfc-toolbar')&&document.querySelector('[contenteditable]')===editor);
+ legacy.remove();await wait(70);check('기존 스크립트가 없어지면 확장 도구 재개',document.querySelectorAll('.ctfc-toolbar').length===1);
+ await chrome.storage.local.set({[key]:{width:280,height:260,xRatio:0,yRatio:0,dockWidth:350,opacity:.45,enabled:true}});await wait(80);
+ check('다른 탭에서 저장한 배치 동기화',Math.abs(chat().getBoundingClientRect().width-280)<1&&chat().style.getPropertyValue('--ctfc-opacity')==='0.45');
+ const old=chat();old.insertAdjacentHTML('afterend',sideHTML());old.remove();await wait(100);
+ check('사이트가 채팅 DOM을 교체하면 새 채팅에 한 번만 설치',document.querySelectorAll('.ctfc-toolbar').length===1&&chat()!==old&&document.querySelectorAll('.ctfc-handle').length===8);
+ check('플랫폼별 키만 저장하고 다른 데이터 보존',store.unrelated==='preserved'&&!store[soop?'chzzkFreeChatLayout':'soopFreeChatLayout']);
+ document.querySelector('#result').textContent=JSON.stringify({platform:soop?'SOOP':'CHZZK',results},null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.querySelector('#result').textContent=error.stack;document.body.dataset.result='fail'});
+</script></body></html>

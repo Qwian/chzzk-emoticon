@@ -1,0 +1,44 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>미리보기 실패·재시도 회귀 검사</title>
+<style>li{width:320px;height:180px;position:relative;background:#283d31;margin:8px}a,.thumbs-box,._thumbnail_test{display:block;width:100%;height:100%}</style>
+<body data-result="pending"><ul>
+<li id="soop"><div class="thumbs-box"><a href="https://play.sooplive.com/streamer/456">숲 모사 썸네일</a></div></li>
+<li id="chzzk" data-nlog-area="live_list.item" data-nlog-params='{"content_id":"123"}'><a href="https://chzzk.naver.com/live/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"><div class="_thumbnail_test">치지직 모사 썸네일</div></a></li>
+</ul><pre id="result">pending</pre><script>
+const players=[],hls=[],responses=[];let mode='once',loads=0,requests=0;
+window.chrome={storage:{local:{get:async()=>({features:{listPreview:true,sidebarPreview:false}})},onChanged:{addListener:()=>{}}}};
+HTMLMediaElement.prototype.play=function(){this.dispatchEvent(new Event('playing'));return Promise.resolve()};HTMLMediaElement.prototype.pause=function(){};HTMLMediaElement.prototype.load=function(){};HTMLMediaElement.prototype.canPlayType=()=>'';
+function installSDK(){window.PreviewPlayer=class{
+ constructor(config){this.config=config;this.events={};players.push(this)}addEventListener(name,fn){this.events[name]=fn}
+ async loadPreview(){loads++;if(mode==='always'||mode==='once'&&loads===1)this.events.STATUS_ERROR?.()}
+ async play(){document.getElementById(this.config.id)?.dispatchEvent(new Event('playing'))}async close(){this.closed=true}
+}}
+installSDK();
+window.Hls=class{static isSupported(){return true}static Events={ERROR:'error',MANIFEST_PARSED:'manifest'};constructor(){this.events={};this.levels=[{height:1080}];hls.push(this)}on(name,fn){this.events[name]=fn}loadSource(){}attachMedia(){this.events.manifest?.()}startLoad(){}destroy(){this.closed=true}};
+window.fetch=async()=>{requests++;if(mode==='network-once'&&requests===1)throw Error('network');if(mode==='missing-source')return{ok:true,json:async()=>({content:{}})};return{ok:true,json:async()=>({content:{livePlaybackJson:JSON.stringify({media:[{mediaId:'HLS',path:'https://media.example.test/live.m3u8'}]})}})}};
+document.addEventListener('chzzk-tools:soop-preview-result',event=>responses.push(event.detail));
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),right=id=>document.querySelector('#'+id+(id==='chzzk'?' ._thumbnail_test':' a')).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true})),label=id=>document.querySelector('#'+id).textContent;
+</script><script src="../preview-bridge.js?v=0.8.0"></script><script src="../list-preview.js?v=0.8.0"></script><script>
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed});await wait(50);
+ right('soop');await wait(80);
+ check('일반 SDK 오류를 미지원 방송이라고 단정하지 않음',!label('soop').includes('지원하지')&&!label('soop').includes('제공하지')&&label('soop').includes('다시 불러오는 중'));
+ await wait(500);check('한 번 실패한 숲 방송은 자동 재시도로 재생',loads===2&&label('soop').includes('소리 켜짐'));
+ check('실패한 플레이어 정리 후 다시 생성',players[0].closed===true);
+ const oldPlayer=players[0];oldPlayer.events.STATUS_ERROR();await wait(30);check('지난 플레이어의 늦은 오류는 현재 미리보기에 영향 없음',label('soop').includes('소리 켜짐')&&loads===2);
+ right('soop');mode='always';loads=0;right('soop');await wait(80);const beforeClose=loads;right('soop');await wait(500);
+ check('닫으면 예약된 자동 재시도도 취소',loads===beforeClose&&!document.querySelector('#soop video'));
+ loads=0;right('soop');await wait(1450);
+ check('실패 재시도는 두 번으로 제한',loads===3);
+ const retry=document.querySelector('#soop button');check('계속 실패하면 직접 다시 시도 버튼 표시',retry?.textContent==='미리보기 다시 시도'&&!label('soop').includes('제공하지'));
+ mode='ok';retry.click();await wait(80);check('직접 다시 시도하면 같은 창에서 회복',label('soop').includes('소리 켜짐')&&!document.querySelector('#soop button'));
+ right('soop');delete window.PreviewPlayer;right('soop');await wait(80);check('SDK 준비 전에는 준비 상태로 안내',label('soop').includes('아직 준비되지 않았습니다'));
+ installSDK();await wait(500);check('SDK가 늦게 준비돼도 재시도로 재생',label('soop').includes('소리 켜짐'));right('soop');
+ mode='network-once';requests=0;right('chzzk');await wait(80);check('치지직 네트워크 오류도 미지원 단정 없이 재시도',label('chzzk').includes('다시 불러오는 중')&&!label('chzzk').includes('제공하지'));
+ await wait(500);check('치지직 일시 요청 실패 다음 자동 복구',requests===2&&label('chzzk').includes('소리 켜짐'));
+ const previous=hls.at(-1);previous.events.error('error',{fatal:true});await wait(900);check('HLS 치명 오류도 기존 연결 정리 후 다시 시작',previous.closed&&requests===3&&label('chzzk').includes('소리 켜짐'));right('chzzk');
+ mode='missing-source';right('chzzk');await wait(1450);check('재생 정보가 없더라도 원인을 추측하지 않음',label('chzzk').includes('다시 시도해 주세요')&&!label('chzzk').includes('제한돼')&&!label('chzzk').includes('제공하지'));
+ document.querySelector('#chzzk').dispatchEvent(new Event('pointerleave'));await wait(50);check('실패 후 마우스 이탈도 버튼과 영상을 정리',!document.querySelector('#chzzk video')&&!document.querySelector('#chzzk button'));
+ check('오류 이벤트 뒤 성공이라고 중복 보고하지 않음',responses[0]?.ok===false&&responses[1]?.ok===true);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.querySelector('#result').textContent=error.stack;document.body.dataset.result='fail'});
+</script></body></html>
