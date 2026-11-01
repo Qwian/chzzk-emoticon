@@ -108,6 +108,11 @@
   const style = document.createElement('style');
   style.id = 'ctfc-style';
   style.textContent = `
+    /* VOD scrolls inside its section. Keep wheel scrolling and the chat's scrollbar. */
+    section[class*="_is_large_"]:has(#player_layout) { scrollbar-width: none !important; }
+    section[class*="_is_large_"]:has(#player_layout)::-webkit-scrollbar {
+      display: none !important; width: 0 !important; height: 0 !important;
+    }
     .ctfc-toolbar, .ctfc-handle, .ctfc-dock-handle, #ctfc-toggle { display: none !important; }
     body.screen_mode #webplayer.ctfc-soop-docked,
     body.screen_mode #webplayer.ctfc-soop-docked #webplayer_contents {

@@ -1,20 +1,27 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><title>다시보기 채팅 배치 검사</title>
-<style>body{margin:0}section,.wrapper{height:100vh}.player{position:relative;display:flex;height:100%}.video{flex:1;min-width:0}#player_layout{height:100%;background:#123}#vod-aside{width:340px;background:#456}._stack_test,._container_test{height:100%;display:flex;flex-direction:column}h2{margin:0}[role=log]{flex:1;min-height:0}</style>
+<style>body{margin:0}section,.wrapper{height:100vh}section{overflow-y:auto}.player{position:relative;display:flex;height:100%}.video{flex:1;min-width:0}#player_layout{height:100%;background:#123}#vod-aside{width:340px;background:#456}._stack_test,._container_test{height:100%;display:flex;flex-direction:column}h2{margin:0}[role=log]{flex:1;min-height:0;overflow-y:auto}section::after{content:'';display:block;height:120vh}</style>
 <body data-result="pending"><section><div class="wrapper"><div class="player"><div class="video"><div id="player_layout"></div></div><aside id="vod-aside" style="margin-bottom:-113px"><div class="_stack_test"><div class="_container_test"><h2>라이브 채팅 다시보기</h2><div role="log">다시보기 채팅</div></div></div></aside></div></div></section><pre id="result"></pre>
 <script>
-history.replaceState(null,'','/video/123');
+const baseline=new URLSearchParams(location.search).has('baseline');history.replaceState(null,'','/video/123');
 const store={features:{freeChat:true}},listeners=new Set();window.chrome={storage:{local:{get:async()=>structuredClone(store),set:async data=>{Object.assign(store,structuredClone(data))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
 const captures=new WeakMap();Element.prototype.setPointerCapture=function(id){captures.set(this,id)};Element.prototype.hasPointerCapture=function(id){return captures.get(this)===id};Element.prototype.releasePointerCapture=function(){captures.delete(this)};
 const wait=()=>new Promise(r=>setTimeout(r,100));const drag=(element,dx)=>{for(const[type,x]of[['pointerdown',0],['pointermove',dx],['pointerup',dx]])element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:8,button:0,clientX:x}))};
-</script><script src="/free-chat.js"></script><script>
+</script><script>document.write('<script src="'+(baseline?'/artifacts/free-chat-0.10.0-scroll.js':'/free-chat.js')+'"><\/script>');</script><script>
 (async()=>{await wait();const results=[],check=(name,passed)=>results.push({name,passed:!!passed}),side=document.querySelector('#vod-aside'),log=side.querySelector('[role=log]');
 check('다시보기 실제 중첩 구조에 도구 한 번 설치',document.querySelectorAll('.ctfc-toolbar').length===1);
 const handle=document.querySelector('.ctfc-dock-handle');check('일반 다시보기에서 폭 조절 손잡이 표시',handle&&getComputedStyle(handle).display!=='none');
 if(handle){const before=side.getBoundingClientRect().width;drag(handle,-70);await wait();check('일반 다시보기 채팅 폭 변경과 저장',side.getBoundingClientRect().width>before&&store.chzzkFreeChatLayout.dockWidth===side.getBoundingClientRect().width)}
 document.querySelector('section').classList.add('_is_large_test');await wait();check('넓은 다시보기에서 자유 배치 활성',getComputedStyle(side).position==='fixed');
+const section=document.querySelector('section');
+check('넓은 다시보기의 내부 페이지 스크롤바 숨김',getComputedStyle(section).scrollbarWidth==='none'&&getComputedStyle(section,'::-webkit-scrollbar').display==='none');
+section.scrollTop=80;check('스크롤바를 숨겨도 페이지 스크롤 유지',section.scrollTop===80&&getComputedStyle(section).overflowY==='auto');section.scrollTop=0;
+check('채팅 목록 스크롤바와 스크롤 속성 유지',getComputedStyle(log).scrollbarWidth!=='none'&&getComputedStyle(log).overflowY==='auto');
+section.classList.remove('_is_large_test');await wait();check('일반 화면으로 돌아오면 페이지 스크롤바 복원',getComputedStyle(section).scrollbarWidth!=='none');section.classList.add('_is_large_test');await wait();
 const resize=document.querySelector('.ctfc-handle[data-edge=e]');if(resize){drag(resize,-80);await wait();check('다시보기 겹친 채팅 크기 변경',side.getBoundingClientRect().width===260)}
 check('원본 채팅 목록 DOM 보존',side.querySelector('[role=log]')===log);
 check('도구 높이만큼 채팅 영역이 줄어 하단이 잘리지 않음',log.getBoundingClientRect().bottom<=side.getBoundingClientRect().bottom+1&&log.getBoundingClientRect().height>0);
 side.remove();await wait();check('다시보기 채팅 닫기 뒤 도구와 큰 배치 정리',!document.querySelector('#ctfc-toggle')&&!document.querySelector('.ctfc-chzzk-active'));
+check('채팅을 닫아도 넓은 다시보기 스크롤바 숨김 유지',getComputedStyle(section).scrollbarWidth==='none');
+document.querySelector('#player_layout').id='live_player_layout';check('라이브 플레이어에는 다시보기 스크롤바 규칙 미적용',getComputedStyle(section).scrollbarWidth!=='none');
 document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';})().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=e.stack});
 </script></body></html>
