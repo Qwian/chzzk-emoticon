@@ -92,7 +92,7 @@
     }
     return false;
   }
-  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.13', enabled: enabled && !stopped,
+  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.14', enabled: enabled && !stopped,
     current: inspect('play').reason, ...spaceStatus });
   function unchanged(state) {
     return state.action === 'mute' ? state.video.muted === state.muted && state.video.volume === state.volume

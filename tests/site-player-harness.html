@@ -46,7 +46,7 @@
     document.querySelector('#midAdPlayerWrapper').style.display='block';
     main.muted=true;now+=1000;await delay(1100);
     check('광고만 음소거와 4배속',ad.muted&&ad.playbackRate===4&&document.querySelector('#midPlayer').playbackRate===1);
-    check('본방 기존 소리 복구와 광고 미니 배치',!main.muted&&main.volume===.4&&document.querySelector('#midAdPlayerWrapper').classList.contains('chzzk-tools-ad-mini'));
+    check('본방 기존 소리 복구와 광고 미니 배치',!main.muted&&main.volume===.4&&document.querySelector('#midAdVideoContainer').classList.contains('chzzk-tools-ad-mini')&&!document.querySelector('#midAdPlayerWrapper').classList.contains('chzzk-tools-ad-mini'));
     document.querySelector('#midAdPlayerWrapper').style.display='none';now+=1000;await delay(1100);
     check('광고 종료 뒤 속도 음소거 배치 원복',ad.playbackRate===1&&!ad.muted&&!main.muted&&!document.querySelector('.chzzk-tools-ad-mini'));
     const catchToggle=panel.querySelector('#catch-up');catchToggle.checked=false;catchToggle.dispatchEvent(new Event('change'));await delay(50);

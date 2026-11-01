@@ -256,14 +256,23 @@
               if (element === wrapper) break;
             }
           }
-        } else if (live && settings.adMini && main && !main.paused && main.readyState >= 2) {
-          const adSurface = wrapper.contains(main) ? wrapper.querySelector('#midAdVideoContainer,#preAdVideoContainer') : wrapper;
-          adSurface?.classList.add("chzzk-tools-ad-mini");
-          // Native mini sizing can be applied above the source wrapper, too.
-          for (let element = main; element && !element.matches('.pzp'); element = element.parentElement) {
-            if (element.contains(wrapper)) break;
-            element.classList.add("chzzk-tools-main-full");
-            if (element.matches('.pzp-pc__video')) break;
+        } else if (live && settings.adMini) {
+          // CHZZK puts a second live-content video beside the ad container.
+          // Shrinking their shared wrapper also shrinks that live picture.
+          const midMain = wrapper.querySelector('video#midPlayer');
+          const liveMain = midMain && !midMain.paused && midMain.readyState >= 2 ? midMain : main;
+          if (!liveMain || liveMain.paused || liveMain.readyState < 2) continue;
+          const adSurface = wrapper.querySelector('#midAdVideoContainer,#preAdVideoContainer');
+          if (!adSurface || adSurface.contains(liveMain)) continue;
+          adSurface.classList.add("chzzk-tools-ad-mini");
+          if (midMain || wrapper.contains(liveMain)) wrapper.classList.add("chzzk-tools-main-full");
+          // Restore every content ancestor, including a shared ad wrapper.
+          const playerRoot = wrapper.closest('.pzp') || wrapper.parentElement;
+          for (const video of new Set([main, liveMain])) {
+            for (let element = video; element && element !== playerRoot; element = element.parentElement) {
+              element.classList.add("chzzk-tools-main-full");
+              if (element.matches('.pzp-pc__video')) break;
+            }
           }
         }
       }

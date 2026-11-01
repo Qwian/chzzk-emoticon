@@ -47,6 +47,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/ad-quality-harness.html` verifies ad preparation/SDK mute isolation, post-ad audio restoration and native quality/notice controls.
 - `tests/ad-detached-harness.html` verifies AdGuard's SDK-container removal, detached ad mute/skip, audio isolation and SPA cleanup.
 - `tests/ad-init-harness.html` verifies missing/late ad-helper initialization, idempotent initialization and skip/mute recovery.
+- `tests/ad-live-layout-harness.html` verifies the shared live-ad wrapper and separate `#midPlayer` stay full size while only the ad container shrinks, including pause, settings, end and channel changes.
 - `tests/list-preview-harness.html` verifies CHZZK HLS and SOOP native preview dispatch and cleanup using simulated playback.
 
 Do not type or send messages in a real CHZZK chat during agent verification. Real logged-in chat checks must be performed by the user:
