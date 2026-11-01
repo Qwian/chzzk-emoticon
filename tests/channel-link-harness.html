@@ -1,0 +1,45 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>채널 라이브·채팅 바로가기 검사</title>
+<style>body{margin:30px;background:#141517;color:#eee;font:16px system-ui}[role=tablist]{display:flex;align-items:center;gap:20px}#result{font:12px monospace;white-space:pre-wrap}</style>
+<body data-result="pending"><div id="layout-body"><h2 data-channel-name>가람</h2><div class="_tab_mock"><div role="tablist"></div></div></div><pre id="result">pending</pre>
+<script>
+const ids=['a','b','c'].map(x=>x.repeat(32)),store={features:{favorites:false,followingExpanded:false,followingRefresh:false}},listeners=[];
+const statuses=new Map([[ids[0],false],[ids[1],true]]),requests=[],deferred=new Map();let now=Date.now(),hidden=false;
+Date.now=()=>now;Object.defineProperty(document,'hidden',{get:()=>hidden});
+history.replaceState(null,'','/'+ids[0]);
+const tabs=()=>['홈','동영상','클립','재생목록','커뮤니티','정보'].map((label,i)=>`<button role="tab" aria-controls="${['','videos','clips','play-list','community','about'][i]}-PANEL">${label}</button>`).join('');
+document.querySelector('[role=tablist]').innerHTML=tabs();
+window.chrome={storage:{local:{get:async()=>structuredClone(store)},onChanged:{addListener:fn=>listeners.push(fn)}}};
+window.fetch=async(url,options)=>{
+ const id=url.match(/channels\/([a-f0-9]{32})/)[1];requests.push({id,url,credentials:options.credentials});
+ if(deferred.has(id))await new Promise(resolve=>deferred.get(id).push(resolve));
+ if(!statuses.has(id))throw Error('simulated network failure');
+ return{ok:true,json:async()=>({code:200,content:url.includes('live-detail')?{channel:{channelId:id},status:statuses.get(id)?'OPEN':'CLOSE',liveId:123,cvExposure:false}:{channelId:id,channelName:'가람',openLive:statuses.get(id)}})};
+};
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),link=()=>document.querySelector('#chzzk-channel-live-link');
+function navigate(path){history.pushState(null,'',path);window.dispatchEvent(new PopStateEvent('popstate'))}
+function feature(on){store.features.channelLiveLink=on;listeners.forEach(fn=>fn({features:{newValue:structuredClone(store.features)}},'local'))}
+</script><script src="/tools-core.js"></script><script src="/channel-data.js"></script><script src="/channel-tools.js"></script><script>
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed:!!passed});await wait(350);
+ check('정보 바로 다음에 오프라인(채팅) 표시',link()?.previousElementSibling.textContent==='정보'&&link()?.textContent==='오프라인(채팅)');
+ check('팔로우·보관 기능이 꺼져 있어도 올바른 채널의 라이브 경로 사용',link()?.getAttribute('href')==='/live/'+ids[0]&&!document.querySelector('#chzzk-channel-save'));
+ check('원래 탭의 역할과 선택 상태를 추가하지 않음',!link()?.hasAttribute('role')&&!link()?.hasAttribute('aria-selected')&&document.querySelectorAll('[role=tab]').length===6);
+ const before=requests.length;await wait(1700);check('렌더 반복은 캐시를 재사용하고 쿠키를 보내지 않음',requests.length===before&&requests.every(r=>r.credentials==='omit'));
+ let normal=false,modified=false;document.addEventListener('click',event=>{if(event.target.closest('#chzzk-channel-live-link')){if(event.ctrlKey)modified=!event.defaultPrevented;else normal=!event.defaultPrevented;event.preventDefault()}});
+ link().dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));link().dispatchEvent(new MouseEvent('click',{ctrlKey:true,bubbles:true,cancelable:true}));check('기본 이동과 Ctrl 새 탭을 가로채지 않음',normal&&modified);
+ navigate('/'+ids[1]+'/videos');await wait(350);check('동영상 등 채널 하위 메뉴와 SPA 채널 이동 지원',link()?.textContent==='라이브'&&link()?.getAttribute('href')==='/live/'+ids[1]);
+ const old=document.querySelector('[role=tablist]');old.outerHTML='<div role="tablist">'+tabs()+'</div>';await wait(350);check('사이트가 탭 목록을 교체하면 하나만 재설치',document.querySelectorAll('#chzzk-channel-live-link').length===1&&link()?.parentElement!==old);
+ const native=document.querySelector('[role=tablist]');const originalTabs=[...native.querySelectorAll('[role=tab]')];
+ const platter=document.createElement('a');platter.className='cheese-channel-live-button';platter.textContent='라이브';native.append(platter);await wait(250);check('치즈 플래터가 있으면 중복 바로가기 없음',!link()&&platter.isConnected);
+ platter.remove();await wait(250);check('치즈 플래터 버튼이 없어지면 복원',!!link()&&originalTabs.every(tab=>tab.isConnected));
+ feature(false);await wait(250);check('설정 끄면 바로가기만 제거',!link()&&originalTabs.every(tab=>tab.isConnected));feature(true);await wait(250);check('설정 다시 켜면 현재 채널 복원',link()?.getAttribute('href')==='/live/'+ids[1]);
+ statuses.set(ids[1],false);now+=31000;navigate(location.pathname);await wait(350);check('30초 캐시 만료 후 방종 상태 반영',link()?.textContent==='오프라인(채팅)');
+ hidden=true;statuses.set(ids[1],true);now+=31000;const calls=requests.length;navigate(location.pathname);await wait(250);check('숨긴 탭에서는 상태 조회 안 함',requests.length===calls);hidden=false;navigate(location.pathname);await wait(350);check('돌아오면 라이브 상태 갱신',link()?.textContent==='라이브');
+ navigate('/'+ids[2]+'/about');await wait(350);check('조회 실패를 오프라인으로 단정하지 않고 이동은 제공',link()?.textContent==='라이브·채팅'&&link()?.getAttribute('href')==='/live/'+ids[2]);
+ const failed=requests.length;await wait(1700);check('실패 직후 반복 요청 제한',requests.length===failed);statuses.set(ids[2],false);now+=11000;navigate(location.pathname);await wait(350);check('실패 뒤 재조회 성공하면 상태 회복',link()?.textContent==='오프라인(채팅)');
+ deferred.set(ids[0],[]);now+=31000;navigate('/'+ids[0]);await wait(250);navigate('/'+ids[1]);await wait(350);deferred.get(ids[0]).forEach(resolve=>resolve());deferred.delete(ids[0]);await wait(250);check('이전 채널의 늦은 응답이 현재 링크를 바꾸지 않음',link()?.getAttribute('href')==='/live/'+ids[1]&&link()?.textContent==='라이브');
+ navigate('/live/'+ids[1]);await wait(250);check('라이브 시청 페이지에서는 채널 메뉴 링크 제거',!link());navigate('/');await wait(250);check('전체 홈에서는 특정 채널 링크 없음',!link());
+ navigate('/'+ids[0]);await wait(250);const event=new Event('pagehide');Object.defineProperty(event,'persisted',{value:false});window.dispatchEvent(event);check('페이지 종료 시 바로가기 정리',!link());
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.querySelector('#result').textContent=error.stack;document.body.dataset.result='fail'});
+</script></body></html>

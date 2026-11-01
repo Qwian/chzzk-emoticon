@@ -40,6 +40,9 @@
     .ct-channel-row.ct-edit .ct-saved-link{padding-right:94px}
     .ct-bookmark{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;height:34px;padding:0 13px;border:1px solid #8884;border-radius:20px;background:var(--color-bg-layer-03,#292b30);color:var(--color-content-01,#f5f5f5);font:700 14px system-ui;cursor:pointer;white-space:nowrap;margin-right:8px}
     .ct-bookmark[aria-pressed="true"]{color:#00c985;border-color:#00c98588}.ct-bookmark svg{width:16px;height:16px}
+    .ct-channel-live-link{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:20px;padding:0 4px;min-height:46px;color:var(--color-content-02,#92949b);font:700 16px system-ui;text-decoration:none;white-space:nowrap}
+    .ct-channel-live-link[data-state="live"]{color:#00c985}.ct-channel-live-link:hover{color:var(--color-content-01,#f5f5f5)}
+    .ct-channel-live-link:focus-visible{outline:2px solid #00dc91;outline-offset:2px;border-radius:4px}.ct-channel-live-link svg{width:16px;height:16px;flex:none}
     .ct-fallback-nav{padding:12px 8px;color:inherit}.ct-fallback-nav strong{font-size:13px}.ct-fallback-nav ul{padding:0;margin:8px 0}
     .ct-sidebar-section{container-type:inline-size}
     @container(max-width:110px){.ct-saved-name,.ct-saved-label,.ct-list-tools{display:none}.ct-saved-link{padding-left:3px;gap:0}.ct-native-body{padding-right:18px!important}.ct-row-actions{right:0}.ct-row-actions .ct-star{width:18px}.ct-star svg{width:16px;height:16px}}
@@ -69,6 +72,8 @@
   const bookmarkButton = document.createElement("button");
   bookmarkButton.type = "button"; bookmarkButton.id = "chzzk-channel-save"; bookmarkButton.className = "ct-bookmark";
   bookmarkButton.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 3h10v14l-5-3-5 3z"/></svg><span></span>';
+  const liveLink = document.createElement("a"); liveLink.id = "chzzk-channel-live-link"; liveLink.className = "ct-channel-live-link";
+  liveLink.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg><span></span>';
   const divider = document.createElement("li"); divider.className = "ct-channel-divider"; divider.setAttribute("role", "separator"); divider.setAttribute("aria-label", "즐겨찾기와 일반 채널 구분");
   let tools = null, fallbackNav = null;
   function showError() { $("#player-status").textContent = "저장하지 못했습니다. 페이지를 새로고침해 주세요."; bookmarkButton.title = "저장하지 못했습니다. 페이지를 새로고침해 주세요."; }
@@ -104,6 +109,25 @@
       roots[i].querySelectorAll("*").forEach(node => { if (node.shadowRoot && node !== playerHost) roots.push(node.shadowRoot); });
     }
     return null;
+  }
+  function placeChannelLink() {
+    const id = location.pathname.match(/^\/([a-f0-9]{32})(?:\/|$)/i)?.[1]?.toLowerCase();
+    const list = id && settings.channelLiveLink ? document.querySelector(
+      '#layout-body [role="tablist"]:has([aria-controls="about-PANEL"]),main [role="tablist"]:has([aria-controls="about-PANEL"])') : null;
+    // Keep the original extension's shortcut when both extensions are enabled.
+    if (!list || list.querySelector('.cheese-channel-live-button')) { liveLink.remove(); return; }
+    const data = channelCache.get(id)?.data;
+    const state = data?.openLive === true ? "live" : data?.openLive === false ? "offline" : "unknown";
+    const label = state === "live" ? "라이브" : state === "offline" ? "오프라인(채팅)" : "라이브·채팅";
+    const href = `/live/${id}`;
+    if (liveLink.getAttribute("href") !== href) liveLink.setAttribute("href", href);
+    if (liveLink.dataset.state !== state) liveLink.dataset.state = state;
+    text(liveLink.querySelector("span"), label);
+    const description = state === "live" ? "라이브 방송 및 채팅 페이지 열기" : state === "offline" ? "오프라인 채팅 페이지 열기" : "방송 및 채팅 페이지 열기 · 라이브 상태 미확인";
+    if (liveLink.title !== description) { liveLink.title = description; liveLink.setAttribute("aria-label", description); }
+    // A regular link also handles offline navigation and Ctrl/Shift/middle clicks.
+    if (list.lastElementChild !== liveLink) list.append(liveLink);
+    refreshChannel({ id });
   }
   function placeControls() {
     const clip = /^\/live\/[a-f0-9]{32}\/?$/i.test(location.pathname) ? queryDeep(".custom__clip-button, button[aria-label='클립 만들기']") : null;
@@ -302,7 +326,7 @@
     const count = sorted.filter(item => pins.includes(item.id)).length;
     if (count && count < sorted.length) { setRank(divider, count * 2 - 1); if (divider.parentElement !== list) list.append(divider); } else divider.remove();
   }
-  function render() { if (!ready || stopped) return; placeControls(); renderSidebar(); }
+  function render() { if (!ready || stopped) return; placeChannelLink(); placeControls(); renderSidebar(); }
   function schedule() { if (!scheduled && !stopped) scheduled = setTimeout(() => { scheduled = 0; render(); }, 100); }
   function applyStorage(data) {
     if (Object.hasOwn(data, "features")) settings = core.features(data.features);
@@ -316,10 +340,10 @@
   const observer = new MutationObserver(records => {
     if (records.some(record => {
       const target = record.target.nodeType === 1 ? record.target : record.target.parentElement;
-      if (target?.closest(".ct-row-actions,.ct-list-tools,.ct-saved-link,.ct-channel-divider,.ct-saved-label,[class*='chatting'],[contenteditable]")) return false;
-      if (target?.closest("nav[aria-label]")) return true;
+      if (target?.closest(".ct-row-actions,.ct-list-tools,.ct-saved-link,.ct-channel-live-link,.ct-channel-divider,.ct-saved-label,[class*='chatting'],[contenteditable]")) return false;
+      if (target?.closest("nav[aria-label],[role='tablist']")) return true;
       return [...record.addedNodes, ...record.removedNodes].some(node => node.nodeType === 1 &&
-        (node.matches("main,#layout-body,#header,nav[aria-label],.custom__clip-button") || node.querySelector(".custom__clip-button,nav[aria-label]")));
+        (node.matches("main,#layout-body,#header,nav[aria-label],[role='tablist'],.custom__clip-button") || node.querySelector(".custom__clip-button,nav[aria-label],[role='tablist']")));
     })) schedule();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
@@ -327,7 +351,7 @@
   const timer = setInterval(schedule, 1500);
   window.addEventListener("pagehide", event => {
     if (event.persisted) return;
-    stopped = true; clearInterval(timer); clearTimeout(scheduled); observer.disconnect(); playerHost.remove(); bookmarkButton.remove(); tools?.remove(); divider.remove(); fallbackNav?.remove();
+    stopped = true; clearInterval(timer); clearTimeout(scheduled); observer.disconnect(); playerHost.remove(); bookmarkButton.remove(); liveLink.remove(); tools?.remove(); divider.remove(); fallbackNav?.remove();
     addedRows.forEach(item => item.row.remove());
     lists.forEach(list => list.classList.remove("ct-channel-list")); sections.forEach(section => section.classList.remove("ct-sidebar-section"));
     originalOrders.forEach((value, row) => { if (value) row.style.setProperty("--ct-order", value); else row.style.removeProperty("--ct-order"); });

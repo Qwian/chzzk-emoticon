@@ -376,6 +376,7 @@ async function initializeFeatures() {
   const labels = {
     globalSpeed: "모든 사이트 속도·프레임 단축키",
     playerShortcuts: "치지직·숲 F11 보호 · 재생·음소거 단축키 복구",
+    channelLiveLink: "채널 메뉴의 라이브 · 오프라인(채팅) 바로가기",
     listPreview: "치지직·숲 목록 우클릭 소리 미리보기",
     sidebarPreview: "팔로잉·보관 채널에 마우스를 올리면 소리 재생",
     freeChat: "치지직·숲 자유 배치 채팅 (이동·크기·투명도 저장)",
