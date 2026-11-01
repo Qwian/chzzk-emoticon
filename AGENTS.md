@@ -41,6 +41,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/search-native-harness.html` reproduces native Enter/button handlers and a stalled parallel response.
 - `tests/media-speed-harness.html` runs the actual background script in a worker and verifies speed, measured-FPS stepping, iframe routing and editable-field exclusions.
 - `tests/player-shortcuts-harness.html` verifies F11 cancellation protection and native-first play/mute fallback, including IME, blocked events, typing and lifecycle; `?soop` uses native keyup handlers.
+- `tests/player-modal-harness.html` verifies that retained hidden dialogs do not block Space, while visible modal dialogs still own the keys.
 - `tests/channel-link-harness.html` verifies channel-menu live/offline-chat links, shared metadata caching, SPA changes, failures, settings and coexistence with Cheese Platter.
 - `tests/ad-quality-harness.html` verifies ad preparation/SDK mute isolation, post-ad audio restoration and native quality/notice controls.
 - `tests/ad-detached-harness.html` verifies AdGuard's SDK-container removal, detached ad mute/skip, audio isolation and SPA cleanup.

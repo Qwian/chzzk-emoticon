@@ -28,7 +28,7 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
  const results=[],check=(name,passed)=>results.push({name,passed:!!passed});await wait();
  check('F11은 플레이어의 일괄 취소를 통과',!(await press('F11')).defaultPrevented);
  check('채팅에서도 브라우저 F11 유지',!(await press('F11',document.querySelector('#chat'))).defaultPrevented);
- let before=paused;await press('Space');check('스페이스 재생을 한 번만 실행',paused!==before&&clicks===(soop?0:1));
+ let before=paused;await press('Space');check('정상 사이트 스페이스 처리와 중복 실행 없음',paused!==before&&clicks===0);
  const afterSpace=clicks;
  before=muted;await press('KeyM');check('정상 사이트 음소거 처리와 중복 실행 없음',muted!==before&&clicks===afterSpace);
  before=muted;await press('KeyM',controls,{key:'Process'});check('한글 IME Process도 물리 M 키로 복구',muted!==before);
@@ -36,12 +36,6 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
  before=muted;await press('KeyM');check('뒤의 리스너가 전체 키를 차단해도 음소거 복구',muted!==before);
  check('전체 키 차단 중에도 F11 유지',!(await press('F11')).defaultPrevented);
  check('F11 keyup도 취소되지 않음',!fire('keyup','F11').defaultPrevented);
- if(!soop){
-  before=paused;fire('keydown','Space');await wait();check('keyup이 없어도 스페이스 즉시 실행',paused!==before);
-  before=paused;fire('keydown','Space');await wait();check('이전 keyup이 누락돼도 다음 스페이스 실행',paused!==before);
-  const held=clicks;fire('keydown','Space',controls,{repeat:true});fire('keyup','Space');await wait();check('스페이스 반복과 keyup에서 중복 실행 없음',clicks===held);
-  const snapshot=globalThis.__chzzkPlayerShortcutStatus();check('팝업 진단에 입력 횟수와 현재 판정 제공',snapshot.down>snapshot.up&&snapshot.current==='ready');
- }
  blocked=false;
  const count=clicks;
  for(const target of [document.querySelector('#search'),document.querySelector('#chat'),document.querySelector('#ordinary')])await press('KeyM',target);

@@ -1,0 +1,37 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>숨겨진 모달과 스페이스 회귀 검사</title>
+<style>video{width:640px;height:360px}.fixture-modal{position:fixed;left:10px;top:10px;width:200px;height:80px;background:white}</style>
+<body data-result="pending"><div class="pzp"><video></video><div id="controls" tabindex="0"><button class="pzp-pc__playback-switch">재생</button></div></div><pre id="result"></pre>
+<script>
+const listeners=new Set();window.chrome={runtime:{id:'fixture'},storage:{local:{get:async()=>({features:{playerShortcuts:true}})},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+const video=document.querySelector('video'),controls=document.querySelector('#controls');let paused=false,clicks=0;
+Object.defineProperties(video,{readyState:{get:()=>4},paused:{get:()=>paused}});
+document.querySelector('button').onclick=()=>{paused=!paused;clicks++};
+</script><script src="/player-shortcuts.js"></script><script>
+// A blocked native shortcut still needs the extension's existing fallback.
+for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{if(event.code==='Space'){event.preventDefault();event.stopImmediatePropagation()}},true);
+(async()=>{
+const results=[],check=(name,passed)=>results.push({name,passed:!!passed}),wait=()=>new Promise(resolve=>setTimeout(resolve,20));
+const press=async()=>{for(const type of ['keydown','keyup'])controls.dispatchEvent(new KeyboardEvent(type,{code:'Space',key:' ',bubbles:true,cancelable:true}));await wait()};
+const modal=document.createElement('div');modal.className='fixture-modal';modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.textContent='모형 모달';document.body.append(modal);
+await wait();
+for(const [name,style,parentStyle,attribute] of [
+ ['display none 모달','display:none'],['visibility hidden 모달','visibility:hidden'],['투명 모달','opacity:0'],
+ ['숨긴 부모 안의 모달','','display:none'],['투명 부모 안의 모달','','opacity:0'],
+ ['hidden 속성 모달','','','hidden'],['aria-hidden 모달','','','aria-hidden'],['inert 모달','','','inert'],
+ ['화면 밖 보관 모달','left:-20000px']
+]){
+ const parent=document.createElement('div');parent.style.cssText=parentStyle||'';document.body.append(parent);parent.append(modal);
+ modal.style.cssText=style||'';
+ if(attribute)modal.setAttribute(attribute,attribute==='aria-hidden'?'true':'');
+ const before=paused;await press();
+ check(name+'은 스페이스를 막지 않음',paused!==before&&globalThis.__chzzkPlayerShortcutStatus().current==='ready');
+ if(attribute)modal.removeAttribute(attribute);modal.style.cssText='';document.body.append(modal);parent.remove();
+}
+let before=paused;await press();check('실제 보이는 모달은 보조 실행 차단',paused===before&&globalThis.__chzzkPlayerShortcutStatus().current==='modal');
+modal.style.display='none';before=paused;await press();check('모달을 닫으면 제거 없이 스페이스 복구',paused!==before);
+const visible=modal.cloneNode(true);visible.style.display='block';document.body.append(visible);before=paused;await press();check('숨긴 모달 뒤의 보이는 모달도 차단',paused===before);visible.remove();modal.remove();
+const native=document.createElement('dialog');native.textContent='기본 모달';document.body.append(native);before=paused;await press();check('닫힌 기본 dialog는 차단하지 않음',paused!==before);
+native.showModal();before=paused;await press();check('열린 기본 dialog는 차단',paused===before);native.close();before=paused;await press();check('기본 dialog를 닫으면 복구',paused!==before);
+document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>
