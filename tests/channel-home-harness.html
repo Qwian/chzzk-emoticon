@@ -1,0 +1,60 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>채널 메인 보관 검사</title>
+<style>
+body{background:#141517;color:#eee;font:14px system-ui;margin:30px}#layout-body,main{max-width:900px;margin:auto}.profile{display:flex;align-items:center;gap:18px}.profile img{border-radius:50%}._action_mock{display:flex;align-items:center;gap:8px;margin-left:auto}button{cursor:pointer}._follow_mock>button{border-radius:20px;padding:8px 18px}#result{white-space:pre-wrap}
+</style><body data-result="pending">
+<header id="header"><button>팔로우</button></header><aside id="sidebar"></aside>
+<div id="layout-body" aria-label="콘텐츠"><section class="profile">
+<a class="_thumbnail_mock" href="/live/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"><img width="80" height="80" src="/icons/icon128.png" alt=""><span hidden>가람 라이브 엔드로 이동</span></a>
+<h2 class="_name_mock"><span>가람</span></h2>
+<div class="_action_mock"><div class="_follow_mock"><button id="follow">팔로우</button></div><button>구독</button></div>
+</section></div><pre id="result">pending</pre>
+<script>
+const ids=['a','b'].map(c=>c.repeat(32));
+history.replaceState(null,'','/'+ids[0]);
+const state={features:{followingExpanded:false},favorites:[],followingFavorites:[],channelOrder:[]},listeners=[];
+let followHits=0,headerHits=0,apiCalls=0;
+document.querySelector('#follow').onclick=()=>followHits++;
+document.querySelector('#header button').onclick=()=>headerHits++;
+window.chrome={storage:{local:{get:async()=>structuredClone(state),set:async values=>{const changes={};for(const[key,value]of Object.entries(values)){changes[key]={oldValue:state[key],newValue:value};state[key]=structuredClone(value)}listeners.forEach(fn=>fn(changes,'local'))}},onChanged:{addListener:fn=>listeners.push(fn)}}};
+window.fetch=async url=>{apiCalls++;const id=url.match(/channels\/([a-f0-9]{32})/)?.[1];return{ok:true,json:async()=>({code:200,content:{channelId:id,channelName:id===ids[0]?'가람':'나래',openLive:false}})}};
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),click=el=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+function navigate(path){history.pushState(null,'',path);window.dispatchEvent(new PopStateEvent('popstate'));}
+</script><script src="/tools-core.js"></script><script src="/channel-data.js"></script><script src="/channel-tools.js"></script><script>
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed});await wait(350);
+ const save=()=>document.querySelector('#chzzk-channel-save');
+ check('main 태그 없는 채널 메인에 보관 버튼 표시',!document.querySelector('main')&&Boolean(save()));
+ check('채널 메인의 팔로우 컨테이너 바로 왼쪽 배치',document.querySelector('._follow_mock').previousElementSibling===save());
+ check('상단 헤더에 보관 버튼을 넣지 않음',!document.querySelector('#header #chzzk-channel-save'));
+ check('메인에서는 따라잡기 플레이어 도구 없음',!document.querySelector('#chzzk-player-tools'));
+ if(!save())throw new Error('채널 메인에 보관 버튼 없음');
+ click(save());await wait(300);
+ check('메인에서 채널 ID와 정확한 프로필 이름 저장',state.favorites.length===1&&state.favorites[0].id===ids[0]&&state.favorites[0].name==='가람');
+ check('보관됨 상태와 사이드바 즉시 반영',save().getAttribute('aria-pressed')==='true'&&save().textContent==='보관됨'&&Boolean(document.querySelector('#sidebar .ct-saved-link')));
+ check('보관이 네이버 팔로우 버튼을 누르지 않음',followHits===0&&headerHits===0);
+ click(save());await wait(250);
+ check('메인에서 해제하면 저장 목록과 사이드바 해제',state.favorites.length===0&&save().getAttribute('aria-pressed')==='false'&&!document.querySelector('.ct-saved-link'));
+ // An offline channel has no live profile link; the header still supplies its name.
+ document.querySelector('._thumbnail_mock').href='/'+ids[1];document.querySelector('._name_mock').textContent='나래';
+ navigate('/'+ids[1]);await wait(250);click(save());await wait(250);
+ check('다른 오프라인 채널 이동 후 현재 채널만 저장',state.favorites.length===1&&state.favorites[0].id===ids[1]&&state.favorites[0].name==='나래');
+ // Native live pages use main plus a tooltip wrapper instead of layout-body.
+ const home=document.querySelector('#layout-body'),main=document.createElement('main');
+ main.innerHTML=`<a href="/${ids[1]}" data-channel-name="나래">나래</a><div class="_has_tooltip_box_mock"><button>팔로잉</button></div>`;
+ home.replaceWith(main);navigate('/live/'+ids[1]);await wait(250);
+ check('라이브로 SPA 이동해도 같은 보관 상태 유지',save()?.getAttribute('aria-pressed')==='true'&&main.querySelector('._has_tooltip_box_mock').previousElementSibling===save());
+ main.replaceWith(home);navigate('/'+ids[1]);await wait(250);
+ check('라이브에서 메인으로 복귀해도 버튼 하나와 상태 유지',document.querySelectorAll('#chzzk-channel-save').length===1&&save()?.getAttribute('aria-pressed')==='true'&&document.querySelector('._follow_mock').previousElementSibling===save());
+ navigate('/');await wait(250);
+ check('치지직 전체 메인에서는 특정 채널 보관 버튼 제거',!save());
+ check('전체 메인에서도 기존 보관 사이드바 유지',Boolean(document.querySelector('#sidebar .ct-saved-link')));
+ navigate('/'+ids[1]);await wait(250);
+ await chrome.storage.local.set({features:{favorites:false}});await wait(250);
+ check('기능 끄면 메인 보관 버튼과 저장 행 제거',!save()&&!document.querySelector('.ct-saved-link')&&state.favorites.length===1);
+ await chrome.storage.local.set({features:{favorites:true}});await wait(250);
+ check('기능 다시 켜면 기존 저장 상태 복원',save()?.getAttribute('aria-pressed')==='true');
+ const calls=apiCalls;await wait(1700);
+ check('기존 캐시를 재사용해 주기적 중복 조회 없음',apiCalls===calls);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>

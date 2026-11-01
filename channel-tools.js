@@ -89,10 +89,12 @@
   }
   function currentChannel() {
     const id = core.channelId(location.pathname); if (!id) return null;
-    const links = [...document.querySelectorAll("main a[href]")].filter(a => channelId(a) === id);
+    const content = document.querySelector("main, #layout-body");
+    const links = [...(content?.querySelectorAll("a[href]") || [])].filter(a => channelId(a) === id);
     const link = links.find(a => a.textContent.trim() && !/라이브|LIVE|팔로워/.test(a.textContent)) || links[0];
-    const name = readName(link, link) || document.title.split(" - ")[0].slice(0, 80) || id;
-    const image = link?.querySelector("img")?.src || bookmarks.find(row => row.id === id)?.image || "";
+    const heading = content?.querySelector('h2[class*="_name_"], h1[data-channel-name], h2[data-channel-name]');
+    const name = readName(heading, heading) || readName(link, link) || document.title.split(" - ")[0].slice(0, 80) || id;
+    const image = links.find(a => a.querySelector("img"))?.querySelector("img")?.src || bookmarks.find(row => row.id === id)?.image || "";
     return { id, name, image: image.startsWith("https://") ? image : "" };
   }
   function queryDeep(selector) {
@@ -110,10 +112,10 @@
     $("#catch-up").checked = settings.catchUp; $("#catch-now").disabled = !settings.catchUp;
     text($("#player-status"), playerStatus);
     const channel = currentChannel();
-    const follow = channel && settings.favorites ? [...document.querySelectorAll("main button")].find(button =>
+    const follow = channel && settings.favorites ? [...document.querySelectorAll("main button, #layout-body button")].find(button =>
       button !== bookmarkButton && !button.closest("nav") && /^(팔로우|팔로잉|Follow)/i.test(button.textContent.trim())) : null;
     if (!follow) { bookmarkButton.remove(); return; }
-    const anchor = follow.closest('[class*="_button_alone_"], [class*="_has_tooltip_box_"]') || follow;
+    const anchor = follow.closest('[class*="_button_alone_"], [class*="_has_tooltip_box_"], [class*="_follow_"]') || follow;
     if (anchor.previousElementSibling !== bookmarkButton) anchor.before(bookmarkButton);
     const saved = bookmarks.some(row => row.id === channel.id);
     text(bookmarkButton.querySelector("span"), saved ? "보관됨" : "보관");
@@ -317,10 +319,11 @@
       if (target?.closest(".ct-row-actions,.ct-list-tools,.ct-saved-link,.ct-channel-divider,.ct-saved-label,[class*='chatting'],[contenteditable]")) return false;
       if (target?.closest("nav[aria-label]")) return true;
       return [...record.addedNodes, ...record.removedNodes].some(node => node.nodeType === 1 &&
-        (node.matches("main,#header,nav[aria-label],.custom__clip-button") || node.querySelector(".custom__clip-button,nav[aria-label]")));
+        (node.matches("main,#layout-body,#header,nav[aria-label],.custom__clip-button") || node.querySelector(".custom__clip-button,nav[aria-label]")));
     })) schedule();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  window.addEventListener("popstate", schedule);
   const timer = setInterval(schedule, 1500);
   window.addEventListener("pagehide", event => {
     if (event.persisted) return;
