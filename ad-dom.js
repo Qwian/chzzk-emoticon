@@ -1,4 +1,5 @@
 (() => {
+  // Run at document_start for detached ads, and again before idle consumers as a fallback.
   if (globalThis.ChzzkAdDom) return;
   const selector = '#midAdPlayerWrapper,#preAdPlayerWrapper,.webplayer-internal-core-ad-ui';
   const retained = new Map();

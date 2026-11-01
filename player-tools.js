@@ -2,7 +2,6 @@
   if (globalThis.__chzzkPlayerTools) return;
   globalThis.__chzzkPlayerTools = true;
   const core = globalThis.ChzzkTools;
-  const ads = globalThis.ChzzkAdDom;
   let settings = core.features();
   let activeMain = null, lastUrl = "", lastNormal = null, adActive = false;
   let margin = 1.5, lastSeek = -Infinity, cooldown = 0, stableSince = performance.now();
@@ -212,6 +211,8 @@
     return state.reason;
   }
   function tick(force = false) {
+    const ads = globalThis.ChzzkAdDom;
+    if (!ads) { announce("플레이어 연결 대기"); return; }
     if (lastUrl !== location.href) {
       audioRecovery = null; beforeAdAudio = null;
       ads.wrappers();

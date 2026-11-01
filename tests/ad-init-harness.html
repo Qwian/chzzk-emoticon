@@ -1,0 +1,41 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>광고 도구 초기화 순서 회귀 검사</title>
+<body data-result="pending"><div class="pzp pzp-pc--adbreak"><div class="webplayer-internal-core-ad-ui">
+<video data-role="videoEl"></video><button data-role="skipBtn">SKIP</button></div></div><pre id="result"></pre>
+<script>
+const errors = [], listeners = [];
+window.addEventListener('error', event => errors.push(event.message));
+history.replaceState(null, '', '/live/' + 'a'.repeat(32));
+const features = { catchUp:false, adAutoSkip:true, adMute:true, adSpeed:1 };
+window.chrome = {storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+const ad = document.querySelector('video');
+Object.defineProperties(ad, {currentSrc:{get:()=> 'https://example.com/ad.mp4'}, readyState:{get:()=>4}, ended:{get:()=>false}});
+let clicks = 0;
+document.querySelector('button').onclick = () => clicks++;
+</script><script src="/tools-core.js"></script><script src="/player-tools.js"></script><script src="/ad-skip.js"></script>
+<script>
+(async()=>{
+  const results=[], check=(name,passed)=>results.push({name,passed:!!passed});
+  const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const load=()=>new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/ad-dom.js';script.onload=resolve;script.onerror=reject;document.head.append(script)});
+  await wait(1200);
+  check('추적 객체가 없어도 스킵 타이머 오류 없음', errors.length===0);
+  check('추적 객체가 없으면 광고를 조작하지 않음', clicks===0&&!ad.muted);
+  // A catch-up request calls the player tick directly, outside its interval's catch.
+  document.dispatchEvent(new Event('chzzk-tools:catch-up'));
+  check('추적 객체가 없어도 플레이어 직접 호출 오류 없음', errors.length===0);
+  await load();
+  const first=globalThis.ChzzkAdDom;
+  await load();
+  check('두 초기화 단계가 같은 추적 객체를 유지', first===globalThis.ChzzkAdDom);
+  await wait(1200);
+  check('나중에 초기화되면 스킵 자동 복구', clicks>0);
+  check('나중에 초기화되면 광고 음소거도 자동 복구', ad.muted);
+  listeners.forEach(fn=>fn({features:{newValue:{...features,adAutoSkip:false,adMute:false}}},'local'));
+  const previous=clicks;
+  await wait(1200);
+  check('복구 후 설정 해제로 스킵 중지와 음소거 복원', clicks===previous&&!ad.muted);
+  check('초기화와 복구 전체에서 pageerror 없음', errors.length===0);
+  document.querySelector('#result').textContent=JSON.stringify({results,errors},null,2);
+  document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>

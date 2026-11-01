@@ -12,11 +12,13 @@
   }
   function tick() {
     if (!settings.adAutoSkip || !/^\/(?:live\/[a-f0-9]{32}|video\/\d+)\/?$/i.test(location.pathname)) return;
-    for (const wrapper of ChzzkAdDom.wrappers()) {
-      const video = ChzzkAdDom.videos(wrapper).find(video => !video.ended && video.readyState >= 2);
+    const ads = globalThis.ChzzkAdDom;
+    if (!ads) return;
+    for (const wrapper of ads.wrappers()) {
+      const video = ads.videos(wrapper).find(video => !video.ended && video.readyState >= 2);
       const buttons = wrapper.querySelectorAll('button[data-role="skipBtn"], button[aria-label="광고 SKIP"]');
       for (const button of buttons) {
-        if (!video || video.ended || video.readyState < 2 || !visible(button, !wrapper.isConnected && ChzzkAdDom.sdk(wrapper)) ||
+        if (!video || video.ended || video.readyState < 2 || !visible(button, !wrapper.isConnected && ads.sdk(wrapper)) ||
             button.matches(':disabled,[aria-disabled="true"]') || button.closest('[inert],[aria-hidden="true"]') ||
             /\d|초\s*후|후\s*(?:SKIP|건너뛰기)|countdown/i.test(button.textContent)) {
           attempts.delete(button); continue;
