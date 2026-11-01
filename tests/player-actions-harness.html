@@ -11,7 +11,8 @@ const player=document.querySelector('#player'),video=document.querySelector('vid
 let paused=false,theaterClicks=0,wrongClicks=0,fullClicks=0,playClicks=0,purchases=0,timeShiftClicks=0,timeShiftAllowed=false,timeShiftDelay=0;
 if(soop){player.id='webplayer';theater.className='btn_screen_mode';wrong.className='pzp-viewmode-button'}else{player.className='pzp';play.className='pzp-pc__playback-switch';theater.className='pzp-pc__viewmode-button';wrong.className='btn_screen_mode'}
 Object.defineProperties(video,{readyState:{get:()=>4},paused:{get:()=>paused}});
-theater.onclick=()=>{theaterClicks++;document.body.classList.toggle(soop?'screen_mode':'fixture-wide')};wrong.onclick=()=>wrongClicks++;
+const wide=()=>soop?document.body.classList.contains('screen_mode'):player.classList.contains('_is_large_fixture');
+theater.onclick=()=>{theaterClicks++;(soop?document.body:player).classList.toggle(soop?'screen_mode':'_is_large_fixture')};wrong.onclick=()=>wrongClicks++;
 document.querySelector('.btn_fullScreen_mode').onclick=()=>fullClicks++;
 document.querySelector('#time_shift_play').onclick=()=>{timeShiftClicks++;if(!timeShiftAllowed){purchases++;return}const button=document.querySelector('#time_shift_play');button.classList.toggle('play');button.classList.toggle('pause');if(timeShiftDelay)setTimeout(()=>paused=!paused,timeShiftDelay);else paused=!paused};
 play.onclick=()=>{playClicks++;if(!soop){paused=!paused;return}if(play.classList.contains('stop')){paused=true;play.className='play';video.remove()}else{paused=false;play.className='stop';player.prepend(video)}};
@@ -27,17 +28,27 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{
 (async()=>{
  const results=[],check=(name,passed)=>results.push({name,passed:!!passed});await wait();
  await press('KeyF');check('F는 플랫폼의 기본 극장 버튼만 실행',theaterClicks===1&&wrongClicks===0&&fullClicks===0);
- await press('KeyF');check('F를 다시 누르면 원래 화면으로 복귀',theaterClicks===2&&!document.body.classList.contains(soop?'screen_mode':'fixture-wide'));
+ await press('KeyF');check('F를 다시 누르면 원래 화면으로 복귀',theaterClicks===2&&!wide());
  fire('keydown','KeyF');fire('keydown','KeyF',controls,{repeat:true});fire('keyup','KeyF');await wait();check('길게 눌러도 한 번 전환하고 native F keyup 차단',theaterClicks===3&&fullClicks===0);
  await press('KeyF',controls,{key:'Process'});check('한글 IME도 물리 F 코드 사용',theaterClicks===4);
  await press('KeyF',play);check('플레이어 버튼에 포커스가 있어도 F 동작',theaterClicks===5&&fullClicks===0);
- const before=theaterClicks;
+ let before=theaterClicks;
  for(const target of [document.querySelector('#search'),document.querySelector('#chat'),document.querySelector('#outside')])await press('KeyF',target);
  await press('KeyF',controls,{ctrlKey:true});await press('KeyF',controls,{shiftKey:true});await press('KeyF',controls,{isComposing:true});
  const host=document.createElement('div');host.attachShadow({mode:'open'}).innerHTML='<input>';document.body.append(host);await press('KeyF',host.shadowRoot.firstChild);
  check('입력창·채팅·외부 버튼·조합키·IME 조합·shadow 입력 제외',theaterClicks===before);
  const modal=document.createElement('dialog');modal.textContent='모형';document.body.append(modal);modal.showModal();await press('KeyF');check('실제 모달에서는 극장 버튼 조작 안 함',theaterClicks===before);modal.close();modal.remove();
  theater.disabled=true;await press('KeyF');check('비활성 극장 버튼 제외',theaterClicks===before);theater.disabled=false;
+ await press('Escape');check('F 극장모드에서 Esc로 원래 화면 복귀',!wide()&&theaterClicks===before+1);
+ const normal=fire('keydown','Escape');fire('keyup','Escape');check('일반 화면 Esc는 전환하거나 가로채지 않음',!normal.defaultPrevented&&!wide()&&theaterClicks===before+1);
+ for(const target of [controls,document.querySelector('#search'),document.querySelector('#chat'),document.querySelector('#outside'),host.shadowRoot.firstChild]){
+  await press('KeyF');const entered=theaterClicks;
+  const down=fire('keydown','Escape',target);fire('keydown','Escape',target,{repeat:true});const up=fire('keyup','Escape',target);
+  check('모든 포커스에서 Esc 한 번만 해제: '+(target.id||target.tagName),!wide()&&theaterClicks===entered+1&&down.defaultPrevented&&up.defaultPrevented);
+ }
+ await press('KeyF');document.body.append(modal);modal.showModal();await press('Escape',modal);check('모달에 포커스가 있어도 Esc로 극장모드 해제',!wide());modal.close();modal.remove();
+ await press('KeyF');let fullscreen=player;Object.defineProperty(document,'fullscreenElement',{configurable:true,get:()=>fullscreen});const fullEscape=fire('keydown','Escape');fire('keyup','Escape');check('실제 전체화면의 Esc는 브라우저에 맡김',wide()&&!fullEscape.defaultPrevented);fullscreen=null;
+ await press('Escape');await press('KeyF');before=theaterClicks;
  if(soop){
   await press('Space');check('타임머신 권한 없으면 기본 정지 버튼 사용',paused&&!video.isConnected&&play.classList.contains('play')&&playClicks===1&&timeShiftClicks===0&&purchases===0);
   await press('KeyF');check('정지로 영상이 사라져도 F 극장 전환 가능',theaterClicks===before+1);

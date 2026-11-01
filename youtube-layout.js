@@ -91,9 +91,25 @@
     });
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["theater", "collapsed", "hidden"] });
     const consume = event => { event.preventDefault(); event.stopImmediatePropagation(); };
+    function exitTheater() {
+      const watch = location.pathname === "/watch" ? document.querySelector("ytd-watch-flexy[theater]") : null;
+      const button = watch?.querySelector(".ytp-size-button");
+      if (!button || document.fullscreenElement) return false;
+      button.click(); return true;
+    }
+    window.addEventListener("message", event => {
+      if (event.origin === location.origin && event.source === chat?.querySelector("#chatframe")?.contentWindow &&
+          event.data?.type === "ct-youtube-exit-theater") exitTheater();
+    }, { signal });
     sync();
     return { sync: schedule,
       keydown(event) {
+        if (event.code === "Escape" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+          if ((pressed.has(event.code) && event.repeat) || (!event.repeat && exitTheater())) {
+            consume(event); pressed.add(event.code);
+          }
+          return;
+        }
         if (location.pathname !== "/watch" || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || ChzzkLayout.typing(event) || !["KeyF", "KeyT"].includes(event.code)) return;
         const button = document.querySelector(event.code === "KeyF" ? ".ytp-size-button" : ".ytp-fullscreen-button");
         if (!button) return;

@@ -30,4 +30,10 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.features) { enabled = changes.features.newValue?.youtubeWide !== false; sync(); }
   });
+  window.addEventListener("keydown", event => {
+    if (enabled && window.parent !== window && event.code === "Escape" && !event.repeat &&
+        !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+      window.parent.postMessage({ type: "ct-youtube-exit-theater" }, location.origin);
+    }
+  }, true);
 })();

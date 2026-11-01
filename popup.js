@@ -375,12 +375,12 @@ async function initializeFeatures() {
   const controls = new Map();
   const labels = {
     globalSpeed: "모든 사이트 속도·프레임 단축키",
-    playerShortcuts: "치지직·숲 F 극장모드 · F11 보호 · 재생·정지·음소거 복구",
+    playerShortcuts: "치지직·숲 F/Esc 극장모드 · F11 보호 · 재생·정지·음소거 복구",
     channelLiveLink: "채널 메뉴의 라이브 · 오프라인(채팅) 바로가기",
     listPreview: "치지직·숲 목록 우클릭 소리 미리보기",
     sidebarPreview: "팔로잉·보관 채널에 마우스를 올리면 소리 재생",
     freeChat: "치지직·숲 자유 배치 채팅 (이동·크기·투명도 저장)",
-    youtubeWide: "유튜브 큰 극장 화면 · F/T 전환 · 옆 채팅",
+    youtubeWide: "유튜브 큰 극장 화면 · F/T/Esc 전환 · 옆 채팅",
     nexonWide: "넥슨 라이브 큰 영상 · 옆 채팅",
     highestQuality: "치지직에서 선택 가능한 최고 화질 자동 선택",
     adblockQuality: "광고 차단 감지로 인한 360p 제한 보정 (새로고침 필요)",

@@ -12,7 +12,7 @@ if(nexon){
  document.querySelector('#expand')?.addEventListener('click',event=>{event.currentTarget.setAttribute('aria-expanded','true');event.currentTarget.closest('[data-state]').setAttribute('data-state','open')});
 }else{
  history.replaceState(null,'','/watch?v=test');
- document.querySelector('#fixture').innerHTML='<div id="masthead-container"><input id="search" aria-label="검색"></div><ytd-page-manager id="page-manager"><ytd-watch-flexy><div id="player-full-bleed-container"><div id="player-container-outer"><div id="player-container-inner"><video></video><button class="ytp-size-button">극장 모드</button><button class="ytp-fullscreen-button">전체화면</button></div></div></div><section id="secondary"><ytd-live-chat-frame id="chat"><iframe id="chatframe" title="모사 채팅" srcdoc="<textarea>작성 중 메시지</textarea>"></iframe><div id="show-hide-button">채팅 숨기기</div></ytd-live-chat-frame></section></ytd-watch-flexy></ytd-page-manager>';
+ document.querySelector('#fixture').innerHTML='<div id="masthead-container"><input id="search" aria-label="검색"></div><ytd-page-manager id="page-manager"><ytd-watch-flexy><div id="player-full-bleed-container"><div id="player-container-outer"><div id="player-container-inner"><video></video><button class="ytp-size-button">극장 모드</button><button class="ytp-fullscreen-button">전체화면</button></div></div></div><section id="secondary"><ytd-live-chat-frame id="chat"><iframe id="chatframe" title="모사 채팅" src="/tests/youtube-chat-frame-harness.html"></iframe><div id="show-hide-button">채팅 숨기기</div></ytd-live-chat-frame></section></ytd-watch-flexy></ytd-page-manager>';
 }
 let fullscreenElement=null,fullscreenRequests=0,sizeClicks=0,fullClicks=0,nativeKeys=0,iframeLoads=0;
 Object.defineProperty(document,'fullscreenElement',{get:()=>fullscreenElement});HTMLElement.prototype.requestFullscreen=async function(){fullscreenRequests++;fullscreenElement=this;document.dispatchEvent(new Event('fullscreenchange'))};document.exitFullscreen=async()=>{fullscreenElement=null;document.dispatchEvent(new Event('fullscreenchange'))};
@@ -46,6 +46,16 @@ if(!nexon){document.querySelector('.ytp-size-button').onclick=()=>{sizeClicks++;
  drag(divider,96);await wait(50);
  if(!nexon){
   check('채팅 iframe과 문서를 재생성·이동하지 않음',document.querySelector('iframe')===iframe&&iframe.contentDocument===iframeDocument&&iframeLoads===originalLoads&&iframe.contentDocument.querySelector('textarea').value==='작성 중 메시지');
+  for(const target of [document.body,document.querySelector('#search'),document.querySelector('.ytp-size-button')]){
+   const entered=sizeClicks;const event=press('Escape',target);await wait(40);
+   check('Esc는 포커스와 관계없이 극장모드 해제: '+(target.id||target.tagName),!document.querySelector('ytd-watch-flexy').hasAttribute('theater')&&sizeClicks===entered+1&&event.defaultPrevented);
+   const normal=press('Escape',target);check('일반 화면 Esc는 극장모드를 켜지 않음: '+(target.id||target.tagName),!normal.defaultPrevented&&sizeClicks===entered+1);
+   press('KeyF');await wait(40);
+  }
+  const held=sizeClicks;document.body.dispatchEvent(new KeyboardEvent('keydown',{code:'Escape',bubbles:true,cancelable:true}));document.body.dispatchEvent(new KeyboardEvent('keydown',{code:'Escape',repeat:true,bubbles:true,cancelable:true}));document.body.dispatchEvent(new KeyboardEvent('keyup',{code:'Escape',bubbles:true,cancelable:true}));check('Esc 길게 눌러도 한 번만 해제',sizeClicks===held+1);press('KeyF');await wait(40);
+  window.postMessage({type:'ct-youtube-exit-theater'},location.origin);await wait(40);check('채팅 프레임이 아닌 메시지는 무시',document.querySelector('ytd-watch-flexy').hasAttribute('theater'));
+  iframe.contentWindow.chrome=window.chrome;const chatScript=iframeDocument.createElement('script');chatScript.src='/youtube-chat-layout.js';await new Promise((resolve,reject)=>{chatScript.onload=resolve;chatScript.onerror=reject;iframeDocument.head.append(chatScript)});
+  iframeDocument.querySelector('textarea').dispatchEvent(new iframe.contentWindow.KeyboardEvent('keydown',{code:'Escape',bubbles:true,cancelable:true}));await wait(50);check('채팅 iframe 입력창의 Esc도 부모 극장모드 해제 및 작성 내용 보존',!document.querySelector('ytd-watch-flexy').hasAttribute('theater')&&iframeDocument.querySelector('textarea').value==='작성 중 메시지');press('KeyF');await wait(40);
   const before=sizeClicks;press('KeyF',document.querySelector('#search'));check('검색창 F는 가로채지 않음',sizeClicks===before);
   press('KeyF',document.body,{repeat:true});await wait(40);check('길게 눌러도 극장 모드를 반복 전환하지 않음',sizeClicks===before);
   press('KeyT');await wait(70);check('T는 클릭 가로채기를 우회해 실제 전체화면',fullClicks===1&&fullscreenRequests===1&&fullscreenElement&&!document.body.classList.contains('ct-yt-wide'));

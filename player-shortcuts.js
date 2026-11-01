@@ -2,7 +2,7 @@
   if (globalThis.__chzzkPlayerShortcuts) return;
   globalThis.__chzzkPlayerShortcuts = true;
   const lifetime = new AbortController(), pending = new Map(), timers = new Set();
-  let enabled = true, stopped = false, theaterKeyOwned = false;
+  let enabled = true, stopped = false, theaterKeyOwned = false, escapeKeyOwned = false;
   const spaceStatus = { down: 0, up: 0, last: 'waiting' };
   const editable = event => event.composedPath().some(node => node.isContentEditable ||
     node.matches?.("input,textarea,select,[contenteditable]:not([contenteditable='false']),[role='textbox']"));
@@ -77,7 +77,22 @@
       volume: video?.volume, playMode: soopPlayMode(root), timeShiftMode: soopTimeShiftMode(root), url: location.href } };
   }
   const candidate = action => inspect(action).state;
-  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.11', enabled: enabled && !stopped,
+  function exitTheater() {
+    if (document.fullscreenElement) return false;
+    for (const root of document.querySelectorAll('.pzp,#webplayer')) {
+      const button = control(root, 'theater');
+      if (!button) continue;
+      let wide = root.id === 'webplayer' && document.body.classList.contains('screen_mode');
+      if (root.id !== 'webplayer') {
+        for (let node = root; node && node !== document.body; node = node.parentElement) {
+          if (/(?:^|\s)_is_large_/.test(node.className)) { wide = true; break; }
+        }
+      }
+      if (wide) { button.click(); return true; }
+    }
+    return false;
+  }
+  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.12', enabled: enabled && !stopped,
     current: inspect('play').reason, ...spaceStatus });
   function unchanged(state) {
     return state.action === 'mute' ? state.video.muted === state.muted && state.video.volume === state.volume
@@ -87,9 +102,17 @@
   function onKeydown(event) {
     const space = event.code === 'Space';
     if (event.code === 'KeyF' && !event.repeat) theaterKeyOwned = false;
+    if (event.code === 'Escape' && !event.repeat) escapeKeyOwned = false;
     if (space) spaceStatus.down++;
     if (!enabled || !connected()) { if (space) spaceStatus.last = 'disabled'; return; }
     if (modified(event)) { if (space) spaceStatus.last = 'modifier'; return; }
+    if (event.code === 'Escape') {
+      // Escape exits from chat/search/control focus too; it must never enter theater.
+      if ((escapeKeyOwned && event.repeat) || (!event.repeat && exitTheater())) {
+        escapeKeyOwned = true; event.preventDefault(); event.stopImmediatePropagation();
+      }
+      return;
+    }
     if (event.code === 'F11') {
       // SOOP cancels every key on its video/control surface. Keep the browser default,
       // including when chat has focus; requestFullscreen() would be a different mode.
@@ -121,6 +144,9 @@
   }
   function onKeyup(event) {
     if (event.code === 'Space') spaceStatus.up++;
+    if (event.code === 'Escape' && escapeKeyOwned && connected()) {
+      escapeKeyOwned = false; event.preventDefault(); event.stopImmediatePropagation(); return;
+    }
     if (event.code === 'KeyF' && theaterKeyOwned && connected()) {
       theaterKeyOwned = false; event.preventDefault(); event.stopImmediatePropagation(); return;
     }
