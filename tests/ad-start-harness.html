@@ -1,0 +1,44 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>광고 시작 음소거 시점 검사</title>
+<body data-result="pending"><div class="pzp"><video class="webplayer-internal-video" style="width:640px;height:360px"></video></div><pre id="result"></pre>
+<script>
+history.replaceState(null,'','/video/123');
+const timers=[],listeners=[],features={catchUp:false,adMute:true,adSpeed:1,mainAudio:true},results=[];
+window.setInterval=fn=>{timers.push(fn);return timers.length};
+window.chrome={storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+const stage=document.querySelector('.pzp'),main=document.querySelector('video');
+Object.defineProperties(main,{paused:{get:()=>true},readyState:{get:()=>4}});main.volume=.4;
+const check=(name,value)=>results.push({name,passed:!!value}),settle=()=>new Promise(resolve=>setTimeout(resolve,0));
+const tick=()=>timers.forEach(fn=>fn());
+</script><script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js"></script><script>
+(async()=>{
+ await settle();tick();
+ for(const detached of [false,true]){
+  const wrapper=document.createElement('div');wrapper.className='webplayer-internal-core-ad-ui';stage.append(wrapper);if(detached)wrapper.remove();await settle();
+  const ad=document.createElement('video'),probe=document.createElement('video');ad.dataset.role='videoEl';probe.title='Advertisement';
+  let source='',ready=0,ended=false;
+  Object.defineProperties(ad,{currentSrc:{get:()=>source},readyState:{get:()=>ready},ended:{get:()=>ended}});
+  wrapper.append(probe,ad);stage.classList.add('pzp-pc--adbreak');await settle();
+  const mode=detached?'detached':'connected';
+  check(mode+': 빈 probe만으로 광고 활성 판정하지 않음',!ChzzkAdDom.wrappers(true).includes(wrapper)&&!probe.muted&&!ad.muted);
+  stage.classList.remove('pzp-pc--adbreak');ad.setAttribute('src','https://example.com/ad.mp4');await settle();
+  check(mode+': adbreak 표시 전에도 실제 광고 소스는 미리 음소거',ad.muted&&!ChzzkAdDom.wrappers(true).includes(wrapper));
+  stage.classList.add('pzp-pc--adbreak');await settle();
+  check(mode+': currentSrc와 데이터가 준비되기 전에 음소거',ad.muted&&ready===0&&source==='');
+  check(mode+': 준비 상태를 재생 가능한 광고로 오판하지 않음',!ChzzkAdDom.wrappers().includes(wrapper));
+  source='https://example.com/ad.mp4';let mutedAtFirstPlay=false;
+  ad.addEventListener('play',()=>{mutedAtFirstPlay=ad.muted},{once:true});ad.dispatchEvent(new Event('play'));
+  check(mode+': 첫 play 핸들러에 도착할 때 이미 음소거',mutedAtFirstPlay);
+  ready=4;ad.dispatchEvent(new Event('loadeddata'));await settle();
+  check(mode+': 본편 음량과 probe 속성 유지',!main.muted&&main.volume===.4&&!probe.muted);
+  ad.muted=false;ad.dispatchEvent(new Event('volumechange'));check(mode+': SDK가 다시 소리를 켜도 이벤트에서 즉시 음소거',ad.muted);
+  ended=true;stage.classList.remove('pzp-pc--adbreak');await settle();tick();
+  check(mode+': 종료 후 원래 광고 음소거 값 복원',!ad.muted&&!main.muted&&main.volume===.4);
+  wrapper.remove();
+ }
+ const wrapper=document.createElement('div');wrapper.id='preAdPlayerWrapper';wrapper.innerHTML='<div id="preAdVideoContainer"><video></video></div>';stage.append(wrapper);await settle();
+ const ad=wrapper.querySelector('video');check('기존 pre-roll도 첫 데이터 전에 음소거',ad.muted);
+ listeners.forEach(fn=>fn({features:{newValue:{...features,adMute:false}}},'local'));await settle();check('설정 해제 시 광고 음소거 즉시 복원',!ad.muted);
+ ad.dispatchEvent(new Event('play'));check('설정 꺼짐이면 재생 이벤트에서도 음소거하지 않음',!ad.muted);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(row=>row.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>

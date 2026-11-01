@@ -144,7 +144,8 @@
     .chzzk-tools-ad-visible {display:block!important;visibility:visible!important;opacity:1!important;}
     .webplayer-internal-core-ad-ui.chzzk-tools-ad-visible {inset:0!important;width:100%!important;height:100%!important;z-index:100!important;}
   `;
-  document.documentElement.append(style);
+  if (document.documentElement) document.documentElement.append(style);
+  else document.addEventListener('DOMContentLoaded', () => document.documentElement.append(style), { once: true });
 
   function announce(text) {
     const detail = { text };
@@ -229,7 +230,7 @@
     bind(main || null);
     clearAdLayout();
     const adVideos = ads.videos;
-    const visibleAdWrappers = ads.wrappers();
+    const visibleAdWrappers = ads.wrappers(true);
     const pendingAdWrappers = visibleAdWrappers.filter(wrapper => {
       const videos = adVideos(wrapper); return !videos.length || videos.some(video => !video.ended);
     });
@@ -242,12 +243,11 @@
       beforeAdAudio = lastNormal ? { ...lastNormal } : main ? { muted: main.muted, volume: main.volume } : null;
       userChangedAdAudio = false; restoreRate(); adActive = true;
     }
+    // Mute during preparation, before readyState reaches HAVE_CURRENT_DATA.
+    if (settings.adMute) for (const video of ads.audioVideos?.() || observedAds) patch(video, "muted", true);
     if (pendingAdWrappers.length && !wrappers.length) { announce(["광고 준비 중", ...new Set(speedNotes)].join(" · ")); return; }
     if (wrappers.length) {
       for (const wrapper of wrappers) {
-        for (const video of adVideos(wrapper)) {
-          if (settings.adMute) patch(video, "muted", true);
-        }
         if (ads.sdk(wrapper) && wrapper.isConnected) {
           // Reveal only the path of an actual SDK ad; keep its native controls intact.
           for (const video of adVideos(wrapper).filter(video => video.currentSrc && !video.ended && video.readyState >= 2)) {
@@ -303,12 +303,13 @@
     status = plan.reason + (Number.isFinite(plan.gap) ? ` · 최신 버퍼까지 ${plan.gap.toFixed(1)}초` : "");
     announce(status);
   }
-  chrome.storage.local.get("features").then(data => { settings = core.features(data.features); });
+  chrome.storage.local.get("features").then(data => { settings = core.features(data.features); refreshAds(); });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.features) return;
     restorePatches(); restoreRate();
     settings = core.features(changes.features.newValue);
     if (!settings.adMute) audioRecovery = null;
+    refreshAds();
   });
   document.addEventListener("chzzk-tools:catch-up", () => {
     heldUntil = 0; cooldown = 0; lastSeek = -Infinity; tick(true);
@@ -318,6 +319,8 @@
     if (e.code !== "ArrowLeft" || e.target.closest?.("input,textarea,[contenteditable='true']")) return;
     restoreRate(); heldUntil = performance.now() + 30000; status = "되감기 · 30초 대기";
   }, true);
-  window.setInterval(() => { try { tick(); } catch { restoreRate(); announce("플레이어 연결 대기"); } }, 1000);
+  function refreshAds() { try { tick(); } catch { restoreRate(); announce("플레이어 연결 대기"); } }
+  document.addEventListener('chzzk-tools:ad-dom-change', refreshAds);
+  window.setInterval(refreshAds, 1000);
   window.addEventListener("pagehide", () => { audioRecovery = null; restorePatches(); restoreRate(); });
 })();
