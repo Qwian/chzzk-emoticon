@@ -215,7 +215,8 @@
     if (stopped) return;
     if (message.type === "GET_TOOL_STATUS") {
       document.dispatchEvent(new Event("chzzk-tools:quality-query"));
-      respond({ ok: true, codeVersion: "0.10.6", quality: globalThis.__chzzkQualityStatus,
+      respond({ ok: true, codeVersion: "0.10.9", quality: globalThis.__chzzkQualityStatus,
+        playerShortcuts: globalThis.__chzzkPlayerShortcutStatus?.(),
         videoHeight: bestVideo()?.videoHeight || 0 }); return;
     }
     if (message.type === "MEDIA_FRAME_AVAILABLE") {

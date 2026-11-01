@@ -102,7 +102,10 @@
         },
         tabs: {
           query: async () => [{ id: 1 }],
-          sendMessage: async (_tabId, message, options) => testParams.has("quality") && message.type === "GET_TOOL_STATUS"
+          sendMessage: async (_tabId, message, options) => testParams.has("space") && message.type === "GET_TOOL_STATUS"
+            ? { codeVersion: window.ChzzkTools.version,
+              playerShortcuts: { version: window.ChzzkTools.version, enabled: true, current: "ready", down: 1, up: 0, last: "changed" } }
+            : testParams.has("quality") && message.type === "GET_TOOL_STATUS"
             ? (document.body.dataset.qualityFrame = String(options?.frameId),
               { codeVersion: "0.7.2", quality: { enabled: true, metadataResponses: 1, repairs: 1 }, videoHeight: 1080 })
             : message.type === "SYNC_DIAGNOSTICS"

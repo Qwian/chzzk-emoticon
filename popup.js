@@ -461,6 +461,15 @@ async function initializeVersionStatus() {
       if (!q.enabled) element.textContent += " · 화질 보정 꺼짐";
       if (q.reason === "hook-unavailable") element.textContent += " · 화질 연결 실패";
     }
+    if (result?.playerShortcuts) {
+      const s = result.playerShortcuts;
+      const labels = { waiting: '입력 감지 없음', ready: '준비됨', 'no-video': '본편 영상 없음',
+        'no-control': '재생 버튼 없음', ad: '광고로 판단', modal: '모달로 판단', disabled: '꺼짐',
+        modifier: '조합키 제외', editable: '입력창 제외', button: '버튼 제외',
+        'button-sent': '재생 버튼 실행', changed: '재생 상태 변경', unchanged: '버튼 실행 후 변화 없음' };
+      element.textContent += ` · Space ${labels[s.last] || s.last} (↓${s.down}/↑${s.up})`;
+      if (s.current !== 'ready') element.textContent += ` · 현재 ${labels[s.current] || s.current}`;
+    }
   } catch { element.textContent = `확장 ${installed} · 페이지 연결 없음 (페이지 새로고침 필요)`; }
 }
 

@@ -2,12 +2,13 @@
   if (globalThis.__chzzkPlayerShortcuts) return;
   globalThis.__chzzkPlayerShortcuts = true;
   const lifetime = new AbortController(), pending = new Map(), timers = new Set();
-  let enabled = true, stopped = false;
+  let enabled = true, stopped = false, ownedSpace = false;
+  const spaceStatus = { down: 0, up: 0, last: 'waiting' };
   const editable = event => event.composedPath().some(node => node.isContentEditable ||
     node.matches?.("input,textarea,select,[contenteditable]:not([contenteditable='false']),[role='textbox']"));
   const modified = event => event.ctrlKey || event.altKey || event.metaKey || event.shiftKey;
   function clear() {
-    pending.clear(); timers.forEach(clearTimeout); timers.clear();
+    pending.clear(); ownedSpace = false; timers.forEach(clearTimeout); timers.clear();
   }
   function stop() {
     if (stopped) return;
@@ -26,7 +27,7 @@
     return [...root.querySelectorAll(selector)].find(button => button.getBoundingClientRect().width > 0 &&
       !button.matches(':disabled,[aria-disabled="true"]') && !button.closest('[hidden],[inert]'));
   }
-  function candidate(action) {
+  function inspect(action) {
     const videos = [...document.querySelectorAll('.pzp video,#webplayer video')].filter(video =>
       video.isConnected && video.readyState > 0 && !video.closest('#midAdPlayerWrapper,#preAdPlayerWrapper,.webplayer-internal-core-ad-ui,#chzzk-sidebar-preview,#cheese-follow-preview') &&
       video.getBoundingClientRect().width > 16 && video.getBoundingClientRect().height > 16);
@@ -35,37 +36,71 @@
       return area(b) - area(a);
     });
     const video = videos[0], root = video?.closest('.pzp,#webplayer');
-    if (!root || !control(root, action)) return null;
-    // Empty/data-URL autoplay probes can keep a layout box after an ad. The
-    // native ad-break state also protects preparation before a real ad is ready.
-    if (root.matches('.pzp-pc--adbreak') ||
-      [...root.querySelectorAll('#midAdVideoContainer video,#preAdVideoContainer video,.webplayer-internal-core-ad-ui video')]
-      .some(ad => !ad.ended && ad.readyState >= 2 && ad.currentSrc && !/^data:/i.test(ad.currentSrc) &&
-        ad.getBoundingClientRect().width > 0 && ad.getBoundingClientRect().height > 0) ||
-        document.querySelector('dialog[open],[role="dialog"][aria-modal="true"]')) return null;
-    return { video, root, action, paused: video.paused, muted: video.muted, volume: video.volume, url: location.href };
+    if (!root) return { reason: 'no-video' };
+    if (!control(root, action)) return { reason: 'no-control' };
+    // Native ad and modal controls keep ownership of their shortcuts.
+    if ([...root.querySelectorAll('#midAdVideoContainer video,#preAdVideoContainer video,.webplayer-internal-core-ad-ui video')]
+      .some(ad => !ad.ended && ad.getBoundingClientRect().width > 0)) return { reason: 'ad' };
+    if (document.querySelector('dialog[open],[role="dialog"][aria-modal="true"]')) return { reason: 'modal' };
+    return { reason: 'ready', state: { video, root, action, paused: video.paused, muted: video.muted, volume: video.volume, url: location.href } };
   }
+  const candidate = action => inspect(action).state;
+  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.9', enabled: enabled && !stopped,
+    current: inspect('play').reason, ...spaceStatus });
   function unchanged(state) {
     return state.action === 'mute' ? state.video.muted === state.muted && state.video.volume === state.volume
       : state.video.paused === state.paused;
   }
   function onKeydown(event) {
-    if (!enabled || !connected() || modified(event)) return;
+    const space = event.code === 'Space';
+    if (space) spaceStatus.down++;
+    if (!enabled || !connected()) { if (space) spaceStatus.last = 'disabled'; return; }
+    if (modified(event)) { if (space) spaceStatus.last = 'modifier'; return; }
     if (event.code === 'F11') {
       // SOOP cancels every key on its video/control surface. Keep the browser default,
       // including when chat has focus; requestFullscreen() would be a different mode.
       event.stopImmediatePropagation(); return;
     }
     const action = event.code === 'KeyM' ? 'mute' : event.code === 'Space' || event.code === 'KeyK' && !document.querySelector('#webplayer') ? 'play' : null;
-    if (!action || event.repeat || pending.has(event.code) || editable(event) ||
-        event.composedPath().some(node => node.matches?.('button,a,[role="button"]'))) return;
-    const state = candidate(action);
+    if (!action) return;
+    if (editable(event)) { if (space) spaceStatus.last = 'editable'; return; }
+    if (event.composedPath().some(node => node.matches?.('button,a,[role="button"]'))) {
+      if (space) spaceStatus.last = 'button'; return;
+    }
+    if (space && ownedSpace) {
+      if (event.repeat) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+      ownedSpace = false;
+    }
+    if (event.repeat || pending.has(event.code)) return;
+    const inspected = inspect(action), state = inspected.state;
+    if (space) spaceStatus.last = inspected.reason;
     if (state) {
+      if (space && state.root.id !== 'webplayer') {
+        // Own CHZZK Space on keydown. A missing/blocked keyup must not prevent it.
+        ownedSpace = true; event.preventDefault(); event.stopImmediatePropagation();
+        control(state.root, action).click();
+        spaceStatus.last = unchanged(state) ? 'button-sent' : 'changed';
+        const press = spaceStatus.down;
+        const timer = setTimeout(() => {
+          timers.delete(timer);
+          if (spaceStatus.down === press) spaceStatus.last = unchanged(state) ? 'unchanged' : 'changed';
+        }, 50);
+        timers.add(timer);
+        return;
+      }
       pending.set(event.code, state);
       if (event.code === 'Space') event.preventDefault();
     }
   }
   function onKeyup(event) {
+    if (event.code === 'Space') {
+      spaceStatus.up++;
+      if (ownedSpace) {
+        ownedSpace = false;
+        if (!modified(event) && !editable(event)) { event.preventDefault(); event.stopImmediatePropagation(); }
+        return;
+      }
+    }
     if (!enabled || !connected()) return;
     if (event.code === 'F11' && !modified(event)) { event.stopImmediatePropagation(); return; }
     const state = pending.get(event.code); pending.delete(event.code);

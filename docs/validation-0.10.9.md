@@ -1,0 +1,21 @@
+# 0.10.9 검증 기록 — 2026-11-01
+
+## 사용자 증상과 조사
+
+사용자는 0.10.8에서도 치지직 스페이스가 작동하지 않는다고 보고했다. 지침에 따라 0.10.8의 광고 판정 변경을 되돌렸다. 해당 모형·주입 조건의 통과를 사용자 증상 해결로 취급하지 않는다.
+
+웹 검색과 공개 1차 소스인 [Cheese Spanner screenShortcuts.js](https://github.com/neder2/Cheese-spanner/blob/main/features/screenShortcuts.js), [holdSpeed.js](https://github.com/neder2/Cheese-spanner/blob/main/features/holdSpeed.js)를 확인했다. 전자는 capture keydown에서 기본 버튼을 즉시 실행하고, 후자는 별도 홀드 기능 때문에 Space의 down/up을 소유한다. 사용자에게 이 확장이 설치되어 있다거나 충돌의 원인이라고 단정하지 않는다. 이번 구현은 공개 구현의 코드를 복사하지 않고 기존 단축키 처리에 즉시 실행 경로를 추가했다.
+
+## 변경
+
+- 치지직 Space는 keydown에서 기본 재생 버튼을 한 번 실행한다. keyup에 의존하지 않으며, 반복 keydown·keyup의 기본 처리를 막아 두 번 전환하지 않는다. 누락된 keyup 뒤 새 keydown도 실행된다.
+- SOOP Space와 M·K의 기존 네이티브 우선 경로, 입력창·일반 버튼·광고·모달 제외를 유지한다.
+- 팝업 하단에 Space down/up 수신 횟수, 마지막 처리 결과, 현재 플레이어 판정을 제공한다. 내용·URL을 수집하지 않으며 디스크에 기록하지 않는다. 이 결과로 사용자 탭에서 영상·버튼 탐색 실패, 광고/모달 판단, 입력 미수신, 버튼 실행 후 변화 없음 등을 구분할 수 있다.
+- 설치 버전만 올리고 tools-core/media-speed의 표시용 버전이 0.10.6에 남았던 문제를 함께 맞췄다.
+
+## 검증과 한계
+
+- 치지직 모형 25개·SOOP 모형 21개·팝업 기본 검사 통과. 키 해제 누락, 다음 키 복구, 반복 중복 방지, 상태 응답 검사를 포함한다.
+- 루트 JavaScript 문법 검사·manifest JSON 파싱·Node 검사 29개 통과.
+- 공개 다시보기 `https://chzzk.naver.com/video/15964028`에서 본편 재생·광고 종료 후 네이티브 키 처리를 차단해 비교했다. 0.10.8 단축키는 keydown 이후에도 paused=false였다가 keyup 이후 true로 바뀌었다. 0.10.9는 keydown 이후 true이고 keyup 이후에도 true로 한 번만 정지했다. 실제 확장의 상태 응답에서도 down=1/up=0/last=changed를 확인했다. 이 조건은 검사 코드로 넣은 것이며 사용자 환경의 키 해제 누락을 입증하지는 않는다.
+- 사용자 웨일 창 조회는 도구의 창 소유자 검증 오류로 실패했다. 실제 로그인 채팅을 입력하거나 전송하지 않았다. 사용자 환경의 최종 원인은 아직 확정하지 않았다.
