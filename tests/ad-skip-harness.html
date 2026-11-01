@@ -12,7 +12,7 @@ let hits=0,otherHits=0,ready=4,ended=false,source='ad1';
 const button=document.querySelector('[data-role="skipBtn"]'),video=document.querySelector('video'),wrapper=document.querySelector('#midAdPlayerWrapper');
 Object.defineProperties(video,{readyState:{get:()=>ready},ended:{get:()=>ended},currentSrc:{get:()=>source}});
 button.onclick=()=>hits++;document.querySelector('#other').onclick=()=>otherHits++;
-</script><script src="/tools-core.js"></script><script src="/ad-skip.js"></script><script>
+</script><script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/ad-skip.js"></script><script>
 (async()=>{
  const results=[],check=(name,passed)=>results.push({name,passed}),wait=()=>new Promise(r=>setTimeout(r,350));
  await wait();check('SDK의 hide 상태에서는 누르지 않음',hits===0);

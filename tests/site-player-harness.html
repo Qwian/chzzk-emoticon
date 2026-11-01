@@ -29,7 +29,7 @@
   main.muted=false;main.volume=.4;
   const delay = ms=>new Promise(resolve=>setTimeout(resolve,ms));
 </script>
-<script src="/tools-core.js"></script><script src="/player-tools.js?v=0.9.0-audio-final"></script><script src="/site-tools.js"></script><script src="/channel-data.js"></script><script src="/channel-tools.js"></script>
+<script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js?v=0.9.0-audio-final"></script><script src="/site-tools.js"></script><script src="/channel-data.js"></script><script src="/channel-tools.js"></script>
 <script>
   (async()=>{
     await delay(1200);
@@ -60,7 +60,9 @@
     now+=1000;await delay(1100);
     check('사용자가 미리 음소거한 본방을 켜지 않음',main.muted);
     history.replaceState(null,'','/video/123');now+=1000;await delay(1100);
-    check('VOD 이동 시 광고 처리와 속도 복구',ad.playbackRate===1&&!ad.muted&&!document.querySelector('.chzzk-tools-ad-mini')&&main.playbackRate===1);
+    check('VOD에서도 광고만 처리하고 본편 배속과 전체 광고 크기 유지',ad.playbackRate===4&&ad.muted&&!document.querySelector('.chzzk-tools-ad-mini')&&main.playbackRate===1);
+    document.querySelector('#midAdPlayerWrapper').style.display='none';now+=1000;await delay(1100);
+    check('다시보기 광고 종료 뒤 배속과 음소거 복원',ad.playbackRate===1&&!ad.muted);
     document.querySelector('#result').textContent=JSON.stringify(results,null,2);
     document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
   })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});

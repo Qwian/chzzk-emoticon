@@ -12,7 +12,7 @@ function prepare(video){Object.defineProperties(video,{paused:{get:()=>false},re
 const tick=(ms=1000)=>{now+=ms;timers.forEach(fn=>fn());document.querySelector('#audio').textContent=`muted=${main.muted}, volume=${main.volume}`};
 const start=()=>{wrapper.style.display='block';tick()},skip=()=>{wrapper.style.display='none';tick()};
 document.querySelector('#start').onclick=start;document.querySelector('#skip').onclick=skip;document.querySelector('#user-mute').onclick=()=>{main.muted=true;tick()};document.querySelector('#late').onclick=()=>{main.muted=true;main.volume=0;tick()};document.querySelector('#clock').onclick=()=>tick();
-</script><script src="/tools-core.js?v=0.9.0"></script><script src="/player-tools.js?v=0.9.0-audio-final"></script><script>
+</script><script src="/tools-core.js?v=0.9.0"></script><script src="/ad-dom.js"></script><script src="/player-tools.js?v=0.9.0-audio-final"></script><script>
 (async()=>{await Promise.resolve();const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});tick();
  if(preview){document.body.dataset.result='preview';return}
  start();skip();main.muted=true;main.volume=0;tick(400);check('Skip 뒤 지연된 SDK 음소거와 0 음량 복원',!main.muted&&main.volume===.4);

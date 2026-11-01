@@ -12,8 +12,8 @@
   }
   function tick() {
     if (!settings.adAutoSkip || !/^\/(?:live\/[a-f0-9]{32}|video\/\d+)\/?$/i.test(location.pathname)) return;
-    for (const wrapper of document.querySelectorAll("#midAdPlayerWrapper, #preAdPlayerWrapper")) {
-      const video = wrapper.querySelector("#midAdVideoContainer video, #preAdVideoContainer video");
+    for (const wrapper of ChzzkAdDom.wrappers()) {
+      const video = ChzzkAdDom.videos(wrapper).find(video => !video.ended && video.readyState >= 2);
       const buttons = wrapper.querySelectorAll('button[data-role="skipBtn"], button[aria-label="광고 SKIP"]');
       for (const button of buttons) {
         if (!video || video.ended || video.readyState < 2 || !visible(button) ||

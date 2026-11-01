@@ -36,6 +36,17 @@
   }
   key('KeyQ'); key('KeyQ',true);
   check('길게 누르기 중복 삽입 없음', shortcuts === 1);
+  key('KeyQ');
+  check('repeat가 빠진 같은 물리 키의 중복 keydown도 한 번만 입력', shortcuts === 1);
+  editor.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyQ',bubbles:true}));
+  key('KeyQ');
+  editor.replaceChildren();
+  editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'deleteContentBackward'}));
+  editor.append('ㅂ');
+  editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertCompositionText',data:'ㅂ',isComposing:true}));
+  check('삭제 후 늦은 IME 이벤트가 삭제한 문장·이모티콘·한글을 복원하지 않음', editor.textContent==='' && !editor.querySelector('img'));
+  editor.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyQ',bubbles:true}));
+  editor.textContent='남아 있으면 안 되는 모의 문장';endCaret();key('KeyQ');
   // The mock site's Enter handler clears the draft, just as a successful site send would.
   // No network/socket or real chat service exists in this harness.
   const enter = key('Enter');
@@ -43,6 +54,17 @@
   editor.append('ㅂ');
   editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertCompositionText',data:'ㅂ',isComposing:true}));
   check('Enter 뒤 늦은 IME 이벤트가 이전 문장을 복원하지 않음', !enter.defaultPrevented && !editor.textContent.includes('모의 문장') && editor.querySelectorAll('img').length === 0);
+  editor.replaceChildren();endCaret();window.__workingChat='{:native:}'.repeat(10);
+  check('네이티브 작성 상태가 DOM보다 먼저 갱신돼도 11번째 입력 차단', insert()?.ok===false && !editor.querySelector('img'));
+  window.__workingChat='{:native:}'.repeat(11);
+  const blocked=key('Enter');
+  check('이미 초과한 네이티브 작성 상태도 전송 전에 차단',blocked.defaultPrevented);
+  const button=document.createElement('button');button.id='send_chat_or_donate';document.querySelector('#aside-chatting').append(button);
+  const click=new MouseEvent('click',{bubbles:true,cancelable:true});button.dispatchEvent(click);
+  check('전송 버튼도 초과 메시지 전송 전에 차단',click.defaultPrevented);
+  const keypress=new KeyboardEvent('keypress',{key:'Enter',bubbles:true,cancelable:true});editor.dispatchEvent(keypress);
+  check('사이트의 네이티브 Enter keypress 경로도 제한',keypress.defaultPrevented);
+  window.__workingChat='';
   document.body.dataset.result = results.every(r=>r.passed)?'pass':'fail';
   document.querySelector('#result').textContent = JSON.stringify(results,null,2);
 </script></body></html>

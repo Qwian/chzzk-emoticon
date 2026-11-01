@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "치지직 Caps Lock 이모티콘",
   "description": "치지직 검색·채팅·광고 도구, 치지직·숲 자유 배치 채팅, 유튜브·넥슨 라이브 큰 영상과 옆 채팅, 모든 사이트 영상 속도·프레임 이동을 지원합니다.",
-  "version": "0.9.5",
+  "version": "0.10.0",
   "background": { "service_worker": "media-background.js" },
   "icons": {
     "16": "icons/icon16.png",
@@ -33,7 +33,7 @@
     },
     {
       "matches": ["https://chzzk.naver.com/*"],
-      "js": ["tools-core.js", "content.js", "player-tools.js", "ad-skip.js", "site-tools.js", "channel-data.js", "channel-tools.js", "chzzk-quality.js", "vendor/hls.min.js", "list-preview.js", "free-chat.js"],
+      "js": ["tools-core.js", "content.js", "ad-dom.js", "player-tools.js", "ad-skip.js", "site-tools.js", "channel-data.js", "channel-tools.js", "chzzk-quality.js", "vendor/hls.min.js", "list-preview.js", "free-chat.js"],
       "run_at": "document_idle"
     },
     {
@@ -56,6 +56,12 @@
       "matches": ["https://www.youtube.com/*"],
       "js": ["layout-runtime.js", "youtube-layout.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.youtube.com/live_chat*"],
+      "js": ["youtube-chat-layout.js"],
+      "run_at": "document_idle",
+      "all_frames": true
     },
     {
       "matches": ["https://live.nexon.com/*"],

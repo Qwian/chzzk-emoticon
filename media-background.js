@@ -1,5 +1,4 @@
 const mediaTabs = new Map();
-let speedQueue = Promise.resolve();
 function tabState(id) {
   if (!mediaTabs.has(id)) mediaTabs.set(id, { rate: null, resumeRate: null, frames: new Map(), badgeQueue: Promise.resolve(), badgeText: null });
   return mediaTabs.get(id);
@@ -31,6 +30,10 @@ chrome.tabs.onUpdated.addListener((id, change) => {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (!Number.isInteger(sender.tab?.id) || sender.id !== chrome.runtime.id) return;
   const tabId = sender.tab.id, state = tabState(tabId);
+  if (message.type === "MEDIA_SPEED_NOTICE" && typeof message.text === "string") {
+    chrome.tabs.sendMessage(tabId, { type: "MEDIA_SPEED_NOTICE", text: message.text.slice(0, 100) }, { frameId: 0 }).catch(() => {});
+    respond({ ok: true }); return;
+  }
   if (message.type === "MEDIA_FRAME_REPORT") {
     if (sender.frameId === 0 && message.hasIframes === false) {
       for (const id of state.frames.keys()) if (id !== 0) state.frames.delete(id);
@@ -42,11 +45,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     for (const [id, info] of state.frames) if (Date.now() - info.time > 15000) state.frames.delete(id);
     if (message.enabled === false) state.rate = null;
     updateBadge(tabId, state);
-    chrome.tabs.sendMessage(tabId, { type: "MEDIA_FRAME_AVAILABLE", available: [...state.frames.values()].some(info => info.score > 0) }).catch(() => {});
+    chrome.tabs.sendMessage(tabId, { type: "MEDIA_FRAME_AVAILABLE", available: [...state.frames.values()].some(info => info.score > 0), rate: primaryFrame(state)?.rate }).catch(() => {});
     respond({ rate: state.rate }); return;
   }
   if (message.type !== "MEDIA_SPEED_COMMAND") return;
-  speedQueue = speedQueue.catch(() => {}).then(async () => {
+  const command = async () => {
     if (message.action === "step") {
       let frameId = sender.frameId;
       if (!message.hasVideo) {
@@ -68,9 +71,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       if (Math.abs(state.rate - 1) > 0.001) state.resumeRate = state.rate;
       else if (Math.abs(current - 1) > 0.001) state.resumeRate = current;
     }
-    await chrome.tabs.sendMessage(tabId, { type: "MEDIA_SPEED_APPLY", rate: state.rate }).catch(() => {});
+    // Compute/respond immediately. An unresponsive iframe must not queue keys or other tabs.
+    chrome.tabs.sendMessage(tabId, { type: "MEDIA_SPEED_APPLY", rate: state.rate,
+      clientId: message.clientId, commandId: message.commandId }).catch(() => {});
     return { ok: true, rate: state.rate };
-  });
-  speedQueue.then(respond, () => respond({ ok: false }));
+  };
+  command().then(respond, () => respond({ ok: false }));
   return true;
 });

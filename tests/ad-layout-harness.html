@@ -1,0 +1,23 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>광고 화면 배치와 다시보기 SDK 검사</title>
+<style>.pzp{position:relative;width:800px;height:450px;background:#123}.pzp-pc__video,.webplayer-internal-core-shadow{position:absolute;inset:0;width:100%;height:100%}.webplayer-internal-core-source-container{position:absolute;left:auto;right:12px;top:12px;width:26%;height:26%;transform:scale(.8)}.webplayer-internal-source-shadow,.webplayer-internal-source-wrapper,video{width:100%;height:100%}#midAdPlayerWrapper{position:absolute;inset:0;width:100%;height:100%}.webplayer-internal-core-ad-ui{display:none;position:absolute;inset:0;width:100%;height:100%;background:#543}.vod_player_wrap{display:none;position:relative;width:100%;height:100%}button[data-role=skipBtn]{position:absolute;right:12px;bottom:12px}</style>
+<body data-result="pending"><div class="pzp"><div class="pzp-pc__video"><div class="webplayer-internal-core-shadow"><div class="webplayer-internal-core-source-container"><div class="webplayer-internal-source-shadow"><div class="webplayer-internal-source-wrapper"><video class="webplayer-internal-video"></video></div></div></div></div></div><div id="midAdPlayerWrapper"><div id="midAdVideoContainer"><video id="live-ad"></video></div></div><div class="webplayer-internal-core-ad-ui"><div class="vod_player_wrap"><video id="sdk-ad" data-role="videoEl"></video><button data-role="skipBtn">SKIP</button></div></div></div><pre id="result"></pre>
+<script>
+history.replaceState(null,'','/live/'+'a'.repeat(32));const features={catchUp:true,adMute:true,adSpeed:1,adMini:true,adAutoSkip:true,mainAudio:true},listeners=[];
+window.chrome={storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+const main=document.querySelector('.webplayer-internal-video'),liveAd=document.querySelector('#live-ad'),sdkAd=document.querySelector('#sdk-ad'),sdk=document.querySelector('.webplayer-internal-core-ad-ui'),stage=document.querySelector('.pzp');let paused=false,ended=false,skipClicks=0;
+Object.defineProperties(main,{paused:{get:()=>paused},readyState:{get:()=>4}});for(const video of[liveAd,sdkAd])Object.defineProperties(video,{paused:{get:()=>false},ended:{get:()=>ended},readyState:{get:()=>4},currentSrc:{get:()=>video.id==='sdk-ad'?'https://example.com/sdk-ad.mp4':'https://example.com/live-ad.mp4'}});
+document.querySelector('[data-role=skipBtn]').onclick=()=>skipClicks++;
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+</script><script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js"></script><script src="/ad-skip.js"></script><script>
+(async()=>{const results=[],check=(name,passed)=>results.push({name,passed:!!passed});await wait(1200);
+check('광고 중 중간 상위 컨테이너가 작아져도 본방은 전체 크기',Math.abs(main.getBoundingClientRect().width-stage.getBoundingClientRect().width)<1&&Math.abs(main.getBoundingClientRect().height-stage.getBoundingClientRect().height)<1);
+check('별도 라이브 광고만 오른쪽 위 축소',document.querySelector('#midAdPlayerWrapper').getBoundingClientRect().width<250);
+paused=true;await wait(1100);check('본방이 멈추면 광고 축소 즉시 해제',!document.querySelector('.chzzk-tools-ad-mini'));
+document.querySelector('#midAdPlayerWrapper').style.display='none';history.replaceState(null,'','/video/123');stage.classList.add('pzp-pc--adbreak');main.playbackRate=1.75;await wait(1400);
+check('다시보기에서 소리만 나는 SDK 광고와 기본 스킵 UI 표시',sdk.getBoundingClientRect().width===800&&sdkAd.getBoundingClientRect().width===800&&getComputedStyle(sdk).display==='block'&&getComputedStyle(sdkAd.parentElement).display==='block');
+check('SDK 기본 스킵 버튼 경로 사용',skipClicks>0);
+check('다시보기 본편 배속을 자동 따라잡기가 덮어쓰지 않음',main.playbackRate===1.75);
+check('SDK 광고도 별도로 음소거',sdkAd.muted);
+stage.classList.remove('pzp-pc--adbreak');await wait(1100);check('광고 종료 후 강제 표시와 음소거 복원',!document.querySelector('.chzzk-tools-ad-visible')&&!sdkAd.muted&&getComputedStyle(sdk).display==='none');
+document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';})().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=e.stack});
+</script></body></html>

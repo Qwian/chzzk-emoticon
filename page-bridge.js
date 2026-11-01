@@ -15,6 +15,8 @@
   let extensionInputDepth = 0;
   const MAX_EMOTES = 10;
   const handledRequests = new Set();
+  const pressedCodes = new Set();
+  const LIMIT_EVENT = "chzzk-caps-emote:limit";
 
   function clearImeGuard() {
     if (!imeGuard) return;
@@ -37,7 +39,21 @@
     if (range && editor.contains(range.commonAncestorContainer)) {
       selected.append(range.cloneContents());
     }
-    return countEmotes(copy) - countEmotes(selected) + 1;
+    return Math.max(countEmotes(copy), nativeEmoteCount()) - countEmotes(selected) + 1;
+  }
+
+  function nativeEmoteCount() {
+    return typeof window.__workingChat === "string"
+      ? (window.__workingChat.match(/\{:[^{}]+:}/g) || []).length : 0;
+  }
+
+  function guardSend(event) {
+    const editor = document.querySelector("#aside-chatting [contenteditable='true']");
+    if (!editor) return;
+    clearImeGuard();
+    if (Math.max(countEmotes(editor), nativeEmoteCount()) <= MAX_EMOTES) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    document.dispatchEvent(new CustomEvent(LIMIT_EVENT));
   }
 
   function debug(type, event = null, extra = {}) {
@@ -228,7 +244,9 @@
 
   function observeInput(event) {
     const guard = imeGuard;
-    if (!guard || event.target !== guard.editor || event.inputType?.startsWith("delete")) return;
+    if (!guard || event.target !== guard.editor) return;
+    // A native edit/send may clear the draft without an Enter keydown. Never undo it.
+    if (event.inputType?.startsWith("delete")) { markImeSafePoint(guard.editor); return; }
 
     if (isGuardedImeEvent(event) || isReclassifiedImeInput(event)) {
       event.stopImmediatePropagation();
@@ -254,7 +272,19 @@
       : Math.max(0, extensionInputDepth - 1);
   }, true);
 
+  document.addEventListener("chzzk-caps-emote:check", event => {
+    const editor = document.activeElement;
+    if (!editor?.matches?.("#aside-chatting [contenteditable='true']")) return;
+    const projected = event.detail?.projected;
+    if (Number.isFinite(projected) && projected + Math.max(0, nativeEmoteCount() - countEmotes(editor)) > MAX_EMOTES) {
+      event.preventDefault();
+    }
+  }, true);
+
   window.addEventListener("keydown", (event) => {
+    if (event.code === "Enter" && event.target.closest?.("#aside-chatting [contenteditable='true']")) {
+      guardSend(event); return;
+    }
     if (imeGuard && !["ShiftLeft", "ShiftRight", "CapsLock"].includes(event.code) &&
         (!shortcutCodes.has(event.code) || !event.getModifierState("CapsLock") ||
          event.ctrlKey || event.altKey || event.metaKey)) clearImeGuard();
@@ -275,12 +305,15 @@
 
     event.preventDefault();
     event.stopImmediatePropagation();
+    const alreadyPressed = pressedCodes.has(event.code);
+    pressedCodes.add(event.code);
     armImeGuard(editor, event.code);
     debug("keydown-blocked", event, { repeat: event.repeat });
-    if (!event.repeat) dispatchShortcut(event.code, false);
+    if (!event.repeat && !alreadyPressed) dispatchShortcut(event.code, false);
   }, true);
 
   window.addEventListener("keyup", (event) => {
+    pressedCodes.delete(event.code);
     if (imeGuard?.code === event.code) {
       debug("keyup", event);
       imeGuard.expiresAt = performance.now() + 80;
@@ -290,6 +323,9 @@
 
   for (const type of ["compositionstart", "compositionupdate", "compositionend", "beforeinput"]) {
     window.addEventListener(type, (event) => {
+      if (type === "beforeinput" && event.target === imeGuard?.editor && event.inputType?.startsWith("delete")) {
+        markImeSafePoint(imeGuard.editor); return;
+      }
       if (!isGuardedImeEvent(event)) return;
       if (event.cancelable) event.preventDefault();
       event.stopImmediatePropagation();
@@ -299,7 +335,14 @@
 
   window.addEventListener("input", observeInput, true);
   window.addEventListener("pointerdown", clearImeGuard, true);
-  window.addEventListener("blur", clearImeGuard, true);
+  window.addEventListener("blur", () => { pressedCodes.clear(); clearImeGuard(); }, true);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { pressedCodes.clear(); clearImeGuard(); } });
+  window.addEventListener("keypress", event => {
+    if (event.key === "Enter" && event.target.closest?.("#aside-chatting [contenteditable='true']")) guardSend(event);
+  }, true);
+  window.addEventListener("click", event => {
+    if (event.target.closest?.("#send_chat_or_donate")) guardSend(event);
+  }, true);
 
   document.addEventListener(INSERT_EVENT, (event) => {
     const { requestId, code, imageUrl } = event.detail || {};

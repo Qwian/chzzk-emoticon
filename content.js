@@ -30,6 +30,9 @@
   const DEBUG_EVENT = "chzzk-caps-emote:debug";
   const EXTENSION_INPUT_EVENT = "chzzk-caps-emote:extension-input";
   const EMOTE_CODE_PATTERN = /^\{:[^{}]+:}$/;
+  document.addEventListener("chzzk-caps-emote:limit", () => {
+    showToast("이모티콘은 한 메시지에 최대 10개까지 입력할 수 있습니다.", "error");
+  });
 
   const CHAT_INPUT_SELECTORS = [
     "#aside-chatting pre[contenteditable='true']",
@@ -172,12 +175,26 @@
     } else {
       const selection = window.getSelection();
       const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-      const selected = document.createElement("div");
-      if (range && input.contains(range.commonAncestorContainer)) selected.append(range.cloneContents());
-      projected = input.querySelectorAll("img").length + count(input.textContent) -
-        selected.querySelectorAll("img").length - count(selected.textContent) + count(text);
+      const copy = input.cloneNode(true);
+      if (range && input.contains(range.commonAncestorContainer)) {
+        const corresponding = node => {
+          const path = [];
+          for (let current = node; current !== input; current = current.parentNode) {
+            path.unshift([...current.parentNode.childNodes].indexOf(current));
+          }
+          return path.reduce((current, index) => current.childNodes[index], copy);
+        };
+        const replacement = document.createRange();
+        replacement.setStart(corresponding(range.startContainer), range.startOffset);
+        replacement.setEnd(corresponding(range.endContainer), range.endOffset);
+        replacement.deleteContents(); replacement.insertNode(document.createTextNode(text));
+      } else copy.append(text);
+      // Count the complete resulting text, including codes joined across the caret.
+      projected = copy.querySelectorAll("img").length + count(copy.textContent);
     }
-    if (projected > 10) {
+    const validation = new CustomEvent("chzzk-caps-emote:check", { cancelable: true, detail: { projected } });
+    document.dispatchEvent(validation);
+    if (projected > 10 || validation.defaultPrevented) {
       showToast("이모티콘은 한 메시지에 최대 10개까지 입력할 수 있습니다.", "error");
       return;
     }

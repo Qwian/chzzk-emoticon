@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const source = readFileSync(path.join(__dirname, "../media-background.js"), "utf8");
 function background() {
   const events = {}, badges = new Map(), titles = new Map(), calls = [];
-  let now = 100000, reject = false;
+  let now = 100000, reject = false, stalled = false;
   const chrome = {
     runtime: { id: "extension", onMessage: { addListener: fn => { events.message = fn; } } },
     action: Object.fromEntries(["setBadgeBackgroundColor", "setBadgeTextColor", "setBadgeText", "setTitle"].map(method => [method, async details => {
@@ -15,7 +15,10 @@ function background() {
       if (method === "setBadgeText") badges.set(details.tabId, details.text);
       if (method === "setTitle") titles.set(details.tabId, details.title);
     }])),
-    tabs: { onRemoved: { addListener: fn => { events.remove = fn; } }, onUpdated: { addListener: fn => { events.update = fn; } }, sendMessage: async () => ({ ok: true }) }
+    tabs: { onRemoved: { addListener: fn => { events.remove = fn; } }, onUpdated: { addListener: fn => { events.update = fn; } }, sendMessage: async (_tab, message) => {
+      if (stalled && message.type === "MEDIA_SPEED_APPLY") return new Promise(() => {});
+      return { ok: true };
+    } }
   };
   vm.runInNewContext(source, { chrome, Date: { now: () => now } });
   const flush = async () => { await new Promise(setImmediate); };
@@ -25,7 +28,7 @@ function background() {
     await flush(); return result;
   };
   const report = (rate, tabId = 1, frameId = 0, score = 100) => message({ type: "MEDIA_FRAME_REPORT", rate, score, mediaScore: score }, tabId, frameId);
-  return { events, badges, titles, calls, message, report, flush, advance: ms => { now += ms; }, reject: value => { reject = value; } };
+  return { events, badges, titles, calls, message, report, flush, advance: ms => { now += ms; }, reject: value => { reject = value; }, stall: () => { stalled = true; } };
 }
 test("badge shows actual native and automatic catch-up speeds, including normal speed", async () => {
   const b = background();
@@ -116,4 +119,12 @@ test("a top-frame slash remembers the observed iframe speed without rounding nat
   const message = { type: "MEDIA_SPEED_COMMAND", action: "reset", hasMedia: false, currentRate: 1 };
   assert.equal((await b.message(message)).rate, 1);
   assert.equal((await b.message(message)).rate, 1.75);
+});
+
+test("unresponsive media delivery never queues speed commands or another tab", async () => {
+  const b = background(); b.stall();
+  const command = (tab = 1) => b.message({ type: "MEDIA_SPEED_COMMAND", action: "increase", hasMedia: false }, tab);
+  assert.equal((await command())?.rate, 1.1);
+  assert.equal((await command())?.rate, 1.2);
+  assert.equal((await command(2))?.rate, 1.1);
 });

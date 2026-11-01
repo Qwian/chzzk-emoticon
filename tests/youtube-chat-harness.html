@@ -1,0 +1,9 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>좁은 유튜브 채팅 검사</title><body data-result="pending"><iframe title="좁은 채팅" style="width:96px;height:500px" src="/tests/youtube-chat-fixture.html"></iframe><pre id="result"></pre>
+<script>
+document.querySelector('iframe').addEventListener('load',()=>setTimeout(()=>{const frame=document.querySelector('iframe'),doc=frame.contentDocument,results=[],check=(name,passed)=>results.push({name,passed:!!passed});
+const chat=doc.querySelector('yt-live-chat-renderer'),message=doc.querySelector('#message'),content=doc.querySelector('#content');
+check('96px iframe 내부 최소 폭 해제',chat.getBoundingClientRect().width<=96&&doc.documentElement.scrollWidth<=96);
+check('긴 메시지도 iframe 밖으로 잘리지 않고 줄바꿈',message.getBoundingClientRect().right<=96&&content.scrollWidth<=96&&message.getBoundingClientRect().height>30);
+doc.querySelector('textarea').value='작성 중';doc.querySelector('button').click();check('기능 해제 시 기본 폭과 입력 보존',chat.getBoundingClientRect().width>=300&&doc.querySelector('textarea').value==='작성 중');
+document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';},100));
+</script></body></html>

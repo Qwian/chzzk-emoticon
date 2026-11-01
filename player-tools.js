@@ -2,6 +2,7 @@
   if (globalThis.__chzzkPlayerTools) return;
   globalThis.__chzzkPlayerTools = true;
   const core = globalThis.ChzzkTools;
+  const ads = globalThis.ChzzkAdDom;
   let settings = core.features();
   let activeMain = null, lastUrl = "", lastNormal = null, adActive = false;
   let margin = 1.5, lastSeek = -Infinity, cooldown = 0, stableSince = performance.now();
@@ -14,7 +15,7 @@
   let status = "플레이어 대기";
 
   function markAdMute(video, value) {
-    if (video.matches?.("#midAdVideoContainer video, #preAdVideoContainer video")) {
+    if (video.matches?.("#midAdVideoContainer video, #preAdVideoContainer video, .webplayer-internal-core-ad-ui video")) {
       localAdMute.set(video, { value, until: performance.now() + 1500 });
     }
   }
@@ -63,8 +64,11 @@
       }
     }
     patches.clear();
-    document.querySelectorAll(".chzzk-tools-ad-mini, .chzzk-tools-main-full").forEach(el =>
-      el.classList.remove("chzzk-tools-ad-mini", "chzzk-tools-main-full"));
+    clearAdLayout();
+  }
+  function clearAdLayout() {
+    document.querySelectorAll(".chzzk-tools-ad-mini,.chzzk-tools-main-full,.chzzk-tools-ad-visible").forEach(el =>
+      el.classList.remove("chzzk-tools-ad-mini", "chzzk-tools-main-full", "chzzk-tools-ad-visible"));
   }
   function restoreRate() {
     if (activeMain && ownedRate !== null && activeMain.playbackRate === ownedRate) activeMain.playbackRate = 1;
@@ -133,7 +137,10 @@
     .chzzk-tools-ad-mini {position:absolute!important;inset:12px 12px auto auto!important;
       width:26%!important;height:auto!important;aspect-ratio:16/9!important;z-index:50!important;
       overflow:hidden!important;box-shadow:0 0 0 1px #9998!important;}
-    .chzzk-tools-main-full {position:absolute!important;inset:0!important;width:100%!important;height:100%!important;}
+    .chzzk-tools-main-full {position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+      max-width:none!important;max-height:none!important;transform:none!important;visibility:visible!important;opacity:1!important;}
+    .chzzk-tools-ad-visible {display:block!important;visibility:visible!important;opacity:1!important;}
+    .webplayer-internal-core-ad-ui.chzzk-tools-ad-visible {inset:0!important;width:100%!important;height:100%!important;z-index:100!important;}
   `;
   document.documentElement.append(style);
 
@@ -207,16 +214,17 @@
       restorePatches(); restoreRate(); bind(null); lastUrl = location.href;
       adActive = false; heldUntil = 0; lastSeek = -Infinity;
     }
-    // Never accelerate VOD, clip, homepage previews, or another channel's mini-player.
-    if (!/^\/live\/[a-f0-9]{32}\/?$/i.test(location.pathname)) {
+    const live = /^\/live\/[a-f0-9]{32}\/?$/i.test(location.pathname);
+    const vod = /^\/video\/\d+\/?$/i.test(location.pathname);
+    if (!live && !vod) {
       restorePatches(); restoreRate(); bind(null); announce("라이브 페이지에서 사용"); return;
     }
     const mains = [...document.querySelectorAll("video.webplayer-internal-video")].filter(v => v.isConnected && v.getBoundingClientRect().width > 0);
     const main = mains.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0];
     bind(main || null);
-    const adVideos = wrapper => [...wrapper.querySelectorAll("#midAdVideoContainer video, #preAdVideoContainer video")];
-    const visibleAdWrappers = [...document.querySelectorAll("#midAdPlayerWrapper, #preAdPlayerWrapper")]
-      .filter(el => getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden");
+    clearAdLayout();
+    const adVideos = ads.videos;
+    const visibleAdWrappers = ads.wrappers();
     const pendingAdWrappers = visibleAdWrappers.filter(wrapper => {
       const videos = adVideos(wrapper); return !videos.length || videos.some(video => !video.ended);
     });
@@ -235,9 +243,23 @@
         for (const video of adVideos(wrapper)) {
           if (settings.adMute) patch(video, "muted", true);
         }
-        if (settings.adMini && main && !main.paused && main.readyState >= 2) {
-          wrapper.classList.add("chzzk-tools-ad-mini");
-          main.closest(".webplayer-internal-source-wrapper")?.classList.add("chzzk-tools-main-full");
+        if (ads.sdk(wrapper)) {
+          // Reveal only the path of an actual SDK ad; keep its native controls intact.
+          for (const video of adVideos(wrapper).filter(video => video.currentSrc && !video.ended && video.readyState >= 2)) {
+            for (let element = video; element && wrapper.contains(element); element = element.parentElement) {
+              element.classList.add("chzzk-tools-ad-visible");
+              if (element === wrapper) break;
+            }
+          }
+        } else if (live && settings.adMini && main && !main.paused && main.readyState >= 2) {
+          const adSurface = wrapper.contains(main) ? wrapper.querySelector('#midAdVideoContainer,#preAdVideoContainer') : wrapper;
+          adSurface?.classList.add("chzzk-tools-ad-mini");
+          // Native mini sizing can be applied above the source wrapper, too.
+          for (let element = main; element && !element.matches('.pzp'); element = element.parentElement) {
+            if (element.contains(wrapper)) break;
+            element.classList.add("chzzk-tools-main-full");
+            if (element.matches('.pzp-pc__video')) break;
+          }
         }
       }
       if (settings.mainAudio && main && beforeAdAudio && !beforeAdAudio.muted && !userChangedAdAudio) {
@@ -258,6 +280,7 @@
     if (!main) { announce("플레이어 대기"); return; }
     repairAudio();
     lastNormal = { muted: main.muted, volume: main.volume };
+    if (!live) { restoreRate(); announce("다시보기 · 광고 표시 복구 대기"); return; }
     if (!settings.catchUp) { restoreRate(); announce("자동 따라잡기 꺼짐"); return; }
     if (main.dataset.chzzkToolsManualRate) { restoreRate(); announce("수동 배속 사용 중 · 자동 따라잡기 대기"); return; }
     const now = performance.now();

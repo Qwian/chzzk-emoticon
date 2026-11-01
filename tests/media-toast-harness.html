@@ -1,0 +1,11 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>iframe 배속 표시 위치 검사</title><body data-result="pending"><iframe title="하위 영상" src="/tests/media-toast-frame.html" style="position:absolute;left:300px;top:240px;width:300px;height:200px"></iframe><pre id="result"></pre>
+<script>
+const listeners=[];window.chrome={runtime:{id:'fixture',onMessage:{addListener:fn=>listeners.push(fn)},sendMessage:async()=>({rate:null})},storage:{local:{get:async()=>({features:{globalSpeed:true}})},onChanged:{addListener:()=>{}}}};
+window.addEventListener('message',e=>{if(e.origin===location.origin&&e.data.fixture==='speed-notice')listeners.forEach(fn=>fn(e.data.message,{},()=>{}))});
+</script><script src="/media-speed.js"></script><script>
+document.querySelector('iframe').addEventListener('load',()=>setTimeout(()=>{const frame=document.querySelector('iframe');frame.contentDocument.querySelector('button').click();setTimeout(()=>{const results=[],check=(name,passed)=>results.push({name,passed:!!passed}),toast=document.querySelector('#media-speed-toast'),rect=toast?.getBoundingClientRect();
+check('iframe 키 입력도 브라우저 화면 좌상단에 배속 표시',toast?.textContent==='1.1배'&&rect.left===16&&rect.top===16);
+check('iframe 안에는 별도 배속 표시를 만들지 않음',!frame.contentDocument.querySelector('#media-speed-toast'));
+check('iframe 영상은 응답 대기 없이 즉시 조절',frame.contentDocument.querySelector('output').textContent==='1.1');
+document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';},100)},100));
+</script></body></html>

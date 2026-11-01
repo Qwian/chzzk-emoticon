@@ -1,0 +1,14 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>문자 매핑 이모티콘 제한 검사</title><body data-result="pending"><aside id="aside-chatting"><pre id="editor" contenteditable="true"></pre></aside><pre id="result"></pre>
+<script>
+const settings={enabled:true,shortcuts:[{code:'KeyQ',mapping:{type:'text',value:':}'}},{code:'KeyT',mapping:{type:'text',value:'{:extra:}'}}]};window.chrome={storage:{local:{get:async()=>({settings}),set:async()=>{}},onChanged:{addListener:()=>{}}},runtime:{onMessage:{addListener:()=>{}}}};
+const editor=document.querySelector('#editor'),end=()=>{editor.focus();const r=document.createRange();r.selectNodeContents(editor);r.collapse(false);getSelection().removeAllRanges();getSelection().addRange(r)};
+const key=code=>{const e=new KeyboardEvent('keydown',{code,bubbles:true,cancelable:true});Object.defineProperty(e,'getModifierState',{value:n=>n==='CapsLock'});editor.dispatchEvent(e);editor.dispatchEvent(new KeyboardEvent('keyup',{code,bubbles:true}))};
+const wait=()=>new Promise(r=>setTimeout(r,40));
+</script><script src="/page-bridge.js"></script><script src="/content.js"></script><script>
+(async()=>{await wait();const results=[],check=(name,passed)=>results.push({name,passed:!!passed});editor.textContent='{:native:}'.repeat(10)+'{:joined';end();key('KeyQ');await wait();check('단축키 문자열이 앞뒤 문장과 합쳐져 11개가 되면 차단',editor.textContent.endsWith('{:joined'));
+editor.textContent='{:native:}'.repeat(9);window.__workingChat='{:native:}'.repeat(10);end();key('KeyT');await wait();check('문자 매핑도 네이티브 작성 상태와 합쳐 최대 10개',editor.textContent==='{:native:}'.repeat(9));
+window.__workingChat='';editor.textContent='{:native:}'.repeat(9);end();key('KeyT');await wait();check('9개에서 10번째 문자 코드 입력 허용',(editor.textContent.match(/\{:[^{}]+:}/g)||[]).length===10);
+key('KeyT');await wait();check('10개에서 11번째 문자 코드 입력 차단',(editor.textContent.match(/\{:[^{}]+:}/g)||[]).length===10);
+const range=document.createRange();range.selectNodeContents(editor);getSelection().removeAllRanges();getSelection().addRange(range);key('KeyT');await wait();check('선택한 전체 문장 교체 허용',editor.textContent==='{:extra:}');
+document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';})().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=e.stack});
+</script></body></html>

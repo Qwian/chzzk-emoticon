@@ -3,7 +3,7 @@
 (() => {
   if (window.top !== window || globalThis.__chzzkFreeChat) return;
   globalThis.__chzzkFreeChat = true;
-  const isChzzk = location.hostname === 'chzzk.naver.com' || !!document.getElementById('aside-chatting');
+  const isChzzk = location.hostname === 'chzzk.naver.com' || !!document.querySelector('#aside-chatting,#vod-aside');
   const storageKey = isChzzk ? 'chzzkFreeChatLayout' : 'soopFreeChatLayout';
   let controller = null, enabled = false, stopped = false, saved = null, lastSaved = '';
   function failure(error) {
@@ -49,7 +49,7 @@
   } catch (error) { failure(error); }
   function createController(initial, persist) {
   'use strict';
-  const isChzzk = location.hostname === 'chzzk.naver.com' || !!document.getElementById('aside-chatting');
+  const isChzzk = location.hostname === 'chzzk.naver.com' || !!document.querySelector('#aside-chatting,#vod-aside');
   const GAP = 0;
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
   const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
@@ -130,7 +130,7 @@
     body.screen_mode #webplayer.ctfc-soop-docked :is(.chatting_box,#chatting_area,#chatbox) {
       width: 100% !important; min-width: 0 !important; max-width: none !important;
     }
-    .ctfc-chzzk-docked #aside-chatting {
+    .ctfc-chzzk-docked :is(#aside-chatting,#vod-aside) {
       width: var(--ctfc-dock-w) !important; flex: 0 0 var(--ctfc-dock-w) !important;
       min-width: 0 !important; max-width: none !important; box-sizing: border-box !important;
     }
@@ -138,8 +138,8 @@
       width: calc(100% - var(--ctfc-dock-w)) !important; flex: 1 1 0 !important;
       min-width: 0 !important; max-width: none !important;
     }
-    .ctfc-chzzk-docked #aside-chatting > div,
-    .ctfc-chzzk-active #aside-chatting > div,
+    .ctfc-chzzk-docked :is(#aside-chatting,#vod-aside) > div,
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) > div,
     body.screen_mode #webplayer.ctfc-enabled.chat_open :is(.chatting_box,#chatting_area,#chatbox) {
       min-width: 0 !important; max-width: 100% !important;
     }
@@ -196,7 +196,7 @@
     .ctfc-chzzk-active .ctfc-chzzk-main {
       width: 100% !important; max-width: none !important; min-width: 0 !important; flex: 1 1 100% !important;
     }
-    .ctfc-chzzk-active #aside-chatting {
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) {
       position: fixed !important; left: var(--ctfc-x) !important; top: var(--ctfc-y) !important;
       right: auto !important; bottom: auto !important;
       width: var(--ctfc-w) !important; height: var(--ctfc-h) !important;
@@ -207,16 +207,22 @@
       background: rgba(0,0,0,var(--ctfc-opacity)) !important;
       box-shadow: 0 0 0 1px rgba(255,255,255,.18);
     }
-    .ctfc-chzzk-active #aside-chatting > div:not(.ctfc-toolbar) { background: transparent !important; }
-    .ctfc-chzzk-active #aside-chatting h2,
-    .ctfc-chzzk-active #aside-chatting > div > [class*="_wrapper_"] > button,
-    .ctfc-chzzk-active #aside-chatting [class*="_title_"] { color: #f4f4f5 !important; }
-    .ctfc-chzzk-active #aside-chatting [role="log"] { min-height: 0 !important; }
-    .ctfc-chzzk-active #aside-chatting [role="log"] [class*="_chatting_message_"] > span {
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) > div:not(.ctfc-toolbar) { background: transparent !important; }
+    .ctfc-chzzk-active #vod-aside > [class*="_stack_"] {
+      flex: 1 1 0 !important; height: auto !important; min-height: 0 !important;
+    }
+    .ctfc-chzzk-active #vod-aside > [class*="_stack_"] > :has([role="log"]) {
+      flex: 1 1 0 !important; height: auto !important; min-height: 0 !important; max-height: none !important;
+    }
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) h2,
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) > div > [class*="_wrapper_"] > button,
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) [class*="_title_"] { color: #f4f4f5 !important; }
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) [role="log"] { min-height: 0 !important; }
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) [role="log"] [class*="_chatting_message_"] > span {
       color: #f4f4f5 !important; text-shadow: 0 1px 3px #000 !important;
     }
-    .ctfc-chzzk-active #aside-chatting [contenteditable="true"] { color: white !important; }
-    .ctfc-chzzk-active #aside-chatting [contenteditable="true"]::before { color: #c3c7d1 !important; }
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) [contenteditable="true"] { color: white !important; }
+    .ctfc-chzzk-active :is(#aside-chatting,#vod-aside) [contenteditable="true"]::before { color: #c3c7d1 !important; }
     body.screen_mode #webplayer.ctfc-enabled.chat_open .ctfc-toolbar, .ctfc-chzzk-active .ctfc-toolbar {
       display: flex !important; position: relative !important; flex: 0 0 34px !important; z-index: 2000 !important;
       align-items: center !important; gap: 6px !important; padding: 0 8px !important;
@@ -263,7 +269,7 @@
       width: auto !important; min-width: 0 !important; box-sizing: border-box !important;
       transition-property: bottom, opacity !important;
     }
-    .ctfc-chzzk-active.ctfc-controls-inset #live_player_layout .pzp-pc__bottom {
+    .ctfc-chzzk-active.ctfc-controls-inset :is(#live_player_layout,#player_layout) .pzp-pc__bottom {
       left: calc(18px + var(--ctfc-controls-left)) !important;
       right: calc(18px + var(--ctfc-controls-right)) !important;
       width: auto !important; min-width: 0 !important; box-sizing: border-box !important;
@@ -341,7 +347,7 @@
     const active = settings.enabled && (isChzzk
       ? mount.player.classList.contains('ctfc-chzzk-active')
       : document.body.classList.contains('screen_mode') && mount.player.classList.contains('chat_open'));
-    const video = mount.player.querySelector(isChzzk ? '#live_player_layout' : '#player');
+    const video = mount.player.querySelector(isChzzk ? '#live_player_layout,#player_layout' : '#player');
     if (active && rect && video) {
       const bounds = video.getBoundingClientRect();
       if (bounds.width > 0 && rect.y + rect.h > bounds.bottom - 64 && rect.y < bounds.bottom) {
@@ -358,7 +364,7 @@
   }
 
   function dockLimits() {
-    const available = mount?.player.getBoundingClientRect().width || window.innerWidth;
+    const available = (mount?.side.id === 'vod-aside' ? mount.side.parentElement : mount?.player)?.getBoundingClientRect().width || window.innerWidth;
     const maxWidth = Math.max(1, available - 1);
     return { minWidth: 1, maxWidth };
   }
@@ -386,14 +392,14 @@
     frame = 0;
     if (!mount?.side.isConnected || !mount?.player.isConnected || (isChzzk && !mount?.videoMain.isConnected)) { install(); return; }
     syncMonitor();
-    const wide = isChzzk ? /(?:^|\s)_is_large_/.test(mount.videoMain.className) : document.body.classList.contains('screen_mode');
+    const wide = isChzzk ? /(?:^|\s)_is_large_/.test(mount.videoMain.className + ' ' + mount.player.className) : document.body.classList.contains('screen_mode');
     const chatOpen = isChzzk ? !/(?:^|\s)_is_folded_/.test(mount.side.className) : mount.player.classList.contains('chat_open');
     const active = settings.enabled && wide && chatOpen;
     mount.player.classList.toggle('ctfc-enabled', settings.enabled);
     if (isChzzk) {
       mount.player.classList.toggle('ctfc-chzzk-wide', wide);
       mount.player.classList.toggle('ctfc-chzzk-active', active);
-      mount.player.classList.toggle('ctfc-chzzk-docked', !settings.enabled && chatOpen);
+      mount.player.classList.toggle('ctfc-chzzk-docked', !active && chatOpen);
     } else {
       mount.player.classList.toggle('ctfc-soop-docked', !settings.enabled && wide && chatOpen);
     }
@@ -483,10 +489,12 @@
   }
 
   function install() {
-    const side = isChzzk ? document.getElementById('aside-chatting') : document.querySelector('#webplayer_contents > .wrapping.side');
+    const side = isChzzk ? document.querySelector('#aside-chatting,#vod-aside') : document.querySelector('#webplayer_contents > .wrapping.side');
     const player = isChzzk ? side?.closest('section') : document.getElementById('webplayer');
-    const videoMain = isChzzk ? side?.parentElement.querySelector(':scope > main') : null;
-    if (!player || !side || (isChzzk ? !videoMain : !side.querySelector('#chatting_area'))) return;
+    const videoMain = isChzzk ? (side?.id === 'vod-aside'
+      ? [...side.parentElement.children].find(element => element !== side && element.querySelector('#player_layout'))
+      : side?.parentElement.querySelector(':scope > main')) : null;
+    if (!player || !side || (isChzzk ? !videoMain : !side.querySelector('#chatting_area'))) { teardownMount(); return; }
     if (mount?.side === side && mount.player === player && mount.videoMain === videoMain && mount.toolbar.isConnected) return;
     teardownMount();
     if (isChzzk) videoMain.classList.add('ctfc-chzzk-main');

@@ -1,0 +1,9 @@
+<!doctype html><html><body><video style="width:200px;height:120px"></video><button>배속 올리기</button><output></output>
+<script>
+const video=document.querySelector('video');const listeners=[];
+window.chrome={runtime:{id:'fixture',onMessage:{addListener:fn=>listeners.push(fn)},sendMessage:async message=>{
+ if(message.type==='MEDIA_SPEED_NOTICE')parent.postMessage({fixture:'speed-notice',message},location.origin);
+ if(message.type==='MEDIA_SPEED_COMMAND')return {rate:1.1};return {rate:null};
+}},storage:{local:{get:async()=>({features:{globalSpeed:true}})},onChanged:{addListener:()=>{}}}};
+document.querySelector('button').onclick=()=>{document.body.dispatchEvent(new KeyboardEvent('keydown',{code:'Period',bubbles:true,cancelable:true}));document.querySelector('output').textContent=String(video.playbackRate)};
+</script><script src="/media-speed.js"></script></body></html>
