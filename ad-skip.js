@@ -1,12 +1,12 @@
 (() => {
   const core = globalThis.ChzzkTools;
   let settings = { adAutoSkip: false }, attempts = new WeakMap();
-  function visible(element) {
-    if (!element.isConnected || !element.getClientRects().length) return false;
+  function visible(element, detachedAd) {
+    if (!detachedAd && (!element.isConnected || !element.getClientRects().length)) return false;
     for (let node = element; node; node = node.parentElement) {
-      const style = getComputedStyle(node);
+      const style = detachedAd ? node.style : getComputedStyle(node);
       if (node.hidden || node.classList.contains("hide") || style.display === "none" ||
-          style.visibility === "hidden" || style.visibility === "collapse" || Number(style.opacity) === 0) return false;
+          style.visibility === "hidden" || style.visibility === "collapse" || style.opacity === "0") return false;
     }
     return true;
   }
@@ -16,7 +16,7 @@
       const video = ChzzkAdDom.videos(wrapper).find(video => !video.ended && video.readyState >= 2);
       const buttons = wrapper.querySelectorAll('button[data-role="skipBtn"], button[aria-label="광고 SKIP"]');
       for (const button of buttons) {
-        if (!video || video.ended || video.readyState < 2 || !visible(button) ||
+        if (!video || video.ended || video.readyState < 2 || !visible(button, !wrapper.isConnected && ChzzkAdDom.sdk(wrapper)) ||
             button.matches(':disabled,[aria-disabled="true"]') || button.closest('[inert],[aria-hidden="true"]') ||
             /\d|초\s*후|후\s*(?:SKIP|건너뛰기)|countdown/i.test(button.textContent)) {
           attempts.delete(button); continue;

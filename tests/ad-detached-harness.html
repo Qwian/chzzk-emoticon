@@ -1,0 +1,59 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>AdGuard 광고 DOM 제거 회귀 검사</title>
+<body data-result="pending"><div class="pzp"><div class="webplayer-internal-core-shadow"><video class="webplayer-internal-video" style="width:640px;height:360px"></video></div></div><pre id="result"></pre>
+<script>
+const baseline = new URLSearchParams(location.search).has('baseline');
+history.replaceState(null, '', '/video/123');
+const features = {catchUp:false, adMute:true, adSpeed:4, adMini:true, mainAudio:true, adAutoSkip:true};
+const listeners = [];
+window.chrome = {storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
+</script><script src="/tools-core.js"></script>
+<script>document.write('<script src="'+(baseline?'/artifacts/ad-dom-0.10.5.js':'/ad-dom.js')+'"><\/script>');</script>
+<script>document.write('<script src="'+(baseline?'/artifacts/player-tools-0.10.5.js':'/player-tools.js')+'"><\/script>');</script>
+<script>document.write('<script src="'+(baseline?'/artifacts/ad-skip-0.10.5.js':'/ad-skip.js')+'"><\/script>');</script>
+<script>
+(async()=>{
+  const results=[], check=(name,passed)=>results.push({name,passed:!!passed});
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const stage=document.querySelector('.pzp'), parent=document.querySelector('.webplayer-internal-core-shadow'), main=document.querySelector('video');
+  Object.defineProperties(main,{paused:{get:()=>true},readyState:{get:()=>4}});
+  main.volume=.4;
+  await wait(1100);
+  const wrapper=document.createElement('div');
+  wrapper.className='webplayer-internal-core-ad-ui wpc-pos-abs';
+  parent.append(wrapper);
+  // Exact remove target in the installed AdGuard Korean filter. Both mutations
+  // happen in one task, then the real SDK initializes inside its retained node.
+  parent.querySelectorAll(':scope > .wpc-pos-abs').forEach(el=>el.remove());
+  await wait(0);
+  let ended=false, ready=4, pauses=0, clicks=0;
+  const ad=document.createElement('video'), probe=document.createElement('video');
+  ad.dataset.role='videoEl'; probe.title='Advertisement';
+  Object.defineProperties(ad,{currentSrc:{get:()=> 'https://example.com/ad.mp4'},ended:{get:()=>ended},paused:{get:()=>false},readyState:{get:()=>ready}});
+  ad.pause=()=>{pauses++};
+  ad.addEventListener('volumechange',()=>{main.muted=ad.muted});
+  const button=document.createElement('button'); button.dataset.role='skipBtn';button.className='hide';button.textContent='SKIP';button.onclick=()=>clicks++;
+  wrapper.append(probe,ad,button); stage.classList.add('pzp-pc--adbreak');
+  await wait(1200);
+  check('문서에서 제거된 뒤 생성된 광고도 추적',ChzzkAdDom.wrappers().includes(wrapper));
+  check('제거된 광고를 다시 붙이거나 표시하지 않음',!wrapper.isConnected&&!document.querySelector('.chzzk-tools-ad-visible'));
+  check('제거된 실제 광고만 음소거와 배속',ad.muted&&ad.playbackRate===4&&!probe.muted&&probe.playbackRate===1);
+  check('제거된 광고의 음소거 이벤트가 본편에 전파되지 않음',!main.muted&&main.volume===.4);
+  check('SDK가 숨긴 스킵 버튼은 누르지 않음',clicks===0);
+  button.classList.remove('hide');button.disabled=true;await wait(350);
+  check('제거된 광고의 비활성 스킵 버튼도 제외',clicks===0);
+  button.disabled=false;button.textContent='5초 후 SKIP';await wait(350);
+  check('제거된 광고의 카운트다운도 대기',clicks===0);
+  button.textContent='SKIP';await wait(350);
+  check('제거된 SDK의 활성 기본 스킵 처리',clicks===1);
+  ended=true;stage.classList.remove('pzp-pc--adbreak');await wait(1100);
+  check('종료 후 광고 속성과 본편 소리 복원',!ad.muted&&ad.playbackRate===1&&!main.muted);
+  const finishedClicks=clicks;await wait(350);check('종료한 제거 광고를 다시 스킵하지 않음',clicks===finishedClicks);
+  ended=false;stage.classList.add('pzp-pc--adbreak');await wait(1100);
+  listeners.forEach(fn=>fn({features:{newValue:{...features,adMute:false,adSpeed:1,adAutoSkip:false}}},'local'));await wait(1100);
+  check('설정 해제 시 제거된 광고도 원상 복원',!ad.muted&&ad.playbackRate===1);
+  const beforeNavigation=pauses;history.replaceState(null,'','/lives');await wait(1100);
+  check('다른 페이지 이동 시 남은 제거 광고 재생 정리',pauses===beforeNavigation+1&&!ChzzkAdDom.wrappers().includes(wrapper));
+  document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+  document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=e.stack});
+</script></body></html>

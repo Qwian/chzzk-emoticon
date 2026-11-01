@@ -16,14 +16,17 @@
 
   function markAdMute(video, value) {
     if (video.matches?.("#midAdVideoContainer video, #preAdVideoContainer video, .webplayer-internal-core-ad-ui video")) {
+      // Detached SDK ads no longer send volumechange through window.
+      if (!localAdMute.has(video)) video.addEventListener("volumechange", stopOwnedMute, true);
       localAdMute.set(video, { value, until: performance.now() + 1500 });
     }
   }
   // The ad SDK mirrors volumechange to the site's shared mute setting. Keep our ad-only change local.
-  window.addEventListener("volumechange", event => {
+  function stopOwnedMute(event) {
     const owned = localAdMute.get(event.target);
     if (owned && owned.until > performance.now() && event.target.muted === owned.value) event.stopImmediatePropagation();
-  }, true);
+  }
+  window.addEventListener("volumechange", stopOwnedMute, true);
   document.addEventListener("pointerdown", event => {
     if ((adActive || audioRecovery) && event.isTrusted && event.target.closest?.(".pzp-pc__volume-control,button[aria-label*='음소거']")) { userChangedAdAudio = true; audioRecovery = null; }
   }, true);
@@ -211,6 +214,7 @@
   function tick(force = false) {
     if (lastUrl !== location.href) {
       audioRecovery = null; beforeAdAudio = null;
+      ads.wrappers();
       restorePatches(); restoreRate(); bind(null); lastUrl = location.href;
       adActive = false; heldUntil = 0; lastSeek = -Infinity;
     }
@@ -243,7 +247,7 @@
         for (const video of adVideos(wrapper)) {
           if (settings.adMute) patch(video, "muted", true);
         }
-        if (ads.sdk(wrapper)) {
+        if (ads.sdk(wrapper) && wrapper.isConnected) {
           // Reveal only the path of an actual SDK ad; keep its native controls intact.
           for (const video of adVideos(wrapper).filter(video => video.currentSrc && !video.ended && video.readyState >= 2)) {
             for (let element = video; element && wrapper.contains(element); element = element.parentElement) {
