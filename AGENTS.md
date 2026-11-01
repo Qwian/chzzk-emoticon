@@ -35,6 +35,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/content-shortcut-harness.html` verifies dynamic shortcut dispatch.
 - `tests/popup-harness.html` verifies the icon preview and bounded scrolling UI; add `?legacy` to verify old mapping migration.
 - `tests/input-regression-harness.html` verifies limits, duplicate/repeat suppression, selection replacement and Enter/IME draft restoration.
+- `tests/send-composition-harness.html` verifies native composition-end pairing and successful-send draft reset without clearing rejected drafts.
 - `tests/site-player-harness.html` verifies search, favorites, adaptive catch-up and ad cleanup against simulated media.
 - `tests/search-suggestions-harness.html` verifies immediate channel results, merged English/Korean matches, cancellation, stale-response protection, cache and failure behavior.
 - `tests/search-native-harness.html` reproduces native Enter/button handlers and a stalled parallel response.
@@ -65,6 +66,7 @@ Do not type or send messages in a real CHZZK chat during agent verification. Rea
 - `page-bridge.js` must stay in the MAIN world because CHZZK keeps emoji ID-to-image state on the page's `window` object.
 - Mapped-key suppression must stay in the document-start MAIN-world bridge; a later isolated-world keydown handler can allow Korean IME composition input to leak through.
 - Windows Korean IME reports letter shortcuts with `KeyboardEvent.key === "Process"` and can emit non-cancelable composition input after a prevented keydown. Do not blur or toggle `contenteditable`: CHZZK may remove the editor on blur. Keep focus, stop guarded composition events in the MAIN world, and roll back only the DOM mutations made by leaked composition input.
+- If CHZZK already received a compositionstart before a shortcut, let its matching compositionend through after rollback. Otherwise its controlled editor stays composing and refuses DOM updates even after a send clears the native draft. Keep entirely guarded start/end pairs blocked.
 - Under fast repeats, Windows IME can reclassify a second leaked Korean character or U+FFFC object marker as ordinary `insertText` 2-6 ms after the blocked keydown. Guard that narrow post-keydown window, but mark extension-originated text insertion explicitly so user-configured text mappings are not rolled back.
 - Apply the six default shortcut rows only when settings are missing. An explicit `shortcuts: []` means the user deleted every row and must stay empty.
 - Do not replace physical-key `KeyboardEvent.code` mappings with layout-dependent `KeyboardEvent.key` mappings.

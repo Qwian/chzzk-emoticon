@@ -16,6 +16,7 @@
   const MAX_EMOTES = 10;
   const handledRequests = new Set();
   const pressedCodes = new Set();
+  const nativeCompositions = new WeakSet();
   const LIMIT_EVENT = "chzzk-caps-emote:limit";
 
   function clearImeGuard() {
@@ -323,6 +324,17 @@
 
   for (const type of ["compositionstart", "compositionupdate", "compositionend", "beforeinput"]) {
     window.addEventListener(type, (event) => {
+      if (type === "compositionstart" && event.target.matches?.("#aside-chatting [contenteditable='true']") && !isGuardedImeEvent(event)) {
+        nativeCompositions.add(event.target);
+      }
+      if (type === "compositionend" && nativeCompositions.delete(event.target)) {
+        // CHZZK's controlled editor ignores DOM updates while isComposing is true.
+        // End a composition it already saw, after removing guarded IME mutations.
+        // Blocking this event leaves even a successfully sent draft on screen.
+        if (isGuardedImeEvent(event)) rollbackImeMutations(event);
+        debug("native-composition-ended", event);
+        return;
+      }
       if (type === "beforeinput" && event.target === imeGuard?.editor && event.inputType?.startsWith("delete")) {
         markImeSafePoint(imeGuard.editor); return;
       }

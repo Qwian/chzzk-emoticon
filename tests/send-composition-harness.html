@@ -1,0 +1,38 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>전송 후 작성창 초기화 검사</title>
+<body data-result="pending"><aside id="aside-chatting"><pre id="editor" contenteditable="true"></pre></aside><pre id="result"></pre>
+<script>
+const settings={enabled:true,shortcuts:[{code:'KeyQ',mapping:{type:'native',code:'{:test:}',imageUrl:'https://ssl.pstatic.net/test.png'}},{code:'KeyT',mapping:{type:'text',value:'문자'}}]};
+window.chrome={storage:{local:{get:async()=>({settings}),set:async()=>{}},onChanged:{addListener:()=>{}}},runtime:{onMessage:{addListener:()=>{}}}};
+const baseline=new URLSearchParams(location.search).has('baseline');
+document.write('<script src="'+(baseline?'/artifacts/page-bridge-0.10.4.js':'/page-bridge.js')+'"><\/script>');
+</script><script src="/content.js"></script><script>
+const editor=document.querySelector('#editor'),results=[],sent=[];let composing=false,html='',lastHtml='',deny=false,ended=0;
+// CHZZK's current controlled editor suppresses DOM updates while isComposing is
+// true. Its compositionend handler resets that flag before emitting the change.
+const render=value=>{html=value;if(!composing){editor.innerHTML=value;lastHtml=value}};
+function emit(){const value=editor.innerHTML;if(value!==lastHtml){html=value;window.__workingChat=editor.textContent+(editor.querySelector('img')?'{:test:}':'')}lastHtml=value}
+editor.addEventListener('compositionstart',()=>{composing=true});
+editor.addEventListener('compositionend',()=>{composing=false;ended++;emit()});
+editor.addEventListener('input',emit);editor.addEventListener('keydown',emit);editor.addEventListener('keyup',emit);
+editor.addEventListener('keypress',event=>{if(event.key!=='Enter')return;event.preventDefault();if(deny||!window.__workingChat)return;sent.push(window.__workingChat);window.__workingChat='';render('')});
+const wait=()=>new Promise(r=>setTimeout(r,20));
+const key=(type,code)=>{const event=new KeyboardEvent(type,{code,key:code==='Enter'?'Enter':'Process',bubbles:true,cancelable:true});Object.defineProperty(event,'getModifierState',{value:()=>true});editor.dispatchEvent(event);return event};
+const end=()=>{editor.focus();const range=document.createRange();range.selectNodeContents(editor);range.collapse(false);getSelection().removeAllRanges();getSelection().addRange(range)};
+function setup(){composing=false;html=lastHtml='';window.__workingChat='';render('');end()}
+function beginKorean(){editor.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));editor.textContent='한글';editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertCompositionText',data:'한글',isComposing:true}));end()}
+function finishKorean(){editor.append('ㅂ');editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertCompositionText',data:'ㅂ',isComposing:true}));editor.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'ㅂ'}))}
+const submit=()=>{key('keydown','Enter');key('keypress','Enter');key('keyup','Enter')};
+const check=(name,passed)=>results.push({name,passed:!!passed});
+(async()=>{await wait();
+ for(const [code,label]of [['KeyQ','이모티콘'],['KeyT','문자 매핑']]){
+  setup();beginKorean();const count=sent.length;key('keydown',code);await wait();key('keyup',code);finishKorean();
+  check(label+' 뒤 기존 네이티브 조합 종료',!composing);
+  check(label+' 뒤 IME 누출 문자는 복원하지 않음',!editor.textContent.includes('ㅂ'));
+  submit();await wait();check(label+' 메시지는 한 번 전송되고 화면·작성 상태 모두 비움',sent.length===count+1&&editor.innerHTML===''&&window.__workingChat==='');
+ }
+ setup();key('keydown','KeyQ');await wait();key('keyup','KeyQ');const before=ended;editor.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));finishKorean();check('차단한 새 조합은 네이티브에 종료만 전달하지 않음',ended===before&&!composing);
+ deny=true;const draft=editor.innerHTML;submit();await wait();check('전송이 거절되면 초안 유지',editor.innerHTML===draft&&!!window.__workingChat);deny=false;
+ setup();beginKorean();editor.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'한글'}));submit();check('일반 한글 입력과 전송도 유지',editor.innerHTML===''&&!composing);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>
