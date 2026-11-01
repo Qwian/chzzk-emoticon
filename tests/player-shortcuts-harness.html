@@ -11,9 +11,9 @@ const player=document.querySelector('#player'),video=document.querySelector('vid
 if(soop){player.id='webplayer'}else{player.className='pzp';play.className='pzp-pc__playback-switch';mute.className='pzp-pc__volume-button'}
 Object.defineProperties(video,{paused:{get:()=>paused},muted:{get:()=>muted,set:v=>{muted=v}},readyState:{get:()=>4}});
 play.onclick=()=>{paused=!paused;clicks++};mute.onclick=()=>{muted=!muted;clicks++};
-const wait=()=>new Promise(r=>setTimeout(r,20));
+const wait=(ms=20)=>new Promise(r=>setTimeout(r,ms));
 const fire=(type,code,target=controls,extra={})=>{const e=new KeyboardEvent(type,{code,key:code==='KeyM'?'m':code==='Space'?' ':code,bubbles:true,cancelable:true,composed:true,...extra});target.dispatchEvent(e);return e};
-const press=async(code,target=controls,extra={})=>{const e=fire('keydown',code,target,extra);fire('keyup',code,target,extra);await wait();return e};
+const press=async(code,target=controls,extra={})=>{const e=fire('keydown',code,target,extra);fire('keyup',code,target,extra);await wait(soop&&code==='Space'?180:20);return e};
 </script><script>if(!params.has('baseline'))document.write('<script src="/player-shortcuts.js"><\/script>')</script><script>
 // SOOP LiveView's video/control handler cancels every key, including browser F11.
 controls.addEventListener('keydown',e=>e.preventDefault());controls.addEventListener('keyup',e=>e.preventDefault());

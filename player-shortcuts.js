@@ -2,7 +2,7 @@
   if (globalThis.__chzzkPlayerShortcuts) return;
   globalThis.__chzzkPlayerShortcuts = true;
   const lifetime = new AbortController(), pending = new Map(), timers = new Set();
-  let enabled = true, stopped = false;
+  let enabled = true, stopped = false, theaterKeyOwned = false;
   const spaceStatus = { down: 0, up: 0, last: 'waiting' };
   const editable = event => event.composedPath().some(node => node.isContentEditable ||
     node.matches?.("input,textarea,select,[contenteditable]:not([contenteditable='false']),[role='textbox']"));
@@ -21,11 +21,20 @@
   }
   function control(root, action) {
     const selector = root.id === 'webplayer'
-      ? action === 'mute' ? '.volume .sound' : '#time_shift_play,#play'
+      ? action === 'theater' ? 'button.btn_screen_mode' : action === 'mute' ? '.volume .sound' : '#play'
+      : action === 'theater' ? '.pzp-viewmode-button,button.pzp-pc__viewmode-button,button.pzp-pc-viewmode-button,pzp-pc-viewmode-button'
       : action === 'mute' ? '.pzp-volume-button,button.pzp-pc__volume-button'
         : '.pzp-playback-switch,button.pzp-pc__playback-switch';
     return [...root.querySelectorAll(selector)].find(button => button.getBoundingClientRect().width > 0 &&
       !button.matches(':disabled,[aria-disabled="true"]') && !button.closest('[hidden],[inert]'));
+  }
+  function soopPlayMode(root) {
+    const button = root.id === 'webplayer' ? root.querySelector('#play') : null;
+    return button?.classList.contains('play') ? 'play' : button?.classList.contains('stop') ? 'stop' : null;
+  }
+  function soopTimeShiftMode(root) {
+    const button = root.id === 'webplayer' ? root.querySelector('#time_shift_play') : null;
+    return button?.classList.contains('play') ? 'play' : button?.classList.contains('pause') ? 'pause' : null;
   }
   function visibleModal(element) {
     if (element.closest('[hidden],[inert],[aria-hidden="true"]')) return false;
@@ -47,7 +56,16 @@
       const area = video => { const rect = video.getBoundingClientRect(); return rect.width * rect.height; };
       return area(b) - area(a);
     });
-    const video = videos[0], root = video?.closest('.pzp,#webplayer');
+    const video = videos[0];
+    let root = video?.closest('.pzp,#webplayer');
+    // SOOP's native stop unloads the video. Its play button remains available.
+    if (!root && action === 'play') {
+      const soop = document.querySelector('#webplayer');
+      if (soop && soopPlayMode(soop) === 'play' && control(soop, 'play')) root = soop;
+    }
+    if (!root && action === 'theater') {
+      root = [...document.querySelectorAll('.pzp,#webplayer')].find(player => control(player, action));
+    }
     if (!root) return { reason: 'no-video' };
     if (!control(root, action)) return { reason: 'no-control' };
     // Native ad and modal controls keep ownership of their shortcuts.
@@ -55,17 +73,20 @@
       .some(ad => !ad.ended && ad.getBoundingClientRect().width > 0)) return { reason: 'ad' };
     // Sites retain hidden dialog nodes between uses. Only a displayed modal owns the keys.
     if ([...document.querySelectorAll('dialog[open],[role="dialog"][aria-modal="true"]')].some(visibleModal)) return { reason: 'modal' };
-    return { reason: 'ready', state: { video, root, action, paused: video.paused, muted: video.muted, volume: video.volume, url: location.href } };
+    return { reason: 'ready', state: { video, root, action, paused: video?.paused, muted: video?.muted,
+      volume: video?.volume, playMode: soopPlayMode(root), timeShiftMode: soopTimeShiftMode(root), url: location.href } };
   }
   const candidate = action => inspect(action).state;
-  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.10', enabled: enabled && !stopped,
+  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.11', enabled: enabled && !stopped,
     current: inspect('play').reason, ...spaceStatus });
   function unchanged(state) {
     return state.action === 'mute' ? state.video.muted === state.muted && state.video.volume === state.volume
-      : state.video.paused === state.paused;
+      : (!state.video || state.video.paused === state.paused) && soopPlayMode(state.root) === state.playMode &&
+        soopTimeShiftMode(state.root) === state.timeShiftMode;
   }
   function onKeydown(event) {
     const space = event.code === 'Space';
+    if (event.code === 'KeyF' && !event.repeat) theaterKeyOwned = false;
     if (space) spaceStatus.down++;
     if (!enabled || !connected()) { if (space) spaceStatus.last = 'disabled'; return; }
     if (modified(event)) { if (space) spaceStatus.last = 'modifier'; return; }
@@ -73,6 +94,16 @@
       // SOOP cancels every key on its video/control surface. Keep the browser default,
       // including when chat has focus; requestFullscreen() would be a different mode.
       event.stopImmediatePropagation(); return;
+    }
+    if (event.code === 'KeyF') {
+      if (editable(event) || event.isComposing) return;
+      if (theaterKeyOwned && event.repeat) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+      if (event.repeat) return;
+      const state = candidate('theater');
+      if (!state || event.composedPath().some(node => node.matches?.('button,a,[role="button"]') && !state.root.contains(node))) return;
+      // SOOP binds F to fullscreen on keyup. Own both halves of this theater key.
+      theaterKeyOwned = true; event.preventDefault(); event.stopImmediatePropagation();
+      control(state.root, 'theater').click(); return;
     }
     const action = event.code === 'KeyM' ? 'mute' : event.code === 'Space' || event.code === 'KeyK' && !document.querySelector('#webplayer') ? 'play' : null;
     if (!action) return;
@@ -90,6 +121,9 @@
   }
   function onKeyup(event) {
     if (event.code === 'Space') spaceStatus.up++;
+    if (event.code === 'KeyF' && theaterKeyOwned && connected()) {
+      theaterKeyOwned = false; event.preventDefault(); event.stopImmediatePropagation(); return;
+    }
     if (!enabled || !connected()) return;
     if (event.code === 'F11' && !modified(event)) { event.stopImmediatePropagation(); return; }
     const state = pending.get(event.code); pending.delete(event.code);
@@ -98,12 +132,14 @@
     // action before falling back, so a working native shortcut is never toggled twice.
     const timer = setTimeout(() => {
       timers.delete(timer);
-      if (!enabled || !connected() || location.href !== state.url || !state.video.isConnected ||
-          candidate(state.action)?.video !== state.video) return;
+      if (!enabled || !connected() || location.href !== state.url || !state.root.isConnected ||
+          state.video && !state.video.isConnected) return;
+      const next = candidate(state.action);
+      if (!next || (state.video ? next.video !== state.video : next.root !== state.root)) return;
       if (!unchanged(state)) { if (event.code === 'Space') spaceStatus.last = 'native'; return; }
       control(state.root, state.action)?.click();
       if (event.code === 'Space') spaceStatus.last = unchanged(state) ? 'unchanged' : 'changed';
-    }, 0);
+    }, state.root.id === 'webplayer' && state.action === 'play' ? 150 : 0);
     timers.add(timer);
   }
   function settingsChanged(changes, area) {
