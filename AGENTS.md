@@ -14,6 +14,7 @@ Run JavaScript syntax checks with the bundled Node executable:
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check popup.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check tools-core.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check player-tools.js
+& 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check player-shortcuts.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check site-tools.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check chzzk-quality.js
 & 'C:\Users\shiny\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check media-speed.js
@@ -38,6 +39,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/search-suggestions-harness.html` verifies immediate channel results, merged English/Korean matches, cancellation, stale-response protection, cache and failure behavior.
 - `tests/search-native-harness.html` reproduces native Enter/button handlers and a stalled parallel response.
 - `tests/media-speed-harness.html` runs the actual background script in a worker and verifies speed, measured-FPS stepping, iframe routing and editable-field exclusions.
+- `tests/player-shortcuts-harness.html` verifies F11 cancellation protection and native-first play/mute fallback, including IME, blocked events, typing and lifecycle; `?soop` uses native keyup handlers.
 - `tests/ad-quality-harness.html` verifies ad preparation/SDK mute isolation, post-ad audio restoration and native quality/notice controls.
 - `tests/list-preview-harness.html` verifies CHZZK HLS and SOOP native preview dispatch and cleanup using simulated playback.
 

@@ -1,0 +1,58 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>플레이어 단축키 복구 검사</title>
+<style>video{width:640px;height:360px}</style><body data-result="pending">
+<div id="player"><video class="webplayer-internal-video"></video><div id="controls" tabindex="0">
+<button id="play">재생</button><div class="volume"><button class="sound">음소거</button></div></div></div>
+<input id="search"><div id="chat" contenteditable="true">작성 중</div><button id="ordinary">일반 버튼</button>
+<pre id="result"></pre><script>
+const params=new URLSearchParams(location.search),soop=params.has('soop');
+const listeners=new Set();let live=true,native=true,blocked=false,paused=false,muted=false,clicks=0;
+window.chrome={runtime:{get id(){return live?'fixture':undefined}},storage:{local:{get:async()=>({features:{playerShortcuts:true}})},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+const player=document.querySelector('#player'),video=document.querySelector('video'),play=document.querySelector('#play'),mute=document.querySelector('.sound'),controls=document.querySelector('#controls');
+if(soop){player.id='webplayer'}else{player.className='pzp';play.className='pzp-pc__playback-switch';mute.className='pzp-pc__volume-button'}
+Object.defineProperties(video,{paused:{get:()=>paused},muted:{get:()=>muted,set:v=>{muted=v}},readyState:{get:()=>4}});
+play.onclick=()=>{paused=!paused;clicks++};mute.onclick=()=>{muted=!muted;clicks++};
+const wait=()=>new Promise(r=>setTimeout(r,20));
+const fire=(type,code,target=controls,extra={})=>{const e=new KeyboardEvent(type,{code,key:code==='KeyM'?'m':code==='Space'?' ':code,bubbles:true,cancelable:true,composed:true,...extra});target.dispatchEvent(e);return e};
+const press=async(code,target=controls,extra={})=>{const e=fire('keydown',code,target,extra);fire('keyup',code,target,extra);await wait();return e};
+</script><script>if(!params.has('baseline'))document.write('<script src="/player-shortcuts.js"><\/script>')</script><script>
+// SOOP LiveView's video/control handler cancels every key, including browser F11.
+controls.addEventListener('keydown',e=>e.preventDefault());controls.addEventListener('keyup',e=>e.preventDefault());
+for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
+ if(blocked){e.preventDefault();e.stopImmediatePropagation();return}
+ if(native&&type===(soop?'keyup':'keydown')){
+  if(e.key==='m')muted=!muted;
+  if(e.code==='Space'){e.preventDefault();paused=!paused}
+ }
+});
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed:!!passed});await wait();
+ check('F11은 플레이어의 일괄 취소를 통과',!(await press('F11')).defaultPrevented);
+ check('채팅에서도 브라우저 F11 유지',!(await press('F11',document.querySelector('#chat'))).defaultPrevented);
+ let before=paused;await press('Space');check('정상 사이트 재생 처리와 중복 실행 없음',paused!==before&&clicks===0);
+ before=muted;await press('KeyM');check('정상 사이트 음소거 처리와 중복 실행 없음',muted!==before&&clicks===0);
+ before=muted;await press('KeyM',controls,{key:'Process'});check('한글 IME Process도 물리 M 키로 복구',muted!==before);
+ native=false;blocked=true;before=paused;await press('Space');check('뒤의 리스너가 전체 키를 차단해도 재생 복구',paused!==before);
+ before=muted;await press('KeyM');check('뒤의 리스너가 전체 키를 차단해도 음소거 복구',muted!==before);
+ check('전체 키 차단 중에도 F11 유지',!(await press('F11')).defaultPrevented);
+ check('F11 keyup도 취소되지 않음',!fire('keyup','F11').defaultPrevented);
+ blocked=false;const count=clicks;
+ for(const target of [document.querySelector('#search'),document.querySelector('#chat'),document.querySelector('#ordinary')])await press('KeyM',target);
+ await press('KeyM',controls,{ctrlKey:true});await press('KeyM',controls,{shiftKey:true});
+ const shadow=document.createElement('div');document.body.append(shadow);shadow.attachShadow({mode:'open'}).innerHTML='<div contenteditable="true">그대로</div>';await press('KeyM',shadow.shadowRoot.firstChild);
+ check('입력창·채팅·버튼·수정키·shadow 편집기는 보조 처리 제외',clicks===count);
+ fire('keydown','KeyM');fire('keydown','KeyM',controls,{repeat:true});fire('keyup','KeyM');await wait();check('키 반복은 보조 동작 한 번',clicks===count+1);
+ const prior=clicks;fire('keydown','KeyM');window.dispatchEvent(new Event('blur'));fire('keyup','KeyM');await wait();check('탭 전환 후 늦은 keyup은 실행하지 않음',clicks===prior);
+ fire('keydown','KeyM');video.remove();fire('keyup','KeyM');await wait();check('영상 교체 중 이전 키는 취소',clicks===prior);player.prepend(video);
+ mute.disabled=true;await press('KeyM');check('비활성 컨트롤은 조작하지 않음',clicks===prior);mute.disabled=false;
+ const ad=document.createElement('video');ad.className='webplayer-internal-core-ad-ui';ad.style='width:300px;height:200px';player.append(ad);
+ const wrapper=document.createElement('div');wrapper.id='midAdVideoContainer';player.append(wrapper);wrapper.append(ad);await press('KeyM');check('광고 중에는 네이티브 처리만 유지',clicks===prior);
+ Object.defineProperty(ad,'ended',{get:()=>true});await press('KeyM');check('종료한 광고 DOM이 남아도 단축키 복구',clicks===prior+1);wrapper.remove();
+ const modal=document.createElement('dialog');modal.setAttribute('open','');document.body.append(modal);await press('KeyM');check('모달이 열려 있으면 보조 처리 제외',clicks===prior+1);modal.remove();
+ const afterAds=clicks;
+ listeners.forEach(fn=>fn({features:{newValue:{playerShortcuts:false}}},'local'));await press('KeyM');check('설정 끄면 보조 처리 중단',clicks===afterAds);
+ check('설정 끄면 F11 가로채기도 해제',(await press('F11')).defaultPrevented);
+ listeners.forEach(fn=>fn({features:{newValue:{playerShortcuts:true}}},'local'));await press('KeyM');check('설정 다시 켜면 복구',clicks===afterAds+1);
+ live=false;await press('KeyM');check('확장 재로드 후 이전 키 처리 정리',clicks===afterAds+1&&listeners.size===0);
+ document.querySelector('#result').textContent=JSON.stringify({platform:soop?'SOOP':'CHZZK',results},null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=e.stack});
+</script></body></html>
