@@ -35,7 +35,17 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
  before=muted;await press('KeyM');check('뒤의 리스너가 전체 키를 차단해도 음소거 복구',muted!==before);
  check('전체 키 차단 중에도 F11 유지',!(await press('F11')).defaultPrevented);
  check('F11 keyup도 취소되지 않음',!fire('keyup','F11').defaultPrevented);
- blocked=false;const count=clicks;
+ blocked=false;
+ if(!soop){
+  const slot=document.createElement('div');slot.className='webplayer-internal-core-ad-ui';
+  const probe=document.createElement('video');slot.append(probe);player.append(slot);
+  before=paused;await press('Space');check('소스 없는 광고 검사 영상이 남아도 스페이스 복구',paused!==before);
+  Object.defineProperties(probe,{readyState:{get:()=>4},currentSrc:{get:()=> 'data:video/mp4;base64,probe'}});
+  before=paused;await press('Space');check('data URL 자동재생 검사 영상은 광고로 오인하지 않음',paused!==before);
+  player.classList.add('pzp-pc--adbreak');const preparing=clicks;await press('Space');check('실제 광고 준비 상태에서는 본편 보조 조작 제외',clicks===preparing);
+  player.classList.remove('pzp-pc--adbreak');slot.remove();
+ }
+ const count=clicks;
  for(const target of [document.querySelector('#search'),document.querySelector('#chat'),document.querySelector('#ordinary')])await press('KeyM',target);
  await press('KeyM',controls,{ctrlKey:true});await press('KeyM',controls,{shiftKey:true});
  const shadow=document.createElement('div');document.body.append(shadow);shadow.attachShadow({mode:'open'}).innerHTML='<div contenteditable="true">그대로</div>';await press('KeyM',shadow.shadowRoot.firstChild);
@@ -45,6 +55,7 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,e=>{
  fire('keydown','KeyM');video.remove();fire('keyup','KeyM');await wait();check('영상 교체 중 이전 키는 취소',clicks===prior);player.prepend(video);
  mute.disabled=true;await press('KeyM');check('비활성 컨트롤은 조작하지 않음',clicks===prior);mute.disabled=false;
  const ad=document.createElement('video');ad.className='webplayer-internal-core-ad-ui';ad.style='width:300px;height:200px';player.append(ad);
+ Object.defineProperties(ad,{readyState:{get:()=>4},currentSrc:{get:()=> 'https://example.com/ad.mp4'}});
  const wrapper=document.createElement('div');wrapper.id='midAdVideoContainer';player.append(wrapper);wrapper.append(ad);await press('KeyM');check('광고 중에는 네이티브 처리만 유지',clicks===prior);
  Object.defineProperty(ad,'ended',{get:()=>true});await press('KeyM');check('종료한 광고 DOM이 남아도 단축키 복구',clicks===prior+1);wrapper.remove();
  const modal=document.createElement('dialog');modal.setAttribute('open','');document.body.append(modal);await press('KeyM');check('모달이 열려 있으면 보조 처리 제외',clicks===prior+1);modal.remove();

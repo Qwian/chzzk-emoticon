@@ -36,9 +36,12 @@
     });
     const video = videos[0], root = video?.closest('.pzp,#webplayer');
     if (!root || !control(root, action)) return null;
-    // Native ad and modal controls keep ownership of their shortcuts.
-    if ([...root.querySelectorAll('#midAdVideoContainer video,#preAdVideoContainer video,.webplayer-internal-core-ad-ui video')]
-      .some(ad => !ad.ended && ad.getBoundingClientRect().width > 0) ||
+    // Empty/data-URL autoplay probes can keep a layout box after an ad. The
+    // native ad-break state also protects preparation before a real ad is ready.
+    if (root.matches('.pzp-pc--adbreak') ||
+      [...root.querySelectorAll('#midAdVideoContainer video,#preAdVideoContainer video,.webplayer-internal-core-ad-ui video')]
+      .some(ad => !ad.ended && ad.readyState >= 2 && ad.currentSrc && !/^data:/i.test(ad.currentSrc) &&
+        ad.getBoundingClientRect().width > 0 && ad.getBoundingClientRect().height > 0) ||
         document.querySelector('dialog[open],[role="dialog"][aria-modal="true"]')) return null;
     return { video, root, action, paused: video.paused, muted: video.muted, volume: video.volume, url: location.href };
   }
