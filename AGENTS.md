@@ -47,7 +47,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/ad-quality-harness.html` verifies ad preparation/SDK mute isolation, post-ad audio restoration and native quality/notice controls.
 - `tests/ad-detached-harness.html` verifies AdGuard's SDK-container removal, detached ad mute/skip, audio isolation and SPA cleanup.
 - `tests/ad-init-harness.html` verifies missing/late ad-helper initialization, idempotent initialization and skip/mute recovery.
-- `tests/ad-live-layout-harness.html` verifies the shared live-ad wrapper and separate `#midPlayer` stay full size while only the ad container shrinks, including pause, settings, end and channel changes.
+- `tests/ad-live-layout-harness.html` verifies the shared live-ad wrapper stays full size while only the ad container shrinks, including pause, settings, end and channel changes. `?native` also reproduces CHZZK's sibling `#live_player_layout.miniplayer` and published `!important` CSS loaded after the extension.
 - `tests/list-preview-harness.html` verifies CHZZK HLS and SOOP native preview dispatch and cleanup using simulated playback.
 
 Do not type or send messages in a real CHZZK chat during agent verification. Real logged-in chat checks must be performed by the user:
@@ -78,3 +78,4 @@ Do not type or send messages in a real CHZZK chat during agent verification. Rea
 - Scope ad mute event suppression to changes made by this extension on ad-container video elements. Never suppress the main video's volume events.
 - CHZZK handles Enter and search-button clicks directly; guarding only form submit misses both paths.
 - Do not report mock preview/quality tests as live verification. Official high-quality extension/login requirements remain in force.
+- Live mid-roll ads can make `#live_player_layout` a fixed-size `.miniplayer` outside the video's inner `.pzp-pc__video` path. Restore that outer layout too; native `.mid_ad_mini #midAdVideoContainer` uses `!important`, so check selector priority and later-loaded site CSS.

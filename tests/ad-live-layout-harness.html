@@ -9,10 +9,19 @@ video{position:absolute;inset:0;width:100%;height:100%;background:#246}
 </style><body data-result="pending">
 <div class="pzp"><div class="pzp-pc__video"><div class="webplayer-internal-core-shadow"><div class="webplayer-internal-core-source-container"><div class="webplayer-internal-source-wrapper"><video class="webplayer-internal-video"></video></div></div></div></div><div id="midAdPlayerWrapper" class="mid_ad_mini"><video id="midPlayer"></video><div id="midAdVideoContainer"><video id="ad"></video></div></div></div><pre id="result"></pre>
 <script>
+const native=new URLSearchParams(location.search).has('native');
 history.replaceState(null,'','/live/'+'a'.repeat(32));
 const features={catchUp:false,adMute:true,adSpeed:1,adMini:true,mainAudio:true},listeners=[];
 window.chrome={storage:{local:{get:async()=>({features})},onChanged:{addListener:fn=>listeners.push(fn)}}};
 const main=document.querySelector('.webplayer-internal-video'),mid=document.querySelector('#midPlayer'),ad=document.querySelector('#ad'),wrapper=document.querySelector('#midAdPlayerWrapper'),container=document.querySelector('#midAdVideoContainer'),stage=document.querySelector('.pzp');
+if(native){
+ const layout=document.createElement('div');layout.id='live_player_layout';layout.className='miniplayer';
+ stage.prepend(layout);stage.classList.remove('pzp');stage.style.cssText='position:relative;width:800px;height:450px';
+ const player=document.createElement('div');player.className='pzp';player.style.cssText='width:100%;height:100%';layout.append(player);player.append(main.closest('.pzp-pc__video'));
+ // Published CHZZK CSS, including !important and the sibling live-player layout.
+ const css=document.createElement('style');css.textContent='.miniplayer:not(.is_large){z-index:1000;top:44px;right:0;width:353px!important;height:198px!important;position:fixed!important}.mid_ad_mini{overflow:hidden;z-index:1001!important;width:353px!important;height:198px!important;position:fixed!important;top:44px!important;left:auto!important;right:0!important}.mid_ad_mini #midAdVideoContainer{width:100%!important;height:100%!important}';
+ window.addEventListener('load',()=>document.head.append(css));
+}
 let mainPaused=false,midPaused=false,ended=false;
 Object.defineProperties(main,{paused:{get:()=>mainPaused},readyState:{get:()=>4}});
 Object.defineProperties(mid,{paused:{get:()=>midPaused},readyState:{get:()=>4}});
@@ -26,6 +35,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
  await wait(1200);
  check('광고와 본방송을 함께 담는 바깥 영역은 전체 크기',full(wrapper));
  check('광고 영역 안의 별도 생방송 영상도 전체 크기',full(mid));
+ if(native)check('네이티브 miniplayer를 가진 본방송 바깥 영역도 전체 크기',full(document.querySelector('#live_player_layout'))&&full(main));
  check('광고 영상만 오른쪽 위 26% 크기',mini()&&Math.abs(ad.getBoundingClientRect().width-container.getBoundingClientRect().width)<1);
  check('광고만 음소거하고 생방송 음소거 유지',ad.muted&&!mid.muted&&!main.muted);
  mainPaused=true;await wait(1100);

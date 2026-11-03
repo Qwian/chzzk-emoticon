@@ -33,6 +33,13 @@ for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{
  await press('KeyF',controls,{key:'Process'});check('한글 IME도 물리 F 코드 사용',theaterClicks===4);
  await press('KeyF',play);check('플레이어 버튼에 포커스가 있어도 F 동작',theaterClicks===5&&fullClicks===0);
  let before=theaterClicks;
+ if(!soop){
+  const ads=document.createElement('div');ads.id='midAdVideoContainer';ads.innerHTML='<video></video>';player.append(ads);
+  const nativeBefore=fullClicks;await press('KeyF');check('광고 재생 중 F도 극장 전환하며 전체화면 차단',theaterClicks===before+1&&fullClicks===nativeBefore);ads.remove();
+  await press('KeyF');before=theaterClicks;
+  theater.hidden=true;theater.style.display='none';const hiddenBefore=fullClicks;await press('KeyF');check('극장 버튼이 일시적으로 숨겨져도 기본 전체화면으로 새지 않음',fullClicks===hiddenBefore&&theaterClicks===before);theater.hidden=false;theater.style.display='';
+  if(!wide())theater.click();before=theaterClicks;
+ }
  for(const target of [document.querySelector('#search'),document.querySelector('#chat'),document.querySelector('#outside')])await press('KeyF',target);
  await press('KeyF',controls,{ctrlKey:true});await press('KeyF',controls,{shiftKey:true});await press('KeyF',controls,{isComposing:true});
  const host=document.createElement('div');host.attachShadow({mode:'open'}).innerHTML='<input>';document.body.append(host);await press('KeyF',host.shadowRoot.firstChild);

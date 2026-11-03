@@ -64,12 +64,13 @@
       if (soop && soopPlayMode(soop) === 'play' && control(soop, 'play')) root = soop;
     }
     if (!root && action === 'theater') {
-      root = [...document.querySelectorAll('.pzp,#webplayer')].find(player => control(player, action));
+      root = [...document.querySelectorAll('.pzp,#webplayer')].find(player => player.getBoundingClientRect().width > 16);
     }
     if (!root) return { reason: 'no-video' };
-    if (!control(root, action)) return { reason: 'no-control' };
-    // Native ad and modal controls keep ownership of their shortcuts.
-    if ([...root.querySelectorAll('#midAdVideoContainer video,#preAdVideoContainer video,.webplayer-internal-core-ad-ui video')]
+    if (!control(root, action) && action !== 'theater') return { reason: 'no-control' };
+    // Play/mute stay native during ads. F still owns theater mode, including
+    // while its control is temporarily hidden or being recreated by the player.
+    if (action !== 'theater' && [...root.querySelectorAll('#midAdVideoContainer video,#preAdVideoContainer video,.webplayer-internal-core-ad-ui video')]
       .some(ad => !ad.ended && ad.getBoundingClientRect().width > 0)) return { reason: 'ad' };
     // Sites retain hidden dialog nodes between uses. Only a displayed modal owns the keys.
     if ([...document.querySelectorAll('dialog[open],[role="dialog"][aria-modal="true"]')].some(visibleModal)) return { reason: 'modal' };
@@ -92,7 +93,7 @@
     }
     return false;
   }
-  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.14', enabled: enabled && !stopped,
+  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.15', enabled: enabled && !stopped,
     current: inspect('play').reason, ...spaceStatus });
   function unchanged(state) {
     return state.action === 'mute' ? state.video.muted === state.muted && state.video.volume === state.volume
@@ -126,7 +127,7 @@
       if (!state || event.composedPath().some(node => node.matches?.('button,a,[role="button"]') && !state.root.contains(node))) return;
       // SOOP binds F to fullscreen on keyup. Own both halves of this theater key.
       theaterKeyOwned = true; event.preventDefault(); event.stopImmediatePropagation();
-      control(state.root, 'theater').click(); return;
+      control(state.root, 'theater')?.click(); return;
     }
     const action = event.code === 'KeyM' ? 'mute' : event.code === 'Space' || event.code === 'KeyK' && !document.querySelector('#webplayer') ? 'play' : null;
     if (!action) return;

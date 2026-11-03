@@ -141,6 +141,13 @@
       overflow:hidden!important;box-shadow:0 0 0 1px #9998!important;}
     .chzzk-tools-main-full {position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
       max-width:none!important;max-height:none!important;transform:none!important;visibility:visible!important;opacity:1!important;}
+    /* Native miniplayer rules use fixed positioning and !important. The live
+       layout is a sibling of the mid-ad wrapper, outside the video ancestors. */
+    #live_player_layout.chzzk-tools-main-full,
+    #midAdPlayerWrapper.chzzk-tools-main-full,
+    #preAdPlayerWrapper.chzzk-tools-main-full {position:absolute!important;inset:0!important;width:100%!important;height:100%!important;z-index:0!important;}
+    #midAdPlayerWrapper #midAdVideoContainer.chzzk-tools-ad-mini,
+    #preAdPlayerWrapper #preAdVideoContainer.chzzk-tools-ad-mini {width:26%!important;height:auto!important;}
     .chzzk-tools-ad-visible {display:block!important;visibility:visible!important;opacity:1!important;}
     .webplayer-internal-core-ad-ui.chzzk-tools-ad-visible {inset:0!important;width:100%!important;height:100%!important;z-index:100!important;}
   `;
@@ -269,9 +276,10 @@
           // Restore every content ancestor, including a shared ad wrapper.
           const playerRoot = wrapper.closest('.pzp') || wrapper.parentElement;
           for (const video of new Set([main, liveMain])) {
+            const liveLayout = video?.closest('#live_player_layout');
             for (let element = video; element && element !== playerRoot; element = element.parentElement) {
               element.classList.add("chzzk-tools-main-full");
-              if (element.matches('.pzp-pc__video')) break;
+              if (liveLayout ? element === liveLayout : element.matches('.pzp-pc__video')) break;
             }
           }
         }
