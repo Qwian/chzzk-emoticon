@@ -8,7 +8,7 @@
   let margin = profile.initialMargin, lastSeek = -Infinity, cooldown = 0, stableSince = performance.now();
   let lastCatchUp = -Infinity;
   let bufferRecovery = false;
-  let heldUntil = 0, ownedRate = null;
+  let ownedRate = null;
   const patches = new Map();
   const adRates = new Map();
   const localAdMute = new WeakMap();
@@ -98,14 +98,8 @@
   function externalRate() {
     if (ownedRate !== null && activeMain?.playbackRate !== ownedRate) {
       ownedRate = null;
-      heldUntil = performance.now() + 30000;
-      status = "외부 배속 변경 · 30초 대기";
+      status = "사용자 배속 유지";
     }
-  }
-  function protectManualSeek() {
-    if (!activeMain || !settings.catchUp) return;
-    restoreRate(); heldUntil = performance.now() + 30000;
-    status = "직접 위치 변경 · 자동 따라잡기 30초 보호";
   }
   function sourceChanged() {
     suspend("영상 전환 · 재생 안정화 중", profile.startDelay);
@@ -223,7 +217,7 @@
       audioRecovery = null; beforeAdAudio = null;
       ads.wrappers();
       restorePatches(); restoreRate(); bind(null); lastUrl = location.href;
-      adActive = false; heldUntil = 0; lastSeek = -Infinity;
+      adActive = false; lastSeek = -Infinity;
     }
     const live = /^\/live\/[a-f0-9]{32}\/?$/i.test(location.pathname);
     const vod = /^\/video\/\d+\/?$/i.test(location.pathname);
@@ -310,7 +304,7 @@
     if (main.paused || main.seeking || main.readyState < 3) {
       restoreRate(); announce("일시정지 / 버퍼 대기"); return;
     }
-    if (now < cooldown || now < heldUntil) { announce(status); return; }
+    if (now < cooldown) { announce(status); return; }
     bufferRecovery = false;
     if (ownedRate === null && Math.abs(main.playbackRate - 1) > 0.001) {
       announce("사용자 배속 유지"); return;
@@ -354,22 +348,8 @@
     refreshAds();
   });
   document.addEventListener("chzzk-tools:catch-up", () => {
-    heldUntil = 0; cooldown = 0; lastSeek = -Infinity; tick(true);
+    cooldown = 0; lastSeek = -Infinity; tick(true);
   });
-  // A seeking event does not identify its origin: CHZZK also adjusts the live
-  // position itself. Protect only an actual user's seek control/key interaction.
-  const seekControl = event => event.composedPath().some(node =>
-    node.matches?.('.pzp-pc__progress-slider,.pzp-pc-progress-slider,pzp-pc-progress-slider') &&
-    node.closest('.pzp')?.contains(activeMain));
-  document.addEventListener("pointerdown", event => {
-    if (event.isTrusted && event.button === 0 && seekControl(event)) protectManualSeek();
-  }, true);
-  document.addEventListener("keydown", e => {
-    if (!e.isTrusted || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
-    const editable = e.composedPath().some(node => node.isContentEditable || node.matches?.("input,textarea,select,[role='textbox']"));
-    const sliderKey = ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.code) && seekControl(e);
-    if (sliderKey || e.code === "ArrowLeft" && !editable) protectManualSeek();
-  }, true);
   function refreshAds() { try { tick(); } catch { restoreRate(); announce("플레이어 연결 대기"); } }
   document.addEventListener('chzzk-tools:ad-dom-change', refreshAds);
   window.setInterval(refreshAds, 1000);

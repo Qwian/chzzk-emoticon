@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><meta charset="utf-8"><title>자동 이동과 직접 되감기 구분</title>
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>위치·배속 변경 후에도 계속 따라잡기</title>
 <body tabindex="-1"><div class="pzp"><video class="webplayer-internal-video" style="width:640px;height:360px"></video>
 <button class="pzp-pc__progress-slider">타임바 이동 모형</button></div>
 <button id="catch-now">지금 따라잡기 모형</button>
@@ -20,5 +20,5 @@ document.querySelector('.pzp-pc__progress-slider').onclick=()=>move(60);
 document.querySelector('#catch-now').onclick=()=>document.dispatchEvent(new CustomEvent('chzzk-tools:catch-up'));
 document.addEventListener('keydown',e=>{if(e.code==='ArrowLeft'&&e.target===document.body)move(60)});
 document.addEventListener('chzzk-tools:player-status',e=>document.querySelector('#status').textContent=e.detail.text);
-window.catchUpSeekProbe={step(ms){now+=ms;interval()},move,delayedSeek(){now+=3000;current+=.7;emit('seeking');emit('seeked')},setCurrent(value){current=value},event:emit,snapshot(){return{current,rate:main.playbackRate,status:document.querySelector('#status').textContent}}};
+window.catchUpSeekProbe={step(ms){now+=ms;interval()},move,delayedSeek(){now+=3000;current+=.7;emit('seeking');emit('seeked')},setCurrent(value){current=value},setRate(value){main.playbackRate=value;emit('ratechange')},event:emit,snapshot(){return{current,rate:main.playbackRate,status:document.querySelector('#status').textContent}}};
 </script><script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js"></script></body></html>
