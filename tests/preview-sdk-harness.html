@@ -1,0 +1,32 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>숲 SDK 기본 재생 검사 컨테이너</title>
+<body data-result="pending"><div id="chzzk-tools-preview-sdk-parent"><video id="chzzk-tools-preview-sdk-video"></video></div><pre id="result">pending</pre>
+<script>
+const players=[],responses=[];let mode='normal',release;
+window.PreviewPlayer=class{
+ constructor(config){this.config=config;this.events={};players.push(this)}
+ addEventListener(name,fn){this.events[name]=fn}
+ async loadPreview(){if(mode==='throw')throw Error('load failed');this.probe=document.createElement('video');document.getElementById('videoLayer').appendChild(this.probe);if(mode==='pending')await new Promise(resolve=>release=resolve)}
+ async play(){this.played=true}
+ async close(){this.closed=true;this.probe?.remove()}
+};
+document.addEventListener('chzzk-tools:soop-preview-result',event=>responses.push(event.detail));
+const wait=()=>new Promise(resolve=>setTimeout(resolve,50));
+const open=requestId=>document.dispatchEvent(new CustomEvent('chzzk-tools:soop-preview',{detail:{action:'open',requestId,parentId:'chzzk-tools-preview-sdk-parent',videoId:'chzzk-tools-preview-sdk-video',streamer:'publictest',broadcast:'123'}}));
+const close=()=>document.dispatchEvent(new CustomEvent('chzzk-tools:soop-preview',{detail:{action:'close'}}));
+</script><script src="/preview-bridge.js"></script><script>
+(async()=>{
+ const results=[],check=(name,passed)=>results.push({name,passed});
+ open('normal');await wait();
+ check('SDK의 고정 기본 부모가 필요한 첫 재생을 지원',responses.find(r=>r.requestId==='normal')?.ok===true&&players[0]?.played);
+ check('호환 컨테이너는 확장 미리보기 안에만 생성',document.getElementById('videoLayer')?.parentElement.id==='chzzk-tools-preview-sdk-parent'&&document.getElementById('videoLayer').style.display==='none');
+ close();await wait();check('종료 시 확장이 만든 호환 컨테이너와 플레이어 정리',!document.getElementById('videoLayer')&&players[0]?.closed);
+ const native=document.createElement('div');native.id='videoLayer';native.textContent='site-owned';document.body.append(native);
+ open('existing');await wait();close();await wait();
+ check('기존 사이트 컨테이너는 덮어쓰거나 삭제하지 않음',document.getElementById('videoLayer')===native&&native.textContent==='site-owned'&&!native.hasAttribute('style'));
+ native.remove();mode='throw';open('throw');await wait();
+ check('SDK 예외가 나도 확장 호환 컨테이너를 정리',responses.find(r=>r.requestId==='throw')?.ok===false&&!document.getElementById('videoLayer')&&players.at(-1).closed);
+ mode='pending';open('pending');await wait();close();await wait();release?.();await wait();
+ check('닫은 뒤 늦게 끝난 SDK 로드가 성공을 보고하지 않음',!responses.some(r=>r.requestId==='pending')&&players.at(-1).closed&&!document.getElementById('videoLayer'));
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=JSON.stringify([{name:error.stack,passed:false}])});
+</script></body></html>

@@ -39,7 +39,7 @@
   }
   function identify(target) {
     if (location.hostname === "chzzk.naver.com" && /^\/(live|video)\//.test(location.pathname)) return null;
-    const card = target.closest?.("li[data-broadcast-id],[data-nlog-area='live_list.item'],li,article");
+    const card = target.closest?.("[data-broadcast-id],[data-type='cBox'],[data-nlog-area='live_list.item'],li,article");
     if (!card || card.closest("#sidebar,nav")) return null;
     const links = [...card.querySelectorAll("a[href]")];
     for (const link of links) {

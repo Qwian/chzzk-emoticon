@@ -97,5 +97,5 @@
     return [...items].sort((a, b) => channelGroup(a, favorites) - channelGroup(b, favorites) ||
       (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.10.22", defaults, features, koreanFromEnglish, catchUpOptions, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.10.23", defaults, features, koreanFromEnglish, catchUpOptions, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup });
 })();

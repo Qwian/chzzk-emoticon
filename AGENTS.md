@@ -54,6 +54,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/ad-init-harness.html` verifies missing/late ad-helper initialization, idempotent initialization and skip/mute recovery.
 - `tests/ad-live-layout-harness.html` verifies the shared live-ad wrapper stays full size while only the ad container shrinks, including pause, settings, end and channel changes. `?native` also reproduces CHZZK's sibling `#live_player_layout.miniplayer` and published `!important` CSS loaded after the extension.
 - `tests/list-preview-harness.html` verifies CHZZK HLS and SOOP native preview dispatch and cleanup using simulated playback.
+- `tests/preview-sdk-harness.html` verifies the official SOOP SDK's fixed autoplay-probe parent requirement, extension-owned cleanup, preservation of site-owned containers and cancellation.
 
 Do not type or send messages in a real CHZZK chat during agent verification. Real logged-in chat checks must be performed by the user:
 

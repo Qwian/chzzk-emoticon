@@ -7,7 +7,9 @@
 <li id="native-chzzk" data-nlog-area="live_list.item" data-nlog-params='{"content_id":"321"}'><a href="https://chzzk.naver.com/live/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"><div class="thumbnail-native"><video></video></div></a></li>
 <li id="ordinary"><a href="https://example.org/">일반 링크</a></li>
 <li id="custom-chzzk" data-nlog-area="live_list.item" data-nlog-params='{"content_id":"654"}'><a class="_thumbnail_direct" href="https://chzzk.naver.com/live/cccccccccccccccccccccccccccccccc"><img alt="직접 올린 썸네일" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><span class="badge">LIVE <svg><path d="M0 0"></path></svg></span></a><a class="title" href="https://chzzk.naver.com/live/cccccccccccccccccccccccccccccccc">직접 올린 썸네일 방송 제목</a></li>
-</ul><pre id="result">pending</pre>
+</ul>
+<section><div id="soop-div" data-type="cBox" data-broadcast-id="900"><div class="thumbs-box"><a href="https://play.sooplive.com/carousel/900"><span>현재 숲 div 썸네일 <svg><path d="M0 0"></path></svg></span></a></div><div class="details"><a class="title" href="https://play.sooplive.com/carousel/900">방송 제목</a><a class="streamer" href="https://www.sooplive.com/station/carousel">방송자</a></div></div>
+<div id="soop-div-early" data-type="cBox"><div class="thumbs-box"><a href="https://play.sooplive.com/early/901">방송 ID 속성이 늦게 붙는 카드</a></div></div></section><pre id="result">pending</pre>
 <script>
  const requests=[],instances=[],nativePlayers=[];
  window.chrome={storage:{local:{get:async()=>({features:{listPreview:true}})},onChanged:{addListener:()=>{}}}};
@@ -41,6 +43,13 @@
   const onCustom=requests.length;check('직접 올린 썸네일 방송도 제목 우클릭은 원래 메뉴',!right('custom-chzzk',false,'.title').defaultPrevented&&requests.length===onCustom);
   check('직접 올린 썸네일도 Shift+우클릭은 원래 메뉴',!right('custom-chzzk',true,'img').defaultPrevented);
   const customBadge=right('custom-chzzk',false,'.badge svg path');await delay();check('썸네일 배지의 SVG 우클릭도 같은 방송 종료',customBadge.defaultPrevented&&!document.querySelector('#custom-chzzk video')&&requests.length===onCustom);
+  const divStart=right('soop-div',false,'.thumbs-box svg path');await delay();
+  const divPlayer=nativePlayers.at(-1),count=nativePlayers.length;
+  check('현재 숲 div 방송 카드와 썸네일 배지에서 미리보기 시작',divStart.defaultPrevented&&divPlayer?.streamer==='carousel'&&divPlayer?.broadcast==='900');
+  check('div 카드의 제목·방송자 우클릭은 원래 메뉴 유지',!right('soop-div',false,'.title').defaultPrevented&&!right('soop-div',false,'.streamer').defaultPrevented&&nativePlayers.length===count);
+  right('soop-div',false,'.thumbs-box');await delay();check('div 카드도 다시 우클릭하면 종료',divPlayer?.closed&&!document.querySelector('#soop-div video'));
+  const early=right('soop-div-early');await delay();check('방송 ID 속성 준비 전에도 현재 cBox 카드 지원',early.defaultPrevented&&nativePlayers.at(-1)?.broadcast==='901');
+  document.querySelector('#soop-div-early').dispatchEvent(new Event('pointerleave'));await delay();check('새 카드의 마우스 이탈도 플레이어 정리',nativePlayers.at(-1)?.closed&&!document.querySelector('#soop-div-early video'));
   document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
  })().catch(error=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack;});
 </script></body></html>

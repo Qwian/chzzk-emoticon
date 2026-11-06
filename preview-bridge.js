@@ -4,6 +4,7 @@
   let active = null, generation = 0;
   async function close() {
     const previous = active; active = null;
+    previous?.compatibilityMount?.remove();
     if (previous) try { await previous.player.close(); } catch { /* already closed by the native player */ }
   }
   document.addEventListener("chzzk-tools:soop-preview", async event => {
@@ -16,10 +17,18 @@
     if (typeof window.PreviewPlayer !== "function") { respond(false, "숲 미리보기 플레이어가 아직 준비되지 않았습니다."); return; }
     await close();
     if (turn !== generation || !document.getElementById(videoId)?.isConnected) return;
+    let compatibilityMount = null;
     try {
+      // The official SDK's first autoplay probe uses this fixed default parent,
+      // even when the actual preview media has a custom parentId.
+      if (!document.getElementById("videoLayer")) {
+        compatibilityMount = document.createElement("div"); compatibilityMount.id = "videoLayer";
+        compatibilityMount.style.display = "none";
+        document.getElementById(parentId).append(compatibilityMount);
+      }
       const player = new window.PreviewPlayer({ id: videoId, parentId, muted: false, volume: 1,
         playDurationLimit: 60, refreshIntervalTime: 10, isDev: false });
-      active = { player, videoId };
+      active = { player, videoId, compatibilityMount };
       let failed = false;
       player.addEventListener("STATUS_ERROR", () => {
         if (turn !== generation || active?.player !== player) return;
@@ -31,7 +40,10 @@
       player.muted = false; player.volume = 1;
       await player.play();
       if (!failed && turn === generation && active?.player === player) respond(true);
-    } catch { if (turn === generation) respond(false, "미리보기를 재생하지 못했습니다."); }
+    } catch {
+      compatibilityMount?.remove();
+      if (turn === generation) { await close(); respond(false, "미리보기를 재생하지 못했습니다."); }
+    }
   });
   window.setInterval(() => { if (active && !document.getElementById(active.videoId)?.isConnected) close(); }, 1000);
   window.addEventListener("pagehide", close);
