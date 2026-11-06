@@ -19,19 +19,32 @@ test("catch-up never seeks outside loaded live buffer or across a hole to unload
 });
 test("catch-up preserves safety margin and uses modest rates for small gaps", () => {
   const base = { time: 98, seekable: [[0, 100]], buffered: [[0, 100]], margin: 1.5, lastSeek: 0, now: 1000 };
-  assert.equal(core.planCatchUp(base).rate, 1.05);
-  assert.equal(core.planCatchUp({ ...base, time: 95 }).rate, 1.15);
+  assert.equal(core.planCatchUp(base).rate, 1.03);
+  assert.equal(core.planCatchUp({ ...base, time: 95 }).rate, 1.08);
   assert.equal(core.planCatchUp({ ...base, time: 99 }).rate, 1);
   assert.equal(core.planCatchUp({ ...base, seekable: [] }).rate, 1);
   assert.equal(core.planCatchUp({ ...base, force: true }).seek, 98.5);
 });
 test("low latency corrects a one-second backlog and recovers without a twenty-second wait", () => {
-  const base = { time: 98.5, seekable: [[0, 100]], buffered: [[0, 100]], margin: .35, lastSeek: 1000, now: 3000 };
+  const base = { time: 98.5, seekable: [[0, 100]], buffered: [[0, 100]], margin: .35, lastSeek: 1000, now: 3000, mode: "lowLatency" };
   assert.equal(core.planCatchUp(base).seek, 99.65);
   assert.equal(core.planCatchUp({ ...base, now: 2999 }).seek, undefined);
   assert.equal(core.planCatchUp({ ...base, time: 99.6 }).rate, 1);
   assert.equal(core.planCatchUp({ ...base, time: 99, now: 2000 }).rate, 1.15);
   assert.equal(core.planCatchUp({ ...base, buffered: [[0, 99.8]] }).seek, undefined);
+});
+test("catch-up mode is a single validated choice and missing settings restore stability", () => {
+  for (const value of [undefined, {}, { catchUpMode: "both" }, { catchUpMode: null }]) {
+    assert.equal(core.features(value).catchUpMode, "stable");
+  }
+  assert.equal(core.features({ catchUpMode: "lowLatency" }).catchUpMode, "lowLatency");
+  assert.equal(core.features({ catchUp: false, catchUpMode: "lowLatency" }).catchUp, false);
+});
+test("stable mode leaves modest delays buffered and waits twenty seconds between jumps", () => {
+  const base = { time: 96, seekable: [[0, 100]], buffered: [[0, 100]], margin: 1.5, lastSeek: 0, now: 30000 };
+  assert.equal(core.planCatchUp(base).seek, undefined);
+  assert.equal(core.planCatchUp({ ...base, time: 90, lastSeek: 15000 }).seek, undefined);
+  assert.equal(core.planCatchUp({ ...base, time: 90, lastSeek: 10000 }).seek, 98.5);
 });
 test("channel matching excludes VOD, clips, malformed and third path segments", () => {
   const id = "a".repeat(32);

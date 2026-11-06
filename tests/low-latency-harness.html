@@ -8,7 +8,7 @@ Object.defineProperty(performance,'now',{value:()=>now});
 // Drive polling explicitly so event tests cannot pass because of the fallback timer.
 window.setInterval=(fn)=>{interval=fn;return 1};
 const main=document.querySelector('video'),listeners=[];
-const state={features:{catchUp:true,adSpeed:1}};
+const state={features:{catchUp:true,catchUpMode:'lowLatency',adSpeed:1}};
 window.chrome={storage:{local:{get:async()=>state},onChanged:{addListener:fn=>listeners.push(fn)}}};
 const range=()=>({length:1,start:()=>0,end:()=>edge});
 const seeks=[];

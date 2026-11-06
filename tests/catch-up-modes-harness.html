@@ -1,0 +1,44 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>따라잡기 방식 전환</title>
+<body data-result="pending"><video class="webplayer-internal-video" style="width:640px;height:360px"></video><pre id="result">pending</pre>
+<script>
+history.replaceState(null,'','/live/'+'a'.repeat(32));
+const results=[],check=(name,passed)=>results.push({name,passed});
+let now=100000,current=50,edge=100,interval;
+Object.defineProperty(performance,'now',{value:()=>now});
+window.setInterval=fn=>{interval=fn;return 1};
+const main=document.querySelector('video'),listeners=[],state={features:{catchUp:true,adSpeed:1}};
+window.chrome={storage:{local:{get:async()=>state},onChanged:{addListener:fn=>listeners.push(fn)}}};
+const range=()=>({length:1,start:()=>0,end:()=>edge});
+Object.defineProperties(main,{currentTime:{get:()=>current,set:v=>current=v},seekable:{get:range},buffered:{get:range},paused:{get:()=>false},readyState:{get:()=>4},seeking:{get:()=>false}});
+const emit=name=>main.dispatchEvent(new Event(name));
+const step=ms=>{now+=ms;interval()};
+const settings=value=>{state.features={...state.features,...value};listeners.forEach(fn=>fn({features:{newValue:state.features}},'local'))};
+</script>
+<script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js"></script>
+<script>
+(async()=>{
+ await Promise.resolve();await Promise.resolve();
+ check('기본 안정 우선은 시작 시 즉시 당기지 않음',current===50);
+ step(4999);emit('canplay');emit('progress');
+ check('안정 우선은 재생 이벤트에도 5초 준비 시간 유지',current===50);
+ step(1);check('준비 후 이전 방식의 1.5초 여유로 이동',current===98.5);
+ step(4000);current=96;emit('progress');interval();
+ check('안정 우선은 작은 지연을 건너뛰지 않고 1.08배 보정',current===96&&main.playbackRate===1.08);
+ emit('waiting');current=80;emit('canplay');step(14999);
+ check('안정 우선은 재생 가능 신호에도 15초 회복 대기',current===80&&main.playbackRate===1);
+ step(1);check('회복 대기가 끝나도 이전 이동으로부터 20초 보호 유지',current===80);
+ step(1000);check('안정 우선은 끊김 뒤 버퍼 여유를 2.25초로 확대',current===97.75);
+ settings({catchUpMode:'lowLatency'});
+ check('최소 지연으로 전환하면 이전 회복 대기와 여유를 해제',Math.abs(current-99.65)<.001);
+ step(1000);current=98.8;emit('timeupdate');
+ check('최소 지연의 이벤트 보정만 동작',main.playbackRate===1.15);
+ settings({catchUpMode:'stable'});current=80;edge=110;emit('canplay');step(4999);emit('progress');
+ check('안정 우선으로 복귀하면 공격적 이벤트 보정 중단',current===80&&main.playbackRate===1);
+ step(1);check('방식 복귀 시 0.35초가 아닌 1.5초 여유 복원',current===108.5);
+ settings({catchUp:false,catchUpMode:'lowLatency'});current=50;edge=120;step(30000);emit('progress');
+ check('꺼짐 상태에서 방식 전환해도 보정하지 않음',current===50&&main.playbackRate===1);
+ settings({catchUp:true});check('다시 켜면 선택했던 최소 지연 하나만 적용',Math.abs(current-119.65)<.001);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+ document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=JSON.stringify([{name:e.stack,passed:false}])});
+</script></body></html>

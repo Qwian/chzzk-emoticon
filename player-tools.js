@@ -4,8 +4,8 @@
   const core = globalThis.ChzzkTools;
   let settings = core.features();
   let activeMain = null, lastUrl = "", lastNormal = null, adActive = false;
-  const MIN_MARGIN = 0.35;
-  let margin = MIN_MARGIN, lastSeek = -Infinity, cooldown = 0, stableSince = performance.now();
+  let profile = core.catchUpProfile(settings.catchUpMode);
+  let margin = profile.initialMargin, lastSeek = -Infinity, cooldown = 0, stableSince = performance.now();
   let lastCatchUp = -Infinity;
   let bufferRecovery = false;
   let heldUntil = 0, ownedRate = null;
@@ -83,7 +83,7 @@
     if (activeMain.playbackRate !== rate) activeMain.playbackRate = rate;
     ownedRate = rate;
   }
-  function suspend(reason, milliseconds = 2000) {
+  function suspend(reason, milliseconds = profile.recoveryDelay) {
     restoreRate();
     bufferRecovery = false;
     cooldown = performance.now() + milliseconds;
@@ -92,7 +92,7 @@
   }
   function waiting() {
     if (adActive || !settings.catchUp || activeMain?.paused || activeMain?.seeking) return;
-    margin = Math.min(6, margin + 0.25);
+    margin = Math.min(6, margin + profile.waitingStep);
     suspend("버퍼 회복 중 · 여유 " + margin.toFixed(1) + "초");
     bufferRecovery = true;
   }
@@ -111,10 +111,8 @@
   }
   function seeked() { ownSeekTarget = null; }
   function sourceChanged() {
-    // readyState is the readiness gate; metadata alone does not require a fixed wait.
     ownSeekTarget = null;
-    restoreRate(); cooldown = 0; bufferRecovery = false; stableSince = performance.now();
-    status = "영상 전환 · 재생 가능 대기";
+    suspend("영상 전환 · 재생 안정화 중", profile.startDelay);
   }
   function bind(main) {
     if (activeMain === main) return;
@@ -128,9 +126,9 @@
       activeMain.removeEventListener("volumechange", repairAudio);
       for (const name of ["progress", "timeupdate", "playing", "canplay"]) activeMain.removeEventListener(name, refreshCatchUp);
     }
-    activeMain = main; margin = MIN_MARGIN; lastNormal = null;
+    activeMain = main; margin = profile.initialMargin; lastNormal = null;
     if (!adActive) beforeAdAudio = null;
-    cooldown = 0; bufferRecovery = false; lastCatchUp = -Infinity;
+    cooldown = performance.now() + profile.startDelay; bufferRecovery = false; lastCatchUp = -Infinity;
     stableSince = performance.now();
     ownSeekTarget = null;
     if (main) {
@@ -306,7 +304,7 @@
         repairAudio();
       }
       beforeAdAudio = null;
-      suspend("광고 종료 · 재생 안정화 중", 750);
+      suspend("광고 종료 · 재생 안정화 중", profile.adDelay);
     }
     if (!main) { announce("플레이어 대기"); return; }
     repairAudio();
@@ -326,9 +324,9 @@
     if (ownedRate === null && Math.abs(main.playbackRate - 1) > 0.001) {
       announce("사용자 배속 유지"); return;
     }
-    if (now - stableSince > 10000) { margin = Math.max(MIN_MARGIN, margin - 0.1); stableSince = now; }
-    const plan = core.planCatchUp({ time: main.currentTime, seekable: ranges(main.seekable), buffered: ranges(main.buffered), margin, lastSeek, now, force });
-    if (plan.seek !== undefined) { ownSeekTarget = plan.seek; main.currentTime = plan.seek; lastSeek = now; cooldown = now + 750; }
+    if (now - stableSince > profile.stableInterval) { margin = Math.max(profile.minMargin, margin - profile.marginStep); stableSince = now; }
+    const plan = core.planCatchUp({ time: main.currentTime, seekable: ranges(main.seekable), buffered: ranges(main.buffered), margin, lastSeek, now, force, mode: settings.catchUpMode });
+    if (plan.seek !== undefined) { ownSeekTarget = plan.seek; main.currentTime = plan.seek; lastSeek = now; cooldown = now + profile.seekCooldown; }
     setRate(plan.rate);
     status = plan.reason + (Number.isFinite(plan.gap) ? ` · 최신 버퍼까지 ${plan.gap.toFixed(1)}초` : "");
     announce(status);
@@ -336,7 +334,7 @@
   // Media events avoid waiting for the DOM/ad polling interval. Keep this path
   // lightweight: no document scans, ad layout writes or new polling timer.
   function refreshCatchUp(event) {
-    if (!activeMain || adActive || lastUrl !== location.href || !/^\/live\/[a-f0-9]{32}\/?$/i.test(location.pathname)) return;
+    if (!profile.eventDriven || !activeMain || adActive || lastUrl !== location.href || !/^\/live\/[a-f0-9]{32}\/?$/i.test(location.pathname)) return;
     if (bufferRecovery && activeMain.readyState >= 3 && ["playing", "canplay"].includes(event?.type)) {
       bufferRecovery = false; cooldown = 0;
     }
@@ -346,11 +344,21 @@
     try { catchUp(activeMain, true); }
     catch { restoreRate(); }
   }
-  chrome.storage.local.get("features").then(data => { settings = core.features(data.features); refreshAds(); });
+  function applySettings(value) {
+    const next = core.features(value);
+    if (next.catchUpMode !== settings.catchUpMode) {
+      restoreRate();
+      profile = core.catchUpProfile(next.catchUpMode);
+      margin = profile.initialMargin; lastSeek = -Infinity; lastCatchUp = -Infinity;
+      suspend("따라잡기 방식 변경 · " + (next.catchUpMode === "stable" ? "안정 우선" : "최소 지연"), profile.startDelay);
+    }
+    settings = next;
+  }
+  chrome.storage.local.get("features").then(data => { applySettings(data.features); refreshAds(); });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.features) return;
     restorePatches(); restoreRate();
-    settings = core.features(changes.features.newValue);
+    applySettings(changes.features.newValue);
     if (!settings.adMute) audioRecovery = null;
     refreshAds();
   });

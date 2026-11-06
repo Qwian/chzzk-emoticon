@@ -71,8 +71,15 @@ await chrome.storage.local.set({features:{followingExpanded:false}});document.qu
 check('상시 펼치기 끄면 접힌 상태 유지',document.querySelector('#collapse').getAttribute('aria-expanded')==='false');
 const player=document.querySelector('#chzzk-player-tools').shadowRoot;
 check('패널을 열지 않아도 자동 따라잡기 켜짐은 초록색',!player.querySelector('details').open&&getComputedStyle(player.querySelector('summary')).color==='rgb(0, 220, 145)'&&getComputedStyle(player.querySelector('svg')).stroke==='rgb(0, 220, 145)');
+const mode=player.querySelector('#catch-mode');
+check('두 방식 중 안정 우선 하나가 기본 선택',mode.options.length===2&&mode.value==='stable'&&mode.selectedOptions.length===1);
+mode.value='lowLatency';mode.dispatchEvent(new Event('change'));await wait(180);
+check('최소 지연만 선택해 저장하고 현재 방식 표시',state.features.catchUpMode==='lowLatency'&&mode.selectedOptions.length===1&&player.querySelector('summary').title.includes('최소 지연'));
+await chrome.storage.local.set({features:{...state.features,catchUpMode:'stable'}});await wait(180);
+check('다른 설정 화면의 방식 변경을 동기화',mode.value==='stable'&&mode.selectedOptions.length===1&&player.querySelector('summary').title.includes('안정 우선'));
 player.querySelector('#catch-up').checked=false;player.querySelector('#catch-up').dispatchEvent(new Event('change'));await wait(180);check('이동된 따라잡기 설정 저장',state.features.catchUp===false);
 check('자동 따라잡기 끄면 흰색 반투명으로 복귀',getComputedStyle(player.querySelector('summary')).color==='rgb(255, 255, 255)'&&Number(getComputedStyle(player.querySelector('summary')).opacity)<.4);
+check('따라잡기 끄면 방식 선택도 비활성화',mode.disabled);
 check('보관 채널 정보 조회가 매번 반복되지 않음',apiCalls===3);
 const before=list.firstElementChild;list.replaceChild(before.cloneNode(true),before);await wait(250);check('사이트가 행을 다시 렌더링해도 별 중복 없음',rowFor(ids[0]).querySelectorAll('.ct-star').length===1);
 const nativeNav=list.closest('nav');nativeNav.remove();await wait(300);

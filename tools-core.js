@@ -1,6 +1,6 @@
 (() => {
   const defaults = Object.freeze({
-    koreanSearch: true, favorites: true, catchUp: true, followingExpanded: true, followingRefresh: true,
+    koreanSearch: true, favorites: true, catchUp: true, catchUpMode: "stable", followingExpanded: true, followingRefresh: true,
     adMute: true, adSpeed: 4, adMini: true, mainAudio: true, adAutoSkip: true, adblockQuality: true,
     globalSpeed: true, playerShortcuts: true, channelLiveLink: true, listPreview: true, sidebarPreview: true, freeChat: true, youtubeWide: true, nexonWide: true, highestQuality: true, dismissAdNotice: true
   });
@@ -42,10 +42,24 @@
   function features(value) {
     const next = { ...defaults, ...value };
     next.adSpeed = [1, 2, 4, 8, 16].includes(Number(next.adSpeed)) ? Number(next.adSpeed) : 4;
+    next.catchUpMode = next.catchUpMode === "lowLatency" ? "lowLatency" : "stable";
     return next;
   }
 
-  function planCatchUp({ time, seekable, buffered, margin, lastSeek, now, force = false }) {
+  const catchUpProfiles = Object.freeze({
+    stable: Object.freeze({ initialMargin: 1.5, minMargin: 0.75, waitingStep: 0.75,
+      startDelay: 5000, recoveryDelay: 15000, adDelay: 5000, seekCooldown: 4000,
+      seekInterval: 20000, seekGap: 5, forceSeekGap: 0.35, stopGap: 0.35,
+      fastGap: 2, fastRate: 1.08, slowRate: 1.03, stableInterval: 60000, marginStep: 0.25, eventDriven: false }),
+    lowLatency: Object.freeze({ initialMargin: 0.35, minMargin: 0.35, waitingStep: 0.25,
+      startDelay: 0, recoveryDelay: 2000, adDelay: 750, seekCooldown: 750,
+      seekInterval: 2000, seekGap: 1, forceSeekGap: 0.1, stopGap: 0.1,
+      fastGap: 0.5, fastRate: 1.15, slowRate: 1.05, stableInterval: 10000, marginStep: 0.1, eventDriven: true })
+  });
+  function catchUpProfile(mode) { return catchUpProfiles[mode === "lowLatency" ? "lowLatency" : "stable"]; }
+
+  function planCatchUp({ time, seekable, buffered, margin, lastSeek, now, force = false, mode = "stable" }) {
+    const profile = catchUpProfile(mode);
     if (!Number.isFinite(time) || !seekable.length) return { rate: 1, reason: "재생 범위 대기" };
     const latest = seekable[seekable.length - 1];
     const buffer = buffered.find(([start, end]) => start <= time + 0.05 && end >= time);
@@ -56,11 +70,11 @@
     const target = edge - margin;
     const gap = edge - time;
     const ahead = buffer[1] - time;
-    if (target >= Math.max(latest[0], fresh[0]) && target > time + (force ? 0.1 : 1) && (force || now - lastSeek >= 2000)) {
+    if (target >= Math.max(latest[0], fresh[0]) && target > time + (force ? profile.forceSeekGap : profile.seekGap) && (force || now - lastSeek >= profile.seekInterval)) {
       return { seek: target, rate: 1, gap, reason: "최신 버퍼로 이동" };
     }
-    if (ahead < margin || gap <= margin + 0.1) return { rate: 1, gap, reason: "안정 재생" };
-    return { rate: gap > margin + 0.5 ? 1.15 : 1.05, gap, reason: "실시간 따라잡는 중" };
+    if (ahead < margin || gap <= margin + profile.stopGap) return { rate: 1, gap, reason: "안정 재생" };
+    return { rate: gap > margin + profile.fastGap ? profile.fastRate : profile.slowRate, gap, reason: "실시간 따라잡는 중" };
   }
 
   function channelId(path) {
@@ -75,5 +89,5 @@
     return [...items].sort((a, b) => channelGroup(a, favorites) - channelGroup(b, favorites) ||
       (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.10.16", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels, channelGroup });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.10.17", defaults, features, koreanFromEnglish, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup });
 })();

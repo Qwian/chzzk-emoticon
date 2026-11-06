@@ -1,0 +1,21 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>따라잡기 팝업 설정</title>
+<body data-result="pending"><iframe src="popup-harness.html" style="width:500px;height:700px"></iframe><pre id="result">pending</pre>
+<script>
+const results=[],check=(name,passed)=>results.push({name,passed}),wait=()=>new Promise(r=>setTimeout(r,100));
+document.querySelector('iframe').addEventListener('load',async()=>{
+ try{
+  const win=document.querySelector('iframe').contentWindow;
+  for(let i=0;i<30&&!win.document.querySelector('#feature-catchUpMode');i++)await wait();
+  const mode=win.document.querySelector('#feature-catchUpMode'),enabled=win.document.querySelector('#feature-catchUp');
+  check('기본값은 안정 우선 단일 선택',mode.value==='stable'&&mode.options.length===2&&mode.selectedOptions.length===1);
+  mode.value='lowLatency';mode.dispatchEvent(new win.Event('change'));await wait();
+  check('최소 지연 선택을 저장',win.savedFeatures.catchUpMode==='lowLatency'&&mode.selectedOptions.length===1);
+  enabled.checked=false;enabled.dispatchEvent(new win.Event('change'));await wait();
+  check('자동 따라잡기를 끄면 방식 선택도 비활성화',mode.disabled&&win.savedFeatures.catchUpMode==='lowLatency'&&!win.savedFeatures.catchUp);
+  await win.chrome.storage.local.set({features:{...win.savedFeatures,catchUp:true,catchUpMode:'stable'}});await wait();
+  check('플레이어 설정 변경 동기화와 활성화',mode.value==='stable'&&!mode.disabled&&enabled.checked&&mode.selectedOptions.length===1);
+  document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+  document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+ }catch(e){document.body.dataset.result='fail';document.querySelector('#result').textContent=JSON.stringify([{name:e.stack,passed:false}])}
+});
+</script></body></html>
