@@ -99,12 +99,13 @@
       if (difference) return difference;
       if (group === 2) {
         const left = channelCategory(a), right = channelCategory(b);
-        const category = Number(!left) - Number(!right) || left.localeCompare(right, "ko", { numeric: true });
+        const priority = category => category.toUpperCase() === "TALK" ? 0 : category ? 2 : 1;
+        const category = priority(left) - priority(right) || left.localeCompare(right, "ko", { numeric: true });
         if (category) return category;
       }
       return (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9);
     });
   }
   function channelCategory(item) { return typeof item.liveCategory === "string" ? item.liveCategory.trim() : ""; }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.10.24", defaults, features, koreanFromEnglish, catchUpOptions, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup, channelCategory });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.10.25", defaults, features, koreanFromEnglish, catchUpOptions, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup, channelCategory });
 })();
