@@ -56,11 +56,11 @@
     const target = edge - margin;
     const gap = edge - time;
     const ahead = buffer[1] - time;
-    if (target >= Math.max(latest[0], fresh[0]) && target > time + (force ? 0.35 : 5) && (force || now - lastSeek >= 20000)) {
+    if (target >= Math.max(latest[0], fresh[0]) && target > time + (force ? 0.1 : 1) && (force || now - lastSeek >= 2000)) {
       return { seek: target, rate: 1, gap, reason: "최신 버퍼로 이동" };
     }
-    if (ahead < margin || gap <= margin + 0.35) return { rate: 1, gap, reason: "안정 재생" };
-    return { rate: gap > margin + 2 ? 1.08 : 1.03, gap, reason: "실시간 따라잡는 중" };
+    if (ahead < margin || gap <= margin + 0.1) return { rate: 1, gap, reason: "안정 재생" };
+    return { rate: gap > margin + 0.5 ? 1.15 : 1.05, gap, reason: "실시간 따라잡는 중" };
   }
 
   function channelId(path) {
@@ -75,5 +75,5 @@
     return [...items].sort((a, b) => channelGroup(a, favorites) - channelGroup(b, favorites) ||
       (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.10.14", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels, channelGroup });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.10.16", defaults, features, koreanFromEnglish, planCatchUp, channelId, orderChannels, channelGroup });
 })();

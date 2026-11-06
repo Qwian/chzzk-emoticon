@@ -1,0 +1,65 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>실시간 지연 최소화</title>
+<body data-result="pending"><video class="webplayer-internal-video" style="width:640px;height:360px"></video><pre id="result">pending</pre>
+<script>
+history.replaceState(null,'','/live/'+'a'.repeat(32));
+const results=[],check=(name,passed)=>results.push({name,passed});
+let now=100000,current=95,edge=100,paused=false,ready=4,seeking=false,interval;
+Object.defineProperty(performance,'now',{value:()=>now});
+// Drive polling explicitly so event tests cannot pass because of the fallback timer.
+window.setInterval=(fn)=>{interval=fn;return 1};
+const main=document.querySelector('video'),listeners=[];
+const state={features:{catchUp:true,adSpeed:1}};
+window.chrome={storage:{local:{get:async()=>state},onChanged:{addListener:fn=>listeners.push(fn)}}};
+const range=()=>({length:1,start:()=>0,end:()=>edge});
+const seeks=[];
+Object.defineProperties(main,{
+ currentTime:{get:()=>current,set:v=>{current=v;seeks.push(v)}},
+ seekable:{get:range},buffered:{get:range},paused:{get:()=>paused},
+ readyState:{get:()=>ready},seeking:{get:()=>seeking}
+});
+window.lastStatus='';document.addEventListener('chzzk-tools:player-status',e=>lastStatus=e.detail.text);
+const emit=name=>main.dispatchEvent(new Event(name));
+const step=(ms=1000)=>{now+=ms;interval()};
+const settings=value=>{state.features={...state.features,...value};listeners.forEach(fn=>fn({features:{newValue:state.features}},'local'))};
+</script>
+<script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js"></script>
+<script>
+(async()=>{
+ await Promise.resolve();await Promise.resolve();
+ check('시작 후 5초 기다리지 않고 최신 버퍼의 0.35초 전으로 이동',Math.abs(current-99.65)<.001);
+ step(1000);current=98.8;main.playbackRate=1;emit('timeupdate');
+ check('1초 정도 밀려도 바로 배속 보정',main.playbackRate>1);
+ step(1000);edge=103;emit('progress');
+ check('수신 이벤트만으로 누적 지연 해소',Math.abs(current-102.65)<.001);
+ const afterProgress=seeks.length;for(let i=0;i<100;i++)emit('progress');
+ check('이벤트가 몰려도 중복 이동하지 않음',seeks.length===afterProgress);
+ step(1000);current=102.63;emit('timeupdate');
+ check('최신 위치 근처에서는 1배속',main.playbackRate===1);
+ paused=true;current=90;edge=110;step();emit('progress');
+ check('일시정지 위치 유지',current===90&&main.playbackRate===1);
+ paused=false;ready=2;emit('playing');step();
+ check('버퍼 부족 시 이동하지 않음',current===90);
+ ready=4;now+=1000;emit('canplay');
+ check('재생 가능해지면 이벤트로 즉시 복귀',current>109);
+ // Browser seek events arrive after assignment; owned seeks must not suspend recovery.
+ emit('seeking');emit('seeked');
+ now+=1000;current=100;emit('seeking');current=101;emit('seeked');edge=120;step();emit('progress');
+ check('사용자의 되감기 존중',current===101);
+ now+=31000;emit('timeupdate');
+ check('수동 조작 보호 시간이 지나면 이벤트로 복귀',current>119);
+ now+=1000;emit('waiting');current=110;edge=122;step(1000);
+ check('실제 버퍼링에는 짧은 회복 시간 확보',current===110&&main.playbackRate===1);
+ now+=100;emit('canplay');
+ check('재생 가능 이벤트가 오면 회복 대기도 즉시 해제',current>121&&current<121.65);
+ now+=1000;emit('waiting');current=110;edge=124;step(2200);
+ check('재생 가능 이벤트가 없어도 2초 뒤 회복 상태 재검사',current>123&&current<123.65);
+ settings({catchUp:false});current=100;edge=130;step();emit('progress');
+ check('기능 해제 시 이벤트로도 보정하지 않음',current===100&&main.playbackRate===1);
+ settings({catchUp:true});step(3000);main.dataset.chzzkToolsManualRate='true';main.playbackRate=1.5;current=100;emit('progress');step();
+ check('수동 배속 유지',current===100&&main.playbackRate===1.5);
+ delete main.dataset.chzzkToolsManualRate;main.playbackRate=1;history.replaceState(null,'','/video/123');step();current=90;emit('progress');step();
+ check('다시보기는 이동하지 않음',current===90&&main.playbackRate===1);
+ document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+ document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
+})().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=JSON.stringify([{name:e.stack,passed:false}])});
+</script></body></html>

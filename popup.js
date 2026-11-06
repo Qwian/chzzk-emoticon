@@ -389,7 +389,7 @@ async function initializeFeatures() {
     favorites: "팔로우 없이 보관 채널 사용",
     followingExpanded: "팔로잉 채널 목록 상시 펼치기",
     followingRefresh: "팔로잉 방송 상태 30초마다 갱신",
-    catchUp: "끊김에 맞춰 조절하는 자동 실시간 따라잡기",
+    catchUp: "지연을 최소화하는 자동 실시간 따라잡기",
     adMute: "광고 자동 음소거",
     adAutoSkip: "활성화된 광고 SKIP 버튼 자동 누르기",
     adMini: "본방이 재생 중이면 광고를 우측 상단에 작게",

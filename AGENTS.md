@@ -37,6 +37,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/input-regression-harness.html` verifies limits, duplicate/repeat suppression, selection replacement and Enter/IME draft restoration.
 - `tests/send-composition-harness.html` verifies native composition-end pairing and successful-send draft reset without clearing rejected drafts.
 - `tests/site-player-harness.html` verifies search, favorites, adaptive catch-up and ad cleanup against simulated media.
+- `tests/low-latency-harness.html` verifies immediate startup/event-driven catch-up, buffer recovery and pause/manual-rate/rewind/VOD exclusions.
 - `tests/search-suggestions-harness.html` verifies immediate channel results, merged English/Korean matches, cancellation, stale-response protection, cache and failure behavior.
 - `tests/search-native-harness.html` reproduces native Enter/button handlers and a stalled parallel response.
 - `tests/media-speed-harness.html` runs the actual background script in a worker and verifies speed, measured-FPS stepping, iframe routing and editable-field exclusions.

@@ -15,15 +15,23 @@ test("catch-up never seeks outside loaded live buffer or across a hole to unload
   assert.equal(core.planCatchUp(base).seek, 78.5);
   assert.equal(core.planCatchUp({ ...base, buffered: [[40, 52], [98, 99]] }).seek, undefined);
   assert.equal(core.planCatchUp({ ...base, buffered: [[60, 80]] }).rate, 1);
-  assert.equal(core.planCatchUp({ ...base, lastSeek: 25000 }).seek, undefined);
+  assert.equal(core.planCatchUp({ ...base, lastSeek: 29000 }).seek, undefined);
 });
 test("catch-up preserves safety margin and uses modest rates for small gaps", () => {
-  const base = { time: 98, seekable: [[0, 100]], buffered: [[0, 100]], margin: 1.5, lastSeek: 0, now: 10000 };
-  assert.equal(core.planCatchUp(base).rate, 1.03);
-  assert.equal(core.planCatchUp({ ...base, time: 95 }).rate, 1.08);
+  const base = { time: 98, seekable: [[0, 100]], buffered: [[0, 100]], margin: 1.5, lastSeek: 0, now: 1000 };
+  assert.equal(core.planCatchUp(base).rate, 1.05);
+  assert.equal(core.planCatchUp({ ...base, time: 95 }).rate, 1.15);
   assert.equal(core.planCatchUp({ ...base, time: 99 }).rate, 1);
   assert.equal(core.planCatchUp({ ...base, seekable: [] }).rate, 1);
   assert.equal(core.planCatchUp({ ...base, force: true }).seek, 98.5);
+});
+test("low latency corrects a one-second backlog and recovers without a twenty-second wait", () => {
+  const base = { time: 98.5, seekable: [[0, 100]], buffered: [[0, 100]], margin: .35, lastSeek: 1000, now: 3000 };
+  assert.equal(core.planCatchUp(base).seek, 99.65);
+  assert.equal(core.planCatchUp({ ...base, now: 2999 }).seek, undefined);
+  assert.equal(core.planCatchUp({ ...base, time: 99.6 }).rate, 1);
+  assert.equal(core.planCatchUp({ ...base, time: 99, now: 2000 }).rate, 1.15);
+  assert.equal(core.planCatchUp({ ...base, buffered: [[0, 99.8]] }).seek, undefined);
 });
 test("channel matching excludes VOD, clips, malformed and third path segments", () => {
   const id = "a".repeat(32);

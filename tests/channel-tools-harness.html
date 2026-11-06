@@ -69,7 +69,10 @@ click(document.querySelector('#chzzk-channel-save'));await wait(180);check('보�
 click(rowFor(ids[1]).querySelector('.ct-star'));click(rowFor(ids[2]).querySelector('.ct-star'));await wait(250);check('빠른 별 해제에서 변경 누락 없음',state.followingFavorites.length===0&&!list.querySelector('.ct-channel-divider'));
 await chrome.storage.local.set({features:{followingExpanded:false}});document.querySelector('#collapse').setAttribute('aria-expanded','false');await wait(1700);
 check('상시 펼치기 끄면 접힌 상태 유지',document.querySelector('#collapse').getAttribute('aria-expanded')==='false');
-const player=document.querySelector('#chzzk-player-tools').shadowRoot;player.querySelector('#catch-up').checked=false;player.querySelector('#catch-up').dispatchEvent(new Event('change'));await wait(180);check('이동된 따라잡기 설정 저장',state.features.catchUp===false);
+const player=document.querySelector('#chzzk-player-tools').shadowRoot;
+check('패널을 열지 않아도 자동 따라잡기 켜짐은 초록색',!player.querySelector('details').open&&getComputedStyle(player.querySelector('summary')).color==='rgb(0, 220, 145)'&&getComputedStyle(player.querySelector('svg')).stroke==='rgb(0, 220, 145)');
+player.querySelector('#catch-up').checked=false;player.querySelector('#catch-up').dispatchEvent(new Event('change'));await wait(180);check('이동된 따라잡기 설정 저장',state.features.catchUp===false);
+check('자동 따라잡기 끄면 흰색 반투명으로 복귀',getComputedStyle(player.querySelector('summary')).color==='rgb(255, 255, 255)'&&Number(getComputedStyle(player.querySelector('summary')).opacity)<.4);
 check('보관 채널 정보 조회가 매번 반복되지 않음',apiCalls===3);
 const before=list.firstElementChild;list.replaceChild(before.cloneNode(true),before);await wait(250);check('사이트가 행을 다시 렌더링해도 별 중복 없음',rowFor(ids[0]).querySelectorAll('.ct-star').length===1);
 const nativeNav=list.closest('nav');nativeNav.remove();await wait(300);
