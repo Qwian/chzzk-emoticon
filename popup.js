@@ -402,15 +402,22 @@ async function initializeFeatures() {
     label.append(input, document.createTextNode(text)); panel.append(label); controls.set(key, input);
     input.addEventListener("change", () => saveFeature(key, input.checked));
   }
-  const modeLabel = document.createElement("label"), mode = document.createElement("select");
-  modeLabel.className = "send-option"; modeLabel.append(document.createTextNode("따라잡기 방식 "));
+  const mode = document.createElement("fieldset");
   mode.id = "feature-catchUpMode";
-  for (const [value, text] of [["stable", "안정 우선 (이전 방식)"], ["lowLatency", "최소 지연 (끊길 수 있음)"]]) {
-    const option = document.createElement("option"); option.value = value; option.textContent = text; mode.append(option);
+  mode.className = "catch-modes";
+  mode.innerHTML = `<legend>따라잡기 방식</legend><div class="mode-switch">
+    <span class="mode-thumb" aria-hidden="true"></span>
+    <label title="이전 방식 · 버퍼 여유를 두고 안정적으로 재생"><input type="radio" name="catch-mode" value="stable">안정 우선</label>
+    <label title="최대한 최신 영상으로 이동 · 끊길 수 있음"><input type="radio" name="catch-mode" value="lowLatency">최소 지연</label>
+  </div>`;
+  function syncMode() {
+    for (const input of mode.querySelectorAll('input')) input.checked = input.value === features.catchUpMode;
+    mode.disabled = !features.catchUp;
   }
-  mode.value = features.catchUpMode; mode.disabled = !features.catchUp;
-  modeLabel.append(mode); panel.append(modeLabel); controls.set("catchUpMode", mode);
-  mode.addEventListener("change", () => saveFeature("catchUpMode", mode.value));
+  syncMode(); panel.append(mode);
+  mode.addEventListener("change", event => {
+    if (event.target.matches('input[type="radio"]') && event.target.checked) saveFeature("catchUpMode", event.target.value);
+  });
   const chatNote = document.createElement("p"); chatNote.className = "intro";
   chatNote.textContent = "자유 배치 채팅: 치지직 생방송·다시보기의 넓은 화면과 숲 스크린모드에서 이동·크기·투명도를 조절합니다. 치지직 일반 화면과 겹치기 끔 상태에서도 채팅 왼쪽 경계로 폭을 조절합니다. 240px 최소 폭 제한은 없습니다. Alt+Shift+C로 겹치기를 전환합니다. 기존 템퍼몽키 자유 배치 스크립트가 실행 중이면 확장 쪽은 대기합니다. 대체해서 쓰려면 기존 스크립트를 끄고 탭을 새로고침하세요. 기존 배치값은 자동 이전되지 않습니다.";
   panel.append(chatNote);
@@ -449,7 +456,7 @@ async function initializeFeatures() {
       if (control.type === "checkbox") control.checked = Boolean(features[key]);
       else control.value = String(features[key]);
     }
-    mode.disabled = !features.catchUp;
+    syncMode();
   });
 }
 

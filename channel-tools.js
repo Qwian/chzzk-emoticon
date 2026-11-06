@@ -54,10 +54,23 @@
     details{position:relative}summary{display:flex;align-items:center;gap:5px;cursor:pointer;list-style:none;padding:8px;color:#fff;white-space:nowrap;font-weight:600;opacity:.35;transition:opacity .15s}summary::-webkit-details-marker{display:none}details:has(#catch-up:checked) summary{color:#00dc91;opacity:1}
     summary svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
     section{position:absolute;right:0;bottom:42px;width:255px;box-sizing:border-box;padding:14px;background:#1d2026f5;border:1px solid #ffffff2b;border-radius:10px;color:#f3f5f7;box-shadow:0 8px 26px #0005;line-height:1.5;z-index:100}
-    label{display:flex;gap:8px;align-items:center;font-weight:600}input{accent-color:#00dc91}select{min-width:0;max-width:100%;margin:10px 0;padding:5px;background:#292d35;color:#f3f5f7;border:1px solid #ffffff40;border-radius:5px}button{border:0;border-radius:6px;background:#00dc91;color:#07231a;padding:7px 12px;font:700 12px system-ui;cursor:pointer;margin-top:10px}button:disabled{opacity:.4;cursor:default}p{font-size:11px;color:#b5bbc6;margin:10px 0 0}
+    label{display:flex;gap:8px;align-items:center;font-weight:600}input{accent-color:#00dc91}button{border:0;border-radius:6px;background:#00dc91;color:#07231a;padding:7px 12px;font:700 12px system-ui;cursor:pointer;margin-top:10px}button:disabled{opacity:.4;cursor:default}p{font-size:11px;color:#b5bbc6;margin:10px 0 0}
+    .catch-modes{border:0;padding:0;margin:12px 0 0;min-width:0}.catch-modes legend{padding:0;margin-bottom:6px;font-weight:600}
+    .mode-switch{display:grid;grid-template-columns:1fr 1fr;position:relative;isolation:isolate;padding:3px;border-radius:7px;background:#111614}
+    .mode-switch label{position:relative;justify-content:center;gap:0;padding:8px 4px;border-radius:5px;color:#c4ccc8;font-size:12px;line-height:1.2;transition:color .2s}
+    .mode-switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+    .mode-switch label:has(input:checked){color:#07231a}.mode-switch label:has(input:focus-visible){outline:2px solid #e8fff5;outline-offset:-1px}
+    .mode-thumb{position:absolute;z-index:-1;left:3px;top:3px;bottom:3px;width:calc((100% - 6px)/2);border-radius:5px;background:#00dc91;pointer-events:none;transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+    .mode-switch:has(input[value="lowLatency"]:checked) .mode-thumb{transform:translateX(100%)}
+    .catch-modes:disabled .mode-switch{opacity:.4}.catch-modes:disabled input{cursor:default}
+    @media(prefers-reduced-motion:reduce){.mode-thumb,.mode-switch label{transition:none}}
   </style><details><summary aria-label="실시간 따라잡기 설정"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5M12 7v5l3 2"/></svg>따라잡기</summary><section>
     <label><input id="catch-up" type="checkbox">자동 실시간 따라잡기</label>
-    <label>방식 <select id="catch-mode"><option value="stable">안정 우선 (이전 방식)</option><option value="lowLatency">최소 지연 (끊길 수 있음)</option></select></label>
+    <fieldset id="catch-mode" class="catch-modes"><legend>따라잡기 방식</legend><div class="mode-switch">
+      <span class="mode-thumb" aria-hidden="true"></span>
+      <label title="이전 방식 · 버퍼 여유를 두고 안정적으로 재생"><input type="radio" name="catch-mode" value="stable">안정 우선</label>
+      <label title="최대한 최신 영상으로 이동 · 끊길 수 있음"><input type="radio" name="catch-mode" value="lowLatency">최소 지연</label>
+    </div></fieldset>
     <button id="catch-now" type="button">지금 따라잡기</button><p id="player-status" role="status"></p>
   </section></details>`;
   const $ = selector => playerUi.querySelector(selector);
@@ -136,7 +149,8 @@
     if (clip?.parentElement && clip.previousElementSibling !== playerHost) clip.before(playerHost);
     if (!clip) playerHost.remove();
     $("#catch-up").checked = settings.catchUp; $("#catch-now").disabled = !settings.catchUp;
-    $("#catch-mode").value = settings.catchUpMode; $("#catch-mode").disabled = !settings.catchUp;
+    for (const input of playerUi.querySelectorAll('#catch-mode input')) input.checked = input.value === settings.catchUpMode;
+    $("#catch-mode").disabled = !settings.catchUp;
     $("summary").title = "자동 따라잡기 " + (settings.catchUp ? "켜짐 · " + (settings.catchUpMode === "stable" ? "안정 우선" : "최소 지연") : "꺼짐");
     text($("#player-status"), playerStatus);
     const channel = currentChannel();
@@ -158,8 +172,9 @@
     });
   });
   $("#catch-up").addEventListener("change", () => update("features", value => ({ ...value, catchUp: $("#catch-up").checked })));
-  $("#catch-mode").addEventListener("change", () => {
-    const mode = $("#catch-mode").value;
+  $("#catch-mode").addEventListener("change", event => {
+    if (!event.target.matches('input[type="radio"]') || !event.target.checked) return;
+    const mode = event.target.value;
     update("features", value => ({ ...value, catchUpMode: mode }));
   });
   $("#catch-now").addEventListener("click", () => document.dispatchEvent(new CustomEvent("chzzk-tools:catch-up")));

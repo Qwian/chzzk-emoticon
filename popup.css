@@ -312,3 +312,15 @@ button:hover {
 
 .feature-panel { border-top: 1px solid #343c38; padding-top: 12px; }
 .feature-panel select { background: #1d2922; color: #eef5f1; border: 1px solid #4a6052; padding: 4px; border-radius: 5px; }
+.catch-modes { border: 0; padding: 0; margin: 15px 0 0; min-width: 0; }
+.catch-modes legend { padding: 0; margin-bottom: 7px; color: #d1d8d4; font-size: 12px; }
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; position: relative; isolation: isolate; padding: 3px; border-radius: 7px; background: #111614; }
+.mode-switch label { position: relative; padding: 9px 4px; border-radius: 5px; color: #c4ccc8; font-size: 12px; text-align: center; transition: color .2s; }
+.mode-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.mode-switch label:has(input:checked) { color: #07231a; }
+.mode-switch label:has(input:focus-visible) { outline: 2px solid #e8fff5; outline-offset: -1px; }
+.mode-thumb { position: absolute; z-index: -1; left: 3px; top: 3px; bottom: 3px; width: calc((100% - 6px)/2); border-radius: 5px; background: #00dc91; pointer-events: none; transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.mode-switch:has(input[value="lowLatency"]:checked) .mode-thumb { transform: translateX(100%); }
+.catch-modes:disabled .mode-switch { opacity: .4; }
+.catch-modes:disabled input { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .mode-thumb, .mode-switch label { transition: none; } }
