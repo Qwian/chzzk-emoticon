@@ -37,9 +37,9 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/input-regression-harness.html` verifies limits, duplicate/repeat suppression, selection replacement and Enter/IME draft restoration.
 - `tests/send-composition-harness.html` verifies native composition-end pairing and successful-send draft reset without clearing rejected drafts.
 - `tests/site-player-harness.html` verifies search, favorites, adaptive catch-up and ad cleanup against simulated media.
-- `tests/low-latency-harness.html` verifies immediate startup/event-driven catch-up, buffer recovery and pause/manual-rate/rewind/VOD exclusions.
-- `tests/catch-up-modes-harness.html` verifies bounded stable headroom, immediate backlog recovery and switching between stable and low-latency policies without concurrent controllers.
-- `tests/catch-up-seek-harness.html` is a fixture for trusted browser pointer/key tests that seek/rewind/rate changes do not add a 30-second hold; it does not auto-run assertions.
+- `tests/low-latency-harness.html` verifies speed-only automatic catch-up at the 1-second setting, buffer recovery and pause/manual-rate/VOD exclusions.
+- `tests/catch-up-modes-harness.html` verifies fixed 2/1.5/1-second choices, speed-only automatic correction and manual-only position jumps after buffering/long playback/settings changes.
+- `tests/catch-up-seek-harness.html` is a fixture for trusted browser pointer/key tests that automatic catch-up never writes currentTime and only explicit catch-now clicks do; it does not auto-run assertions.
 - `tests/catch-up-popup-harness.html` verifies the popup's exclusive mode selection, persistence and external settings sync.
 - `tests/search-suggestions-harness.html` verifies immediate channel results, merged English/Korean matches, cancellation, stale-response protection, cache and failure behavior.
 - `tests/search-native-harness.html` reproduces native Enter/button handlers and a stalled parallel response.

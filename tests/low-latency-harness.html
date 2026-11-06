@@ -8,7 +8,7 @@ Object.defineProperty(performance,'now',{value:()=>now});
 // Drive polling explicitly so event tests cannot pass because of the fallback timer.
 window.setInterval=(fn)=>{interval=fn;return 1};
 const main=document.querySelector('video'),listeners=[];
-const state={features:{catchUp:true,catchUpMode:'lowLatency',adSpeed:1}};
+const state={features:{catchUp:true,catchUpMode:'1',adSpeed:1}};
 window.chrome={storage:{local:{get:async()=>state},onChanged:{addListener:fn=>listeners.push(fn)}}};
 const range=()=>({length:1,start:()=>0,end:()=>edge});
 const seeks=[];
@@ -26,33 +26,33 @@ const settings=value=>{state.features={...state.features,...value};listeners.for
 <script>
 (async()=>{
  await Promise.resolve();await Promise.resolve();
- check('시작 후 5초 기다리지 않고 최신 버퍼의 0.35초 전으로 이동',Math.abs(current-99.65)<.001);
- step(1000);current=98.8;main.playbackRate=1;emit('timeupdate');
+ check('시작 후 5초 기다리지 않고 배속으로 보정',current===95&&main.playbackRate===1.15&&seeks.length===0);
+ step(1000);current=98.5;main.playbackRate=1;emit('timeupdate');
  check('1초 정도 밀려도 바로 배속 보정',main.playbackRate>1);
  step(1000);edge=103;emit('progress');
- check('수신 이벤트만으로 누적 지연 해소',Math.abs(current-102.65)<.001);
+ check('수신 이벤트에서는 위치를 건너뛰지 않고 배속 보정',current===98.5&&main.playbackRate===1.15&&seeks.length===0);
  const afterProgress=seeks.length;for(let i=0;i<100;i++)emit('progress');
  check('이벤트가 몰려도 중복 이동하지 않음',seeks.length===afterProgress);
- step(1000);current=102.63;emit('timeupdate');
+ step(1000);current=101.95;emit('timeupdate');
  check('최신 위치 근처에서는 1배속',main.playbackRate===1);
  paused=true;current=90;edge=110;step();emit('progress');
  check('일시정지 위치 유지',current===90&&main.playbackRate===1);
  paused=false;ready=2;emit('playing');step();
  check('버퍼 부족 시 이동하지 않음',current===90);
  ready=4;now+=1000;emit('canplay');
- check('재생 가능해지면 이벤트로 즉시 복귀',current>109);
+ check('재생 가능해지면 이벤트로 즉시 배속 복귀',current===90&&main.playbackRate===1.15);
  // Neither extension nor native-player seeking identifies an intentional rewind.
  emit('seeking');emit('seeked');
  now+=1000;current=100;emit('seeking');current=101;emit('seeked');edge=120;step();emit('progress');
- check('플레이어의 자동 위치 변경으로 30초 멈추지 않음',current>119);
+ check('플레이어의 자동 위치 변경으로 30초 멈추지 않음',current===101&&main.playbackRate===1.15);
  now+=31000;emit('timeupdate');
- check('자동 위치 변경 뒤에도 이벤트 보정 유지',current>119);
+ check('자동 위치 변경 뒤에도 이벤트 보정 유지',current===101&&main.playbackRate===1.15);
  now+=1000;emit('waiting');current=110;edge=122;step(1000);
  check('실제 버퍼링에는 짧은 회복 시간 확보',current===110&&main.playbackRate===1);
  now+=100;emit('canplay');
- check('재생 가능 이벤트가 오면 회복 대기도 즉시 해제',current>121&&current<121.65);
+ check('재생 가능 이벤트가 오면 회복 대기도 즉시 해제',current===110&&main.playbackRate===1.15);
  now+=1000;emit('waiting');current=110;edge=124;step(2200);
- check('재생 가능 이벤트가 없어도 2초 뒤 회복 상태 재검사',current>123&&current<123.65);
+ check('재생 가능 이벤트가 없어도 2초 뒤 회복 상태 재검사',current===110&&main.playbackRate===1.15);
  settings({catchUp:false});current=100;edge=130;step();emit('progress');
  check('기능 해제 시 이벤트로도 보정하지 않음',current===100&&main.playbackRate===1);
  settings({catchUp:true});step(3000);main.dataset.chzzkToolsManualRate='true';main.playbackRate=1.5;current=100;emit('progress');step();

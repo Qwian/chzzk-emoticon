@@ -3,13 +3,13 @@
 <script>
 history.replaceState(null,'','/live/'+'a'.repeat(32));
 const results=[],check=(name,passed)=>results.push({name,passed});
-let now=100000,current=50,edge=100,interval;
+let now=100000,current=50,edge=100,interval,seeks=0;
 Object.defineProperty(performance,'now',{value:()=>now});
 window.setInterval=fn=>{interval=fn;return 1};
 const main=document.querySelector('video'),listeners=[],state={features:{catchUp:true,adSpeed:1}};
 window.chrome={storage:{local:{get:async()=>state},onChanged:{addListener:fn=>listeners.push(fn)}}};
 const range=()=>({length:1,start:()=>0,end:()=>edge});
-Object.defineProperties(main,{currentTime:{get:()=>current,set:v=>current=v},seekable:{get:range},buffered:{get:range},paused:{get:()=>false},readyState:{get:()=>4},seeking:{get:()=>false}});
+Object.defineProperties(main,{currentTime:{get:()=>current,set:v=>{current=v;seeks++}},seekable:{get:range},buffered:{get:range},paused:{get:()=>false},readyState:{get:()=>4},seeking:{get:()=>false}});
 const emit=name=>main.dispatchEvent(new Event(name));
 const step=ms=>{now+=ms;interval()};
 const settings=value=>{state.features={...state.features,...value};listeners.forEach(fn=>fn({features:{newValue:state.features}},'local'))};
@@ -18,28 +18,22 @@ const settings=value=>{state.features={...state.features,...value};listeners.for
 <script>
 (async()=>{
  await Promise.resolve();await Promise.resolve();
- check('안정 우선도 재생 가능하면 시작부터 1.5초 여유로 당김',current===98.5);
- step(3000);current=96;emit('progress');
- check('안정 우선도 수신 이벤트에서 밀린 위치를 즉시 당김',current===98.5);
- step(3000);emit('waiting');current=80;step(1000);
- check('실제 버퍼링 직후에는 무리하게 이동하지 않음',current===80&&main.playbackRate===1);
- now+=100;emit('canplay');
- check('안정 우선도 재생 가능하면 15초 대기 없이 당김',current===98.5);
- let bounded=true;
- for(let i=0;i<10;i++){now+=3000;emit('waiting');current=94;emit('canplay');bounded&&=current===98.5}
- check('반복 버퍼링 뒤에도 6초 밀린 영상을 1.5초 여유로 계속 당김',bounded);
- now+=100;current=95;emit('progress');
- check('이동 직후에는 이벤트로 이동 간격 제한을 우회하지 않음',current===95);
- step(3000);check('짧은 이동 보호 뒤에는 밀린 위치를 다시 당김',current===98.5);
- settings({catchUpMode:'lowLatency'});
- check('최소 지연으로 전환하면 이전 회복 대기와 여유를 해제',Math.abs(current-99.65)<.001);
- step(1000);current=98.8;emit('timeupdate');
- check('최소 지연의 이벤트 보정만 동작',main.playbackRate===1.15);
- settings({catchUpMode:'stable'});current=80;edge=110;now+=3000;emit('canplay');
- check('안정 우선으로 복귀해도 새 여유로 바로 당김',current===108.5);
- settings({catchUp:false,catchUpMode:'lowLatency'});current=50;edge=120;step(30000);emit('progress');
- check('꺼짐 상태에서 방식 전환해도 보정하지 않음',current===50&&main.playbackRate===1);
- settings({catchUp:true});check('다시 켜면 선택했던 최소 지연 하나만 적용',Math.abs(current-119.65)<.001);
+ check('시작부터 배속으로 따라잡고 자동으로 위치를 건너뛰지 않음',current===50&&main.playbackRate===1.15&&seeks===0);
+ for(const mode of ['2','1.5','1']){
+  current=80;settings({catchUpMode:mode});step(1000);emit('progress');
+  const before=seeks;
+  check(mode+'초 선택 시 배속 보정만 실행',current===80&&main.playbackRate===1.15);
+  let smooth=true;
+  for(let i=0;i<10;i++){now+=3000;emit('waiting');current=80;emit('canplay');smooth&&=current===80&&main.playbackRate===1.15&&seeks===before}
+  check(mode+'초 반복 버퍼링 뒤에도 자동 위치 이동 없음',smooth);
+  step(600000);document.dispatchEvent(new CustomEvent('chzzk-tools:catch-up'));
+  check(mode+'초는 오래 재생해도 수동 따라잡기 여유가 고정',current===100-Number(mode)&&seeks===before+1);
+  step(1000);current=100-Number(mode)-.05;emit('timeupdate');
+  check(mode+'초 목표 부근에서는 1배속',main.playbackRate===1);
+ }
+ settings({catchUp:false});current=50;const before=seeks;step(30000);emit('progress');
+ check('꺼짐 상태에서는 배속과 위치 보정을 하지 않음',current===50&&main.playbackRate===1&&seeks===before);
+ settings({catchUp:true});check('다시 켜면 선택했던 1초를 배속으로 따라잡음',current===50&&main.playbackRate===1.15&&seeks===before);
  document.querySelector('#result').textContent=JSON.stringify(results,null,2);
  document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
 })().catch(e=>{document.body.dataset.result='fail';document.querySelector('#result').textContent=JSON.stringify([{name:e.stack,passed:false}])});

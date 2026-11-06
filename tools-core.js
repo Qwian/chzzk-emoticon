@@ -1,6 +1,6 @@
 (() => {
   const defaults = Object.freeze({
-    koreanSearch: true, favorites: true, catchUp: true, catchUpMode: "stable", followingExpanded: true, followingRefresh: true,
+    koreanSearch: true, favorites: true, catchUp: true, catchUpMode: "2", followingExpanded: true, followingRefresh: true,
     adMute: true, adSpeed: 4, adMini: true, mainAudio: true, adAutoSkip: true, adblockQuality: true,
     globalSpeed: true, playerShortcuts: true, channelLiveLink: true, listPreview: true, sidebarPreview: true, freeChat: true, youtubeWide: true, nexonWide: true, highestQuality: true, dismissAdNotice: true
   });
@@ -42,26 +42,30 @@
   function features(value) {
     const next = { ...defaults, ...value };
     next.adSpeed = [1, 2, 4, 8, 16].includes(Number(next.adSpeed)) ? Number(next.adSpeed) : 4;
-    next.catchUpMode = next.catchUpMode === "lowLatency" ? "lowLatency" : "stable";
+    next.catchUpMode = normalizeCatchUpMode(next.catchUpMode);
     return next;
   }
 
-  const catchUpProfiles = Object.freeze({
-    stable: Object.freeze({ initialMargin: 1.5, minMargin: 0.75, maxMargin: 1.5, waitingStep: 0.25,
+  const catchUpOptions = Object.freeze([
+    Object.freeze({ value: "2", seconds: 2, label: "2초", hint: "2초 여유\n비교적 안정적 · 끊길 수 있음" }),
+    Object.freeze({ value: "1.5", seconds: 1.5, label: "1.5초", hint: "1.5초 여유\n회선에 따라 끊길 수 있음" }),
+    Object.freeze({ value: "1", seconds: 1, label: "1초", hint: "1초 여유\n지연이 짧지만 끊길 수 있음" })
+  ]);
+  function normalizeCatchUpMode(mode) {
+    const value = String(mode);
+    return catchUpOptions.some(option => option.value === value) ? value : "2";
+  }
+  const catchUpProfiles = Object.freeze(Object.fromEntries(catchUpOptions.map(option => [option.value,
+    Object.freeze({ initialMargin: option.seconds, minMargin: option.seconds, maxMargin: option.seconds,
       startDelay: 0, recoveryDelay: 2000, adDelay: 750, seekCooldown: 750,
-      seekInterval: 3000, seekGap: 0.75, forceSeekGap: 0.35, stopGap: 0.15,
-      fastGap: 0.75, fastRate: 1.08, slowRate: 1.03, stableInterval: 60000, marginStep: 0.25, eventDriven: true }),
-    lowLatency: Object.freeze({ initialMargin: 0.35, minMargin: 0.35, maxMargin: 0.75, waitingStep: 0.25,
-      startDelay: 0, recoveryDelay: 2000, adDelay: 750, seekCooldown: 750,
-      seekInterval: 2000, seekGap: 1, forceSeekGap: 0.1, stopGap: 0.1,
-      fastGap: 0.5, fastRate: 1.15, slowRate: 1.05, stableInterval: 10000, marginStep: 0.1, eventDriven: true })
-  });
-  function catchUpProfile(mode) { return catchUpProfiles[mode === "lowLatency" ? "lowLatency" : "stable"]; }
+      forceSeekGap: 0.1, stopGap: 0.15,
+      fastGap: 2, fastRate: 1.15, mediumGap: 0.5, mediumRate: 1.08, slowRate: 1.03, eventDriven: true })
+  ])));
+  function catchUpProfile(mode) { return catchUpProfiles[normalizeCatchUpMode(mode)]; }
 
-  function planCatchUp({ time, seekable, buffered, margin, lastSeek, now, force = false, mode = "stable" }) {
+  function planCatchUp({ time, seekable, buffered, force = false, mode = "2" }) {
     const profile = catchUpProfile(mode);
-    // Recovery must not turn several seconds of accumulated latency into the target.
-    margin = Math.min(profile.maxMargin, Math.max(profile.minMargin, Number.isFinite(margin) ? margin : profile.initialMargin));
+    const margin = profile.initialMargin;
     if (!Number.isFinite(time) || !seekable.length) return { rate: 1, reason: "재생 범위 대기" };
     const latest = seekable[seekable.length - 1];
     const buffer = buffered.find(([start, end]) => start <= time + 0.05 && end >= time);
@@ -72,11 +76,13 @@
     const target = edge - margin;
     const gap = edge - time;
     const ahead = buffer[1] - time;
-    if (target >= Math.max(latest[0], fresh[0]) && target > time + (force ? profile.forceSeekGap : profile.seekGap) && (force || now - lastSeek >= profile.seekInterval)) {
-      return { seek: target, rate: 1, gap, reason: "최신 버퍼로 이동" };
+    // Automatic recovery only accelerates. A jump is reserved for catch-now.
+    if (force && target >= Math.max(latest[0], fresh[0]) && target > time + profile.forceSeekGap) {
+      return { seek: target, rate: 1, gap: margin, reason: "최신 버퍼로 이동" };
     }
     if (ahead < margin || gap <= margin + profile.stopGap) return { rate: 1, gap, reason: "안정 재생" };
-    return { rate: gap > margin + profile.fastGap ? profile.fastRate : profile.slowRate, gap, reason: "실시간 따라잡는 중" };
+    const rate = gap > margin + profile.fastGap ? profile.fastRate : gap > margin + profile.mediumGap ? profile.mediumRate : profile.slowRate;
+    return { rate, gap, reason: rate + "배속으로 따라잡는 중" };
   }
 
   function channelId(path) {
@@ -91,5 +97,5 @@
     return [...items].sort((a, b) => channelGroup(a, favorites) - channelGroup(b, favorites) ||
       (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.10.20", defaults, features, koreanFromEnglish, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.10.21", defaults, features, koreanFromEnglish, catchUpOptions, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup });
 })();

@@ -405,10 +405,9 @@ async function initializeFeatures() {
   const mode = document.createElement("fieldset");
   mode.id = "feature-catchUpMode";
   mode.className = "catch-modes";
-  mode.innerHTML = `<legend>따라잡기 방식</legend><div class="mode-switch">
+  mode.innerHTML = `<legend>따라잡기 여유</legend><div class="mode-switch">
     <span class="mode-thumb" aria-hidden="true"></span>
-    <label title="0.75~1.5초 여유를 남기고 밀리면 계속 따라잡기"><input type="radio" name="catch-mode" value="stable">안정 우선</label>
-    <label title="최대한 최신 영상으로 이동 · 끊길 수 있음"><input type="radio" name="catch-mode" value="lowLatency">최소 지연</label>
+    ${core.catchUpOptions.map((option, index) => `<label><input type="radio" name="catch-mode" value="${option.value}" aria-describedby="popup-catch-hint-${index}">${option.label}</label><span class="mode-hint" id="popup-catch-hint-${index}" role="tooltip">${option.hint}</span>`).join("")}
   </div>`;
   function syncMode() {
     for (const input of mode.querySelectorAll('input')) input.checked = input.value === features.catchUpMode;

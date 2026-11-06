@@ -40,7 +40,7 @@
     const search=document.querySelector('#search-input'); search.value='rkdwl';search.dispatchEvent(new Event('input',{bubbles:true}));
     check('영타 검색과 영문 원문 검색 모두 표시',document.querySelector('#chzzk-tools-search-hint').textContent.includes('강지 전체 검색')&&document.querySelector('#chzzk-tools-search-hint a:last-child').getAttribute('href').includes('rkdwl'));
     panel.querySelector('#catch-now').click();
-    check('안정 우선으로 이동 가능한 최신 버퍼 안으로 따라잡기',Math.abs(current-98.5)<.01);
+    check('선택한 2초 여유로 최신 버퍼 안으로 수동 따라잡기',Math.abs(current-98)<.01);
     main.dispatchEvent(new Event('waiting')); now+=1000; await delay(1100);
     check('끊김 후 즉시 다시 당기지 않음',panel.querySelector('#player-status').textContent.includes('버퍼 회복'));
     document.querySelector('#midAdPlayerWrapper').style.display='block';

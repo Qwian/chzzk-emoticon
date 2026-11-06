@@ -8,13 +8,13 @@ document.querySelector('iframe').addEventListener('load',async()=>{
   for(let i=0;i<30&&!win.document.querySelector('#feature-catchUpMode');i++)await wait();
   const mode=win.document.querySelector('#feature-catchUpMode'),enabled=win.document.querySelector('#feature-catchUp');
   const selectedMode=()=>mode.querySelector('input:checked')?.value;
-  check('기본값은 안정 우선 단일 선택',selectedMode()==='stable'&&mode.querySelectorAll('input').length===2&&mode.querySelectorAll(':checked').length===1&&!mode.querySelector('select'));
-  mode.querySelector('input[value="lowLatency"]').click();await wait();
-  check('최소 지연 선택을 저장',win.savedFeatures.catchUpMode==='lowLatency'&&mode.querySelectorAll(':checked').length===1);
+  check('기본값은 세 여유 중 2초 단일 선택',selectedMode()==='2'&&mode.querySelectorAll('input').length===3&&mode.querySelectorAll(':checked').length===1&&!mode.querySelector('select'));
+  mode.querySelector('input[value="1"]').click();await wait();
+  check('1초 선택을 저장',win.savedFeatures.catchUpMode==='1'&&mode.querySelectorAll(':checked').length===1);
   enabled.checked=false;enabled.dispatchEvent(new win.Event('change'));await wait();
-  check('자동 따라잡기를 끄면 방식 선택도 비활성화',mode.disabled&&win.savedFeatures.catchUpMode==='lowLatency'&&!win.savedFeatures.catchUp);
-  await win.chrome.storage.local.set({features:{...win.savedFeatures,catchUp:true,catchUpMode:'stable'}});await wait();
-  check('플레이어 설정 변경 동기화와 활성화',selectedMode()==='stable'&&!mode.disabled&&enabled.checked&&mode.querySelectorAll(':checked').length===1);
+  check('자동 따라잡기를 끄면 여유 선택도 비활성화',mode.disabled&&win.savedFeatures.catchUpMode==='1'&&!win.savedFeatures.catchUp);
+  await win.chrome.storage.local.set({features:{...win.savedFeatures,catchUp:true,catchUpMode:'1.5'}});await wait();
+  check('플레이어 설정 변경 동기화와 활성화',selectedMode()==='1.5'&&!mode.disabled&&enabled.checked&&mode.querySelectorAll(':checked').length===1);
   document.querySelector('#result').textContent=JSON.stringify(results,null,2);
   document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';
  }catch(e){document.body.dataset.result='fail';document.querySelector('#result').textContent=JSON.stringify([{name:e.stack,passed:false}])}

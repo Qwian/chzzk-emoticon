@@ -5,7 +5,7 @@
   let settings = core.features();
   let activeMain = null, lastUrl = "", lastNormal = null, adActive = false;
   let profile = core.catchUpProfile(settings.catchUpMode);
-  let margin = profile.initialMargin, lastSeek = -Infinity, cooldown = 0, stableSince = performance.now();
+  let margin = profile.initialMargin, cooldown = 0;
   let lastCatchUp = -Infinity;
   let bufferRecovery = false;
   let ownedRate = null;
@@ -86,12 +86,10 @@
     restoreRate();
     bufferRecovery = false;
     cooldown = performance.now() + milliseconds;
-    stableSince = performance.now();
     status = reason;
   }
   function waiting() {
     if (adActive || !settings.catchUp || activeMain?.paused || activeMain?.seeking) return;
-    margin = Math.min(profile.maxMargin, margin + profile.waitingStep);
     suspend("버퍼 회복 중 · 여유 " + margin.toFixed(1) + "초");
     bufferRecovery = true;
   }
@@ -117,7 +115,6 @@
     activeMain = main; margin = profile.initialMargin; lastNormal = null;
     if (!adActive) beforeAdAudio = null;
     cooldown = performance.now() + profile.startDelay; bufferRecovery = false; lastCatchUp = -Infinity;
-    stableSince = performance.now();
     if (main) {
       main.addEventListener("waiting", waiting);
       main.addEventListener("ratechange", externalRate);
@@ -217,7 +214,7 @@
       audioRecovery = null; beforeAdAudio = null;
       ads.wrappers();
       restorePatches(); restoreRate(); bind(null); lastUrl = location.href;
-      adActive = false; lastSeek = -Infinity;
+      adActive = false;
     }
     const live = /^\/live\/[a-f0-9]{32}\/?$/i.test(location.pathname);
     const vod = /^\/video\/\d+\/?$/i.test(location.pathname);
@@ -309,9 +306,8 @@
     if (ownedRate === null && Math.abs(main.playbackRate - 1) > 0.001) {
       announce("사용자 배속 유지"); return;
     }
-    if (now - stableSince > profile.stableInterval) { margin = Math.max(profile.minMargin, margin - profile.marginStep); stableSince = now; }
-    const plan = core.planCatchUp({ time: main.currentTime, seekable: ranges(main.seekable), buffered: ranges(main.buffered), margin, lastSeek, now, force, mode: settings.catchUpMode });
-    if (plan.seek !== undefined) { main.currentTime = plan.seek; lastSeek = now; cooldown = now + profile.seekCooldown; }
+    const plan = core.planCatchUp({ time: main.currentTime, seekable: ranges(main.seekable), buffered: ranges(main.buffered), force, mode: settings.catchUpMode });
+    if (plan.seek !== undefined) { main.currentTime = plan.seek; cooldown = now + profile.seekCooldown; }
     setRate(plan.rate);
     status = plan.reason + (Number.isFinite(plan.gap) ? ` · 최신 버퍼까지 ${plan.gap.toFixed(1)}초` : "");
     announce(status);
@@ -334,8 +330,8 @@
     if (next.catchUpMode !== settings.catchUpMode) {
       restoreRate();
       profile = core.catchUpProfile(next.catchUpMode);
-      margin = profile.initialMargin; lastSeek = -Infinity; lastCatchUp = -Infinity;
-      suspend("따라잡기 방식 변경 · " + (next.catchUpMode === "stable" ? "안정 우선" : "최소 지연"), profile.startDelay);
+      margin = profile.initialMargin; lastCatchUp = -Infinity;
+      suspend("따라잡기 여유 변경 · " + next.catchUpMode + "초", profile.startDelay);
     }
     settings = next;
   }
@@ -348,7 +344,7 @@
     refreshAds();
   });
   document.addEventListener("chzzk-tools:catch-up", () => {
-    cooldown = 0; lastSeek = -Infinity; tick(true);
+    cooldown = 0; tick(true);
   });
   function refreshAds() { try { tick(); } catch { restoreRate(); announce("플레이어 연결 대기"); } }
   document.addEventListener('chzzk-tools:ad-dom-change', refreshAds);

@@ -314,13 +314,16 @@ button:hover {
 .feature-panel select { background: #1d2922; color: #eef5f1; border: 1px solid #4a6052; padding: 4px; border-radius: 5px; }
 .catch-modes { border: 0; padding: 0; margin: 15px 0 0; min-width: 0; }
 .catch-modes legend { padding: 0; margin-bottom: 7px; color: #d1d8d4; font-size: 12px; }
-.mode-switch { display: grid; grid-template-columns: 1fr 1fr; position: relative; isolation: isolate; padding: 3px; border-radius: 7px; background: #111614; }
+.mode-switch { display: grid; grid-template-columns: repeat(3, 1fr); position: relative; isolation: isolate; padding: 3px; border-radius: 7px; background: #111614; }
 .mode-switch label { position: relative; padding: 9px 4px; border-radius: 5px; color: #c4ccc8; font-size: 12px; text-align: center; transition: color .2s; }
 .mode-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .mode-switch label:has(input:checked) { color: #07231a; }
 .mode-switch label:has(input:focus-visible) { outline: 2px solid #e8fff5; outline-offset: -1px; }
-.mode-thumb { position: absolute; z-index: -1; left: 3px; top: 3px; bottom: 3px; width: calc((100% - 6px)/2); border-radius: 5px; background: #00dc91; pointer-events: none; transition: transform .22s cubic-bezier(.2,.8,.2,1); }
-.mode-switch:has(input[value="lowLatency"]:checked) .mode-thumb { transform: translateX(100%); }
+.mode-thumb { position: absolute; z-index: -1; left: 3px; top: 3px; bottom: 3px; width: calc((100% - 6px)/3); border-radius: 5px; background: #00dc91; pointer-events: none; transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.mode-switch:has(input[value="1.5"]:checked) .mode-thumb { transform: translateX(100%); }
+.mode-switch:has(input[value="1"]:checked) .mode-thumb { transform: translateX(200%); }
+.mode-hint { display: none; position: absolute; z-index: 5; left: 0; right: 0; bottom: calc(100% + 7px); box-sizing: border-box; padding: 8px 10px; border: 1px solid #00dc9180; border-radius: 6px; background: #101c17; color: #e4f5ec; box-shadow: 0 4px 16px #0007; pointer-events: none; font: 11px/1.5 system-ui; text-align: left; white-space: pre-line; }
+.mode-switch label:hover + .mode-hint, .mode-switch:not(:has(label:hover)) label:has(input:focus-visible) + .mode-hint { display: block; }
 .catch-modes:disabled .mode-switch { opacity: .4; }
 .catch-modes:disabled input { cursor: default; }
 @media (prefers-reduced-motion: reduce) { .mode-thumb, .mode-switch label { transition: none; } }

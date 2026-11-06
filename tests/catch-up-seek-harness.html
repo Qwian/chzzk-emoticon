@@ -2,23 +2,24 @@
 <body tabindex="-1"><div class="pzp"><video class="webplayer-internal-video" style="width:640px;height:360px"></video>
 <button class="pzp-pc__progress-slider">타임바 이동 모형</button></div>
 <button id="catch-now">지금 따라잡기 모형</button>
-<label><input type="radio" name="mode" value="stable" checked>안정 우선 모형</label>
-<label><input type="radio" name="mode" value="lowLatency">최소 지연 모형</label>
+<label><input type="radio" name="mode" value="2" checked>2초 모형</label>
+<label><input type="radio" name="mode" value="1.5">1.5초 모형</label>
+<label><input type="radio" name="mode" value="1">1초 모형</label>
 <pre id="status"></pre><script>
-const mode=new URLSearchParams(location.search).get('mode')||'stable';
+const mode=new URLSearchParams(location.search).get('mode')||'2';
 history.replaceState(null,'','/live/'+'a'.repeat(32));
-let now=100000,current=50,interval;
+let now=100000,current=50,interval,seeks=0;
 Object.defineProperty(performance,'now',{value:()=>now});
 window.setInterval=fn=>{interval=fn;return 1};
 const main=document.querySelector('video'),listeners=[],state={features:{catchUp:true,catchUpMode:mode,adSpeed:1}};
 window.chrome={storage:{local:{get:async()=>state},onChanged:{addListener:fn=>listeners.push(fn)}}};
 const range=()=>({length:1,start:()=>0,end:()=>100});
-Object.defineProperties(main,{currentTime:{get:()=>current,set:v=>current=v},seekable:{get:range},buffered:{get:range},paused:{get:()=>false},readyState:{get:()=>4},seeking:{get:()=>false}});
+Object.defineProperties(main,{currentTime:{get:()=>current,set:v=>{current=v;seeks++}},seekable:{get:range},buffered:{get:range},paused:{get:()=>false},readyState:{get:()=>4},seeking:{get:()=>false}});
 const emit=name=>main.dispatchEvent(new Event(name));
 const move=value=>{current=value;emit('seeking');emit('seeked')};
 document.querySelector('.pzp-pc__progress-slider').onclick=()=>move(60);
 document.querySelector('#catch-now').onclick=()=>document.dispatchEvent(new CustomEvent('chzzk-tools:catch-up'));
 document.addEventListener('keydown',e=>{if(e.code==='ArrowLeft'&&e.target===document.body)move(60)});
 document.addEventListener('chzzk-tools:player-status',e=>document.querySelector('#status').textContent=e.detail.text);
-window.catchUpSeekProbe={step(ms){now+=ms;interval()},move,delayedSeek(){now+=3000;current+=.7;emit('seeking');emit('seeked')},setCurrent(value){current=value},setRate(value){main.playbackRate=value;emit('ratechange')},event:emit,snapshot(){return{current,rate:main.playbackRate,status:document.querySelector('#status').textContent}}};
+window.catchUpSeekProbe={step(ms){now+=ms;interval()},move,delayedSeek(){now+=3000;current+=.7;emit('seeking');emit('seeked')},setCurrent(value){current=value},setRate(value){main.playbackRate=value;emit('ratechange')},event:emit,snapshot(){return{current,rate:main.playbackRate,seeks,status:document.querySelector('#status').textContent}}};
 </script><script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js"></script></body></html>
