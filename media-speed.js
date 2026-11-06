@@ -5,7 +5,7 @@
   let enabled = true, desiredRate = null, toastTimer = 0, remoteMediaUntil = 0, reportTimer = 0, reportSoonTimer = 0, reportedMedia = false, stopped = false;
   let resumeRate = null, commandId = 0, remoteRate = null;
   const clientId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-  const mediaEvents = ["loadedmetadata", "ratechange", "play", "pause", "emptied"];
+  const mediaEvents = ["loadedmetadata", "ratechange", "play", "pause", "emptied", "chzzk-tools:catch-up-owner"];
   function unwatch(element) {
     mediaEvents.forEach(name => element.removeEventListener(name, onMediaEvent));
     const info = frameInfo.get(element);
@@ -94,6 +94,10 @@
     }, 1600);
   }
   function applyRate(element) {
+    if (element.dataset.chzzkToolsCatchUp === "true") {
+      delete element.dataset.chzzkToolsManualRate;
+      return;
+    }
     if (!enabled || desiredRate === null || isAd(element)) return;
     try {
       element.dataset.chzzkToolsManualRate = String(desiredRate);
@@ -189,6 +193,9 @@
     if (event.shiftKey && !video && !frame) return;
     event.preventDefault(); event.stopImmediatePropagation();
     if (event.code === "Slash" && event.repeat) return;
+    if (!event.shiftKey && video?.dataset.chzzkToolsCatchUp === "true") {
+      toast("자동 따라잡기가 배속을 조절하고 있습니다."); return;
+    }
     const message = event.shiftKey ? { action: "step", direction: event.code === "Comma" ? -1 : 1, hasVideo: Boolean(video) } :
       { action: event.code === "Slash" ? "reset" : event.code === "Comma" ? "decrease" : "increase", hasMedia: Boolean(video || audio), currentRate: (video || audio)?.playbackRate || 1 };
     if (!event.shiftKey) {
@@ -215,7 +222,7 @@
     if (stopped) return;
     if (message.type === "GET_TOOL_STATUS") {
       document.dispatchEvent(new Event("chzzk-tools:quality-query"));
-      respond({ ok: true, codeVersion: "0.10.14", quality: globalThis.__chzzkQualityStatus,
+      respond({ ok: true, codeVersion: "0.10.22", quality: globalThis.__chzzkQualityStatus,
         playerShortcuts: globalThis.__chzzkPlayerShortcutStatus?.(),
         videoHeight: bestVideo()?.videoHeight || 0 }); return;
     }

@@ -56,7 +56,7 @@ const settings=value=>{state.features={...state.features,...value};listeners.for
  settings({catchUp:false});current=100;edge=130;step();emit('progress');
  check('기능 해제 시 이벤트로도 보정하지 않음',current===100&&main.playbackRate===1);
  settings({catchUp:true});step(3000);main.dataset.chzzkToolsManualRate='true';main.playbackRate=1.5;current=100;emit('progress');step();
- check('수동 배속 유지',current===100&&main.playbackRate===1.5);
+ check('체크된 자동 따라잡기는 수동 표시보다 우선해 실제 배속 보정',current===100&&main.playbackRate===1.15&&!main.dataset.chzzkToolsManualRate);
  delete main.dataset.chzzkToolsManualRate;main.playbackRate=1;history.replaceState(null,'','/video/123');step();current=90;emit('progress');step();
  check('다시보기는 이동하지 않음',current===90&&main.playbackRate===1);
  document.querySelector('#result').textContent=JSON.stringify(results,null,2);

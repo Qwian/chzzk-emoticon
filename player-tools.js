@@ -82,6 +82,15 @@
     if (activeMain.playbackRate !== rate) activeMain.playbackRate = rate;
     ownedRate = rate;
   }
+  function setCatchUpOwnership(main, enabled) {
+    if (!main) return;
+    const previous = main.dataset.chzzkToolsCatchUp === "true";
+    if (enabled) {
+      main.dataset.chzzkToolsCatchUp = "true";
+      delete main.dataset.chzzkToolsManualRate;
+    } else delete main.dataset.chzzkToolsCatchUp;
+    if (previous !== enabled) main.dispatchEvent(new CustomEvent("chzzk-tools:catch-up-owner", { bubbles: true }));
+  }
   function suspend(reason, milliseconds = profile.recoveryDelay) {
     restoreRate();
     bufferRecovery = false;
@@ -93,34 +102,27 @@
     suspend("버퍼 회복 중 · 여유 " + margin.toFixed(1) + "초");
     bufferRecovery = true;
   }
-  function externalRate() {
-    if (ownedRate !== null && activeMain?.playbackRate !== ownedRate) {
-      ownedRate = null;
-      status = "사용자 배속 유지";
-    }
-  }
   function sourceChanged() {
     suspend("영상 전환 · 재생 안정화 중", profile.startDelay);
   }
   function bind(main) {
     if (activeMain === main) return;
     restoreRate();
+    setCatchUpOwnership(activeMain, false);
     if (activeMain) {
       activeMain.removeEventListener("waiting", waiting);
-      activeMain.removeEventListener("ratechange", externalRate);
       activeMain.removeEventListener("loadedmetadata", sourceChanged);
       activeMain.removeEventListener("volumechange", repairAudio);
-      for (const name of ["progress", "timeupdate", "playing", "canplay"]) activeMain.removeEventListener(name, refreshCatchUp);
+      for (const name of ["progress", "timeupdate", "playing", "canplay", "ratechange"]) activeMain.removeEventListener(name, refreshCatchUp);
     }
     activeMain = main; margin = profile.initialMargin; lastNormal = null;
     if (!adActive) beforeAdAudio = null;
     cooldown = performance.now() + profile.startDelay; bufferRecovery = false; lastCatchUp = -Infinity;
     if (main) {
       main.addEventListener("waiting", waiting);
-      main.addEventListener("ratechange", externalRate);
       main.addEventListener("loadedmetadata", sourceChanged);
       main.addEventListener("volumechange", repairAudio);
-      for (const name of ["progress", "timeupdate", "playing", "canplay"]) main.addEventListener(name, refreshCatchUp);
+      for (const name of ["progress", "timeupdate", "playing", "canplay", "ratechange"]) main.addEventListener(name, refreshCatchUp);
     }
   }
   const style = document.createElement("style");
@@ -224,6 +226,7 @@
     const mains = [...document.querySelectorAll("video.webplayer-internal-video")].filter(v => v.isConnected && v.getBoundingClientRect().width > 0);
     const main = mains.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0];
     bind(main || null);
+    setCatchUpOwnership(activeMain, live && settings.catchUp);
     clearAdLayout();
     const adVideos = ads.videos;
     const visibleAdWrappers = ads.wrappers(true);
@@ -296,16 +299,13 @@
   function catchUp(main, live, force = false) {
     if (!live) { restoreRate(); announce("다시보기 · 광고 표시 복구 대기"); return; }
     if (!settings.catchUp) { restoreRate(); announce("자동 따라잡기 꺼짐"); return; }
-    if (main.dataset.chzzkToolsManualRate) { restoreRate(); announce("수동 배속 사용 중 · 자동 따라잡기 대기"); return; }
+    setCatchUpOwnership(main, true);
     const now = performance.now();
     if (main.paused || main.seeking || main.readyState < 3) {
       restoreRate(); announce("일시정지 / 버퍼 대기"); return;
     }
     if (now < cooldown) { announce(status); return; }
     bufferRecovery = false;
-    if (ownedRate === null && Math.abs(main.playbackRate - 1) > 0.001) {
-      announce("사용자 배속 유지"); return;
-    }
     const plan = core.planCatchUp({ time: main.currentTime, seekable: ranges(main.seekable), buffered: ranges(main.buffered), force, mode: settings.catchUpMode });
     if (plan.seek !== undefined) { main.currentTime = plan.seek; cooldown = now + profile.seekCooldown; }
     setRate(plan.rate);
@@ -349,5 +349,5 @@
   function refreshAds() { try { tick(); } catch { restoreRate(); announce("플레이어 연결 대기"); } }
   document.addEventListener('chzzk-tools:ad-dom-change', refreshAds);
   window.setInterval(refreshAds, 1000);
-  window.addEventListener("pagehide", () => { audioRecovery = null; restorePatches(); restoreRate(); });
+  window.addEventListener("pagehide", () => { audioRecovery = null; restorePatches(); restoreRate(); setCatchUpOwnership(activeMain, false); });
 })();
