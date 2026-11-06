@@ -40,11 +40,18 @@ test("catch-up mode is a single validated choice and missing settings restore st
   assert.equal(core.features({ catchUpMode: "lowLatency" }).catchUpMode, "lowLatency");
   assert.equal(core.features({ catchUp: false, catchUpMode: "lowLatency" }).catchUp, false);
 });
-test("stable mode leaves modest delays buffered and waits twenty seconds between jumps", () => {
-  const base = { time: 96, seekable: [[0, 100]], buffered: [[0, 100]], margin: 1.5, lastSeek: 0, now: 30000 };
-  assert.equal(core.planCatchUp(base).seek, undefined);
-  assert.equal(core.planCatchUp({ ...base, time: 90, lastSeek: 15000 }).seek, undefined);
-  assert.equal(core.planCatchUp({ ...base, time: 90, lastSeek: 10000 }).seek, 98.5);
+test("stable mode pulls several seconds of backlog instead of keeping an inflated recovery margin", () => {
+  const base = { time: 94, seekable: [[0, 100]], buffered: [[0, 100]], margin: 6, lastSeek: 0, now: 3000 };
+  assert.equal(core.planCatchUp(base).seek, 98.5);
+  assert.equal(core.planCatchUp({ ...base, time: 96 }).seek, 98.5);
+  assert.equal(core.planCatchUp({ ...base, now: 2999 }).seek, undefined);
+  assert.equal(core.planCatchUp({ ...base, now: 2999 }).rate, 1.08);
+});
+test("recovery headroom stays bounded in both modes without seeking into a short buffer range", () => {
+  const base = { time: 90, seekable: [[0, 100]], buffered: [[0, 100]], margin: 6, lastSeek: -Infinity, now: 3000 };
+  assert.equal(core.planCatchUp({ ...base, mode: "lowLatency" }).seek, 99.25);
+  assert.equal(core.planCatchUp({ ...base, buffered: [[0, 91], [99, 100]] }).seek, undefined);
+  assert.equal(core.planCatchUp({ ...base, mode: "lowLatency", buffered: [[0, 91], [99.5, 100]] }).seek, undefined);
 });
 test("channel matching excludes VOD, clips, malformed and third path segments", () => {
   const id = "a".repeat(32);

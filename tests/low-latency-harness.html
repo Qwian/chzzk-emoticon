@@ -41,12 +41,12 @@ const settings=value=>{state.features={...state.features,...value};listeners.for
  check('버퍼 부족 시 이동하지 않음',current===90);
  ready=4;now+=1000;emit('canplay');
  check('재생 가능해지면 이벤트로 즉시 복귀',current>109);
- // Browser seek events arrive after assignment; owned seeks must not suspend recovery.
+ // Neither extension nor native-player seeking identifies an intentional rewind.
  emit('seeking');emit('seeked');
  now+=1000;current=100;emit('seeking');current=101;emit('seeked');edge=120;step();emit('progress');
- check('사용자의 되감기 존중',current===101);
+ check('플레이어의 자동 위치 변경으로 30초 멈추지 않음',current>119);
  now+=31000;emit('timeupdate');
- check('수동 조작 보호 시간이 지나면 이벤트로 복귀',current>119);
+ check('자동 위치 변경 뒤에도 이벤트 보정 유지',current>119);
  now+=1000;emit('waiting');current=110;edge=122;step(1000);
  check('실제 버퍼링에는 짧은 회복 시간 확보',current===110&&main.playbackRate===1);
  now+=100;emit('canplay');

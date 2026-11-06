@@ -47,11 +47,11 @@
   }
 
   const catchUpProfiles = Object.freeze({
-    stable: Object.freeze({ initialMargin: 1.5, minMargin: 0.75, waitingStep: 0.75,
-      startDelay: 5000, recoveryDelay: 15000, adDelay: 5000, seekCooldown: 4000,
-      seekInterval: 20000, seekGap: 5, forceSeekGap: 0.35, stopGap: 0.35,
-      fastGap: 2, fastRate: 1.08, slowRate: 1.03, stableInterval: 60000, marginStep: 0.25, eventDriven: false }),
-    lowLatency: Object.freeze({ initialMargin: 0.35, minMargin: 0.35, waitingStep: 0.25,
+    stable: Object.freeze({ initialMargin: 1.5, minMargin: 0.75, maxMargin: 1.5, waitingStep: 0.25,
+      startDelay: 0, recoveryDelay: 2000, adDelay: 750, seekCooldown: 750,
+      seekInterval: 3000, seekGap: 0.75, forceSeekGap: 0.35, stopGap: 0.15,
+      fastGap: 0.75, fastRate: 1.08, slowRate: 1.03, stableInterval: 60000, marginStep: 0.25, eventDriven: true }),
+    lowLatency: Object.freeze({ initialMargin: 0.35, minMargin: 0.35, maxMargin: 0.75, waitingStep: 0.25,
       startDelay: 0, recoveryDelay: 2000, adDelay: 750, seekCooldown: 750,
       seekInterval: 2000, seekGap: 1, forceSeekGap: 0.1, stopGap: 0.1,
       fastGap: 0.5, fastRate: 1.15, slowRate: 1.05, stableInterval: 10000, marginStep: 0.1, eventDriven: true })
@@ -60,6 +60,8 @@
 
   function planCatchUp({ time, seekable, buffered, margin, lastSeek, now, force = false, mode = "stable" }) {
     const profile = catchUpProfile(mode);
+    // Recovery must not turn several seconds of accumulated latency into the target.
+    margin = Math.min(profile.maxMargin, Math.max(profile.minMargin, Number.isFinite(margin) ? margin : profile.initialMargin));
     if (!Number.isFinite(time) || !seekable.length) return { rate: 1, reason: "재생 범위 대기" };
     const latest = seekable[seekable.length - 1];
     const buffer = buffered.find(([start, end]) => start <= time + 0.05 && end >= time);
@@ -89,5 +91,5 @@
     return [...items].sort((a, b) => channelGroup(a, favorites) - channelGroup(b, favorites) ||
       (positions.get(a.id) ?? 1e9) - (positions.get(b.id) ?? 1e9));
   }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.10.18", defaults, features, koreanFromEnglish, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.10.19", defaults, features, koreanFromEnglish, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup });
 })();

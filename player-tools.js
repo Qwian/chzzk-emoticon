@@ -9,7 +9,6 @@
   let lastCatchUp = -Infinity;
   let bufferRecovery = false;
   let heldUntil = 0, ownedRate = null;
-  let ownSeekTarget = null;
   const patches = new Map();
   const adRates = new Map();
   const localAdMute = new WeakMap();
@@ -92,7 +91,7 @@
   }
   function waiting() {
     if (adActive || !settings.catchUp || activeMain?.paused || activeMain?.seeking) return;
-    margin = Math.min(6, margin + profile.waitingStep);
+    margin = Math.min(profile.maxMargin, margin + profile.waitingStep);
     suspend("버퍼 회복 중 · 여유 " + margin.toFixed(1) + "초");
     bufferRecovery = true;
   }
@@ -103,15 +102,12 @@
       status = "외부 배속 변경 · 30초 대기";
     }
   }
-  function seeking() {
-    if (ownSeekTarget !== null && Math.abs(activeMain.currentTime - ownSeekTarget) < 0.5) return;
-    ownSeekTarget = null;
+  function protectManualSeek() {
+    if (!activeMain || !settings.catchUp) return;
     restoreRate(); heldUntil = performance.now() + 30000;
-    status = "위치 이동 감지 · 자동 따라잡기만 30초 대기";
+    status = "직접 위치 변경 · 자동 따라잡기 30초 보호";
   }
-  function seeked() { ownSeekTarget = null; }
   function sourceChanged() {
-    ownSeekTarget = null;
     suspend("영상 전환 · 재생 안정화 중", profile.startDelay);
   }
   function bind(main) {
@@ -120,8 +116,6 @@
     if (activeMain) {
       activeMain.removeEventListener("waiting", waiting);
       activeMain.removeEventListener("ratechange", externalRate);
-      activeMain.removeEventListener("seeking", seeking);
-      activeMain.removeEventListener("seeked", seeked);
       activeMain.removeEventListener("loadedmetadata", sourceChanged);
       activeMain.removeEventListener("volumechange", repairAudio);
       for (const name of ["progress", "timeupdate", "playing", "canplay"]) activeMain.removeEventListener(name, refreshCatchUp);
@@ -130,12 +124,9 @@
     if (!adActive) beforeAdAudio = null;
     cooldown = performance.now() + profile.startDelay; bufferRecovery = false; lastCatchUp = -Infinity;
     stableSince = performance.now();
-    ownSeekTarget = null;
     if (main) {
       main.addEventListener("waiting", waiting);
       main.addEventListener("ratechange", externalRate);
-      main.addEventListener("seeking", seeking);
-      main.addEventListener("seeked", seeked);
       main.addEventListener("loadedmetadata", sourceChanged);
       main.addEventListener("volumechange", repairAudio);
       for (const name of ["progress", "timeupdate", "playing", "canplay"]) main.addEventListener(name, refreshCatchUp);
@@ -326,7 +317,7 @@
     }
     if (now - stableSince > profile.stableInterval) { margin = Math.max(profile.minMargin, margin - profile.marginStep); stableSince = now; }
     const plan = core.planCatchUp({ time: main.currentTime, seekable: ranges(main.seekable), buffered: ranges(main.buffered), margin, lastSeek, now, force, mode: settings.catchUpMode });
-    if (plan.seek !== undefined) { ownSeekTarget = plan.seek; main.currentTime = plan.seek; lastSeek = now; cooldown = now + profile.seekCooldown; }
+    if (plan.seek !== undefined) { main.currentTime = plan.seek; lastSeek = now; cooldown = now + profile.seekCooldown; }
     setRate(plan.rate);
     status = plan.reason + (Number.isFinite(plan.gap) ? ` · 최신 버퍼까지 ${plan.gap.toFixed(1)}초` : "");
     announce(status);
@@ -341,7 +332,7 @@
     const now = performance.now();
     if (now - lastCatchUp < 100) return;
     lastCatchUp = now;
-    try { catchUp(activeMain, true); }
+    try { catchUp(activeMain, true, false); }
     catch { restoreRate(); }
   }
   function applySettings(value) {
@@ -365,10 +356,19 @@
   document.addEventListener("chzzk-tools:catch-up", () => {
     heldUntil = 0; cooldown = 0; lastSeek = -Infinity; tick(true);
   });
-  // An intentional rewind must not be immediately undone by the automatic controller.
+  // A seeking event does not identify its origin: CHZZK also adjusts the live
+  // position itself. Protect only an actual user's seek control/key interaction.
+  const seekControl = event => event.composedPath().some(node =>
+    node.matches?.('.pzp-pc__progress-slider,.pzp-pc-progress-slider,pzp-pc-progress-slider') &&
+    node.closest('.pzp')?.contains(activeMain));
+  document.addEventListener("pointerdown", event => {
+    if (event.isTrusted && event.button === 0 && seekControl(event)) protectManualSeek();
+  }, true);
   document.addEventListener("keydown", e => {
-    if (e.code !== "ArrowLeft" || e.target.closest?.("input,textarea,[contenteditable='true']")) return;
-    restoreRate(); heldUntil = performance.now() + 30000; status = "되감기 · 30초 대기";
+    if (!e.isTrusted || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+    const editable = e.composedPath().some(node => node.isContentEditable || node.matches?.("input,textarea,select,[role='textbox']"));
+    const sliderKey = ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.code) && seekControl(e);
+    if (sliderKey || e.code === "ArrowLeft" && !editable) protectManualSeek();
   }, true);
   function refreshAds() { try { tick(); } catch { restoreRate(); announce("플레이어 연결 대기"); } }
   document.addEventListener('chzzk-tools:ad-dom-change', refreshAds);

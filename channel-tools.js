@@ -68,7 +68,7 @@
     <label><input id="catch-up" type="checkbox">자동 실시간 따라잡기</label>
     <fieldset id="catch-mode" class="catch-modes"><legend>따라잡기 방식</legend><div class="mode-switch">
       <span class="mode-thumb" aria-hidden="true"></span>
-      <label title="이전 방식 · 버퍼 여유를 두고 안정적으로 재생"><input type="radio" name="catch-mode" value="stable">안정 우선</label>
+      <label title="0.75~1.5초 여유를 남기고 밀리면 계속 따라잡기"><input type="radio" name="catch-mode" value="stable">안정 우선</label>
       <label title="최대한 최신 영상으로 이동 · 끊길 수 있음"><input type="radio" name="catch-mode" value="lowLatency">최소 지연</label>
     </div></fieldset>
     <button id="catch-now" type="button">지금 따라잡기</button><p id="player-status" role="status"></p>

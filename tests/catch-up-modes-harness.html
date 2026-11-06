@@ -18,23 +18,25 @@ const settings=value=>{state.features={...state.features,...value};listeners.for
 <script>
 (async()=>{
  await Promise.resolve();await Promise.resolve();
- check('기본 안정 우선은 시작 시 즉시 당기지 않음',current===50);
- step(4999);emit('canplay');emit('progress');
- check('안정 우선은 재생 이벤트에도 5초 준비 시간 유지',current===50);
- step(1);check('준비 후 이전 방식의 1.5초 여유로 이동',current===98.5);
- step(4000);current=96;emit('progress');interval();
- check('안정 우선은 작은 지연을 건너뛰지 않고 1.08배 보정',current===96&&main.playbackRate===1.08);
- emit('waiting');current=80;emit('canplay');step(14999);
- check('안정 우선은 재생 가능 신호에도 15초 회복 대기',current===80&&main.playbackRate===1);
- step(1);check('회복 대기가 끝나도 이전 이동으로부터 20초 보호 유지',current===80);
- step(1000);check('안정 우선은 끊김 뒤 버퍼 여유를 2.25초로 확대',current===97.75);
+ check('안정 우선도 재생 가능하면 시작부터 1.5초 여유로 당김',current===98.5);
+ step(3000);current=96;emit('progress');
+ check('안정 우선도 수신 이벤트에서 밀린 위치를 즉시 당김',current===98.5);
+ step(3000);emit('waiting');current=80;step(1000);
+ check('실제 버퍼링 직후에는 무리하게 이동하지 않음',current===80&&main.playbackRate===1);
+ now+=100;emit('canplay');
+ check('안정 우선도 재생 가능하면 15초 대기 없이 당김',current===98.5);
+ let bounded=true;
+ for(let i=0;i<10;i++){now+=3000;emit('waiting');current=94;emit('canplay');bounded&&=current===98.5}
+ check('반복 버퍼링 뒤에도 6초 밀린 영상을 1.5초 여유로 계속 당김',bounded);
+ now+=100;current=95;emit('progress');
+ check('이동 직후에는 이벤트로 이동 간격 제한을 우회하지 않음',current===95);
+ step(3000);check('짧은 이동 보호 뒤에는 밀린 위치를 다시 당김',current===98.5);
  settings({catchUpMode:'lowLatency'});
  check('최소 지연으로 전환하면 이전 회복 대기와 여유를 해제',Math.abs(current-99.65)<.001);
  step(1000);current=98.8;emit('timeupdate');
  check('최소 지연의 이벤트 보정만 동작',main.playbackRate===1.15);
- settings({catchUpMode:'stable'});current=80;edge=110;emit('canplay');step(4999);emit('progress');
- check('안정 우선으로 복귀하면 공격적 이벤트 보정 중단',current===80&&main.playbackRate===1);
- step(1);check('방식 복귀 시 0.35초가 아닌 1.5초 여유 복원',current===108.5);
+ settings({catchUpMode:'stable'});current=80;edge=110;now+=3000;emit('canplay');
+ check('안정 우선으로 복귀해도 새 여유로 바로 당김',current===108.5);
  settings({catchUp:false,catchUpMode:'lowLatency'});current=50;edge=120;step(30000);emit('progress');
  check('꺼짐 상태에서 방식 전환해도 보정하지 않음',current===50&&main.playbackRate===1);
  settings({catchUp:true});check('다시 켜면 선택했던 최소 지연 하나만 적용',Math.abs(current-119.65)<.001);
