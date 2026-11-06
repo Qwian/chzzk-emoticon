@@ -220,7 +220,11 @@
       return ids;
     });
   }
-  function groupOf(id) { const item = nativeRows.get(id) || addedRows.get(id); return item ? core.channelGroup(item, pins) : -1; }
+  function groupOf(id) {
+    const item = nativeRows.get(id) || addedRows.get(id); if (!item) return "";
+    const group = core.channelGroup(item, pins);
+    return group === 2 ? `${group}:${core.channelCategory(item)}` : String(group);
+  }
   function decorate(item, sorted) {
     const row = item.row; row.classList.add("ct-channel-row"); row.classList.toggle("ct-edit", editing);
     if (!decoratedRows.has(row)) { row.querySelector(":scope > .ct-row-actions")?.remove(); decoratedRows.add(row); }
@@ -278,6 +282,7 @@
     }
     const data = channelCache.get(channel.id)?.data || channel;
     item.followed = false; item.openLive = data.openLive === true;
+    item.liveCategory = item.openLive ? data.category : "";
     item.name = data.name || channel.name; text(item.title, item.name); item.link.href = data.openLive ? `/live/${channel.id}` : `/${channel.id}`;
     text(item.category, data.openLive === true ? ["LIVE", data.category].filter(Boolean).join(" · ") : data.openLive === false ? "오프라인" : "팔로우 없이 보관");
     item.viewers.hidden = !data.openLive || !Number.isFinite(data.viewers);

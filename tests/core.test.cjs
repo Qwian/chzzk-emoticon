@@ -93,3 +93,17 @@ test("following live precedes saved live, then following offline and saved offli
   assert.deepEqual(core.orderChannels(rows, [], custom).map(row => row.id), ["follow-live-b", "follow-live-a", "saved-live", "follow-off", "saved-off"]);
   assert.deepEqual(core.orderChannels(rows, ["saved-off"], custom).map(row => row.id), ["saved-off", "follow-live-b", "follow-live-a", "saved-live", "follow-off"]);
 });
+
+test("saved live channels sort by current category before custom order, with unknown categories last", () => {
+  const saved = (id, liveCategory) => ({ id, liveCategory, followed: false, openLive: true });
+  const rows = [saved("unknown", ""), saved("game", "게임"), saved("talk-a", "TALK"), saved("talk-b", " TALK ")];
+  const order = ["unknown", "game", "talk-b", "talk-a"];
+  assert.deepEqual(core.orderChannels(rows, [], order).map(row => row.id), ["game", "talk-b", "talk-a", "unknown"]);
+  rows[1].liveCategory = "ASMR";
+  assert.deepEqual(core.orderChannels(rows, [], order).map(row => row.id), ["game", "talk-b", "talk-a", "unknown"]);
+  // Pins retain their own manual order, regardless of category or broadcast state.
+  assert.deepEqual(core.orderChannels(rows, ["unknown", "game"], order).map(row => row.id), ["unknown", "game", "talk-b", "talk-a"]);
+  rows[1].openLive = false;
+  assert.deepEqual(core.orderChannels(rows, [], order).map(row => row.id), ["talk-b", "talk-a", "unknown", "game"]);
+  assert.deepEqual(rows.map(row => row.id), ["unknown", "game", "talk-a", "talk-b"]);
+});

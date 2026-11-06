@@ -1,0 +1,39 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>보관 카테고리 정렬 검사</title>
+<body data-result="pending"><aside id="sidebar"><nav aria-label="팔로잉"><div><strong>팔로잉</strong></div><ul>
+<li><a href="/live/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"><strong data-channel-name="팔로잉">팔로잉</strong></a></li>
+</ul></nav></aside><pre id="result">pending</pre>
+<script>
+const ids=['b','c','d','e','f'].map(x=>x.repeat(32));
+const categories=['게임','TALK','TALK','','ASMR'];
+const state={features:{followingExpanded:false,channelLiveLink:false},favorites:ids.map((id,i)=>({id,name:'보관'+i})),followingFavorites:[],channelOrder:[...ids]},listeners=[];
+const clock=Date.now;let now=clock(),requests=0;Date.now=()=>now;
+window.chrome={storage:{local:{get:async()=>structuredClone(state),set:async values=>{Object.assign(state,structuredClone(values));listeners.forEach(fn=>fn(Object.fromEntries(Object.entries(values).map(([k,v])=>[k,{newValue:v}])),'local'))}},onChanged:{addListener:fn=>listeners.push(fn)}}};
+window.ChzzkChannels={get:async id=>{requests++;const i=ids.indexOf(id);return{id,name:'보관'+i,openLive:i!==4,category:categories[i]}}};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const rows=()=>[...document.querySelectorAll('.ct-channel-row')].sort((a,b)=>Number(a.style.getPropertyValue('--ct-order'))-Number(b.style.getPropertyValue('--ct-order')));
+const sequence=()=>rows().map(row=>row.querySelector('a').getAttribute('href').slice(-32));
+const rowFor=id=>rows().find(row=>row.querySelector(`a[href$="${id}"]`));
+const click=el=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+</script><script src="/tools-core.js"></script><script src="/channel-tools.js"></script><script>
+(async()=>{
+const results=[],check=(name,passed)=>results.push({name,passed});await wait(900);
+const follow='a'.repeat(32);
+check('팔로잉 뒤에 게임·TALK 묶음·미확인·오프라인 순서',sequence().join() === [follow,ids[0],ids[1],ids[2],ids[3],ids[4]].join());
+check('행의 현재 카테고리를 표시',rowFor(ids[1]).querySelector('.ct-saved-category').textContent==='LIVE · TALK');
+click(document.querySelector('.ct-list-tools button'));await wait(160);
+check('카테고리 경계의 이동 버튼 비활성화',rowFor(ids[0]).querySelectorAll('.ct-move:not(.ct-drag)')[0].disabled&&rowFor(ids[0]).querySelectorAll('.ct-move:not(.ct-drag)')[1].disabled);
+click(rowFor(ids[2]).querySelector('.ct-move'));await wait(160);
+check('같은 카테고리 안에서 수동 이동 저장',sequence().join()===[follow,ids[0],ids[2],ids[1],ids[3],ids[4]].join()&&state.channelOrder.indexOf(ids[2])<state.channelOrder.indexOf(ids[1]));
+const data=new DataTransfer();rowFor(ids[0]).querySelector('.ct-drag').dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:data}));rowFor(ids[1]).dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data}));await wait(160);
+check('드래그로 다른 카테고리와 섞이지 않음',sequence().join()===[follow,ids[0],ids[2],ids[1],ids[3],ids[4]].join());
+const before=requests;await wait(160);
+check('정렬 편집이 추가 조회를 만들지 않음',requests===before);
+categories[0]='음악';categories[1]='ASMR';now+=30001;await wait(2100);
+check('30초 갱신 시 현재 카테고리와 순서 변경',sequence().join()===[follow,ids[0],ids[1],ids[2],ids[3],ids[4]].join()&&rowFor(ids[1]).querySelector('.ct-saved-category').textContent==='LIVE · ASMR');
+click(rowFor(ids[3]).querySelector('.ct-star'));await wait(160);
+check('별표 즐겨찾기는 카테고리와 무관하게 상단 고정',sequence()[0]===ids[3]);
+document.querySelector('nav[aria-label="팔로잉"]').remove();await wait(400);
+check('보관 전용 사이드바도 카테고리 정렬',Boolean(document.querySelector('.ct-fallback-nav'))&&sequence().join()===[ids[3],ids[0],ids[1],ids[2],ids[4]].join());
+Date.now=clock;document.querySelector('#result').textContent=JSON.stringify(results,null,2);document.body.dataset.result=results.every(x=>x.passed)?'pass':'fail';
+})().catch(error=>{Date.now=clock;document.body.dataset.result='fail';document.querySelector('#result').textContent=error.stack});
+</script></body></html>
