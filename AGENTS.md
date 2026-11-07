@@ -39,6 +39,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/site-player-harness.html` verifies search, favorites, adaptive catch-up and ad cleanup against simulated media.
 - `tests/low-latency-harness.html` verifies speed-only automatic catch-up at the 1-second setting, checked catch-up priority over manual rate flags, buffer recovery and pause/VOD exclusions.
 - `tests/catch-up-rate-harness.html` is a fixture loading the actual media-speed and player-tools scripts together to verify checked catch-up controls the real rate despite cached manual speeds; it signals data-ready and does not auto-run assertions.
+- `tests/catch-up-health.test.cjs` runs the real controller with independent media clocks and decoder counters to verify overload recovery, repeated buffering/rate conflicts, backoff and manual-only seeking. `tests/catch-up-health-harness.html` exposes `healthProbe` for two simultaneous browser pages; it signals data-ready and does not auto-run assertions.
 - `tests/catch-up-modes-harness.html` verifies fixed 2/1.5/1-second choices, speed-only automatic correction and manual-only position jumps after buffering/long playback/settings changes.
 - `tests/catch-up-seek-harness.html` is a fixture for trusted browser pointer/key tests that automatic catch-up never writes currentTime and only explicit catch-now clicks do; it does not auto-run assertions.
 - `tests/catch-up-popup-harness.html` verifies the popup's exclusive mode selection, persistence and external settings sync.

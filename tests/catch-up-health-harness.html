@@ -1,0 +1,33 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>동시 방송 따라잡기 회복</title>
+<body data-ready="pending"><video class="webplayer-internal-video" style="width:640px;height:360px"></video><pre id="result">pending</pre>
+<script>
+history.replaceState(null, '', '/live/' + 'a'.repeat(32));
+let now=100000,current=80,edge=100,total=100,dropped=0,poll,seeks=0,rateEvents=0,acceleratedWrites=0,status='';
+Object.defineProperty(performance,'now',{value:()=>now});
+window.setInterval=fn=>{poll=fn;return 1};
+const main=document.querySelector('video');
+const listeners=[],state={features:{catchUp:true,catchUpMode:'2',adSpeed:1}};
+window.chrome={storage:{local:{get:async()=>state},onChanged:{addListener:fn=>listeners.push(fn)}}};
+const range=()=>({length:1,start:()=>0,end:()=>edge});
+const nativeRate=Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype,'playbackRate');
+Object.defineProperties(main,{
+ playbackRate:{get:()=>nativeRate.get.call(main),set:value=>{if(value>1)acceleratedWrites++;nativeRate.set.call(main,value)}},
+ currentTime:{get:()=>current,set:value=>{current=value;seeks++}},
+ paused:{get:()=>false},readyState:{get:()=>4},seeking:{get:()=>false},
+ seekable:{get:range},buffered:{get:range},
+ getVideoPlaybackQuality:{value:()=>({totalVideoFrames:total,droppedVideoFrames:dropped})}
+});
+main.addEventListener('ratechange',()=>rateEvents++);
+document.addEventListener('chzzk-tools:player-status',event=>status=event.detail.text);
+window.healthProbe={
+ snapshot:()=>({rate:main.playbackRate,seeks,rateEvents,acceleratedWrites,status}),
+ advance(ms,lost=0){current+=ms/1000*main.playbackRate;edge+=ms/1000;now+=ms;total+=60;dropped+=lost;poll()},
+ conflict(){now+=200;main.playbackRate=1;main.dispatchEvent(new Event('ratechange'))},
+ event(name){main.dispatchEvent(new Event(name))},
+ catchNow(){document.dispatchEvent(new CustomEvent('chzzk-tools:catch-up'))},
+ settings(value){state.features={...state.features,...value};listeners.forEach(fn=>fn({features:{newValue:state.features}},'local'))}
+};
+</script>
+<script src="/tools-core.js"></script><script src="/ad-dom.js"></script><script src="/player-tools.js"></script>
+<script>Promise.resolve().then(()=>{document.body.dataset.ready='ready';document.querySelector('#result').textContent='Use healthProbe to drive independent simultaneous streams.'});</script>
+</body></html>

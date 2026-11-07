@@ -52,7 +52,7 @@ const settings=value=>{state.features={...state.features,...value};listeners.for
  now+=100;emit('canplay');
  check('재생 가능 이벤트가 오면 회복 대기도 즉시 해제',current===110&&main.playbackRate===1.15);
  now+=1000;emit('waiting');current=110;edge=124;step(2200);
- check('재생 가능 이벤트가 없어도 2초 뒤 회복 상태 재검사',current===110&&main.playbackRate===1.15);
+ check('반복 버퍼링에는 canplay와 무관하게 1배속 회복 시간 유지',current===110&&main.playbackRate===1&&lastStatus.includes('버퍼링 반복'));
  settings({catchUp:false});current=100;edge=130;step();emit('progress');
  check('기능 해제 시 이벤트로도 보정하지 않음',current===100&&main.playbackRate===1);
  settings({catchUp:true});step(3000);main.dataset.chzzkToolsManualRate='true';main.playbackRate=1.5;current=100;emit('progress');step();

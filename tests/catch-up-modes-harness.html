@@ -24,8 +24,8 @@ const settings=value=>{state.features={...state.features,...value};listeners.for
   const before=seeks;
   check(mode+'초 선택 시 배속 보정만 실행',current===80&&main.playbackRate===1.15);
   let smooth=true;
-  for(let i=0;i<10;i++){now+=3000;emit('waiting');current=80;emit('canplay');smooth&&=current===80&&main.playbackRate===1.15&&seeks===before}
-  check(mode+'초 반복 버퍼링 뒤에도 자동 위치 이동 없음',smooth);
+  for(let i=0;i<10;i++){now+=3000;emit('waiting');current=80;emit('canplay');smooth&&=current===80&&main.playbackRate===(i===0?1.15:1)&&seeks===before}
+  check(mode+'초 반복 버퍼링에는 1배속으로 회복하고 자동 위치 이동 없음',smooth);
   step(600000);document.dispatchEvent(new CustomEvent('chzzk-tools:catch-up'));
   check(mode+'초는 오래 재생해도 수동 따라잡기 여유가 고정',current===100-Number(mode)&&seeks===before+1);
   step(1000);current=100-Number(mode)-.05;emit('timeupdate');

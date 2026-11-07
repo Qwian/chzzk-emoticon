@@ -9,6 +9,8 @@
   let lastCatchUp = -Infinity;
   let bufferRecovery = false;
   let ownedRate = null;
+  let healthSample = null, safetyUntil = 0, safetyLevel = 0, safetyReason = "";
+  let rateConflicts = [], bufferWaits = [];
   const patches = new Map();
   const adRates = new Map();
   const localAdMute = new WeakMap();
@@ -86,23 +88,75 @@
     if (!main) return;
     const previous = main.dataset.chzzkToolsCatchUp === "true";
     if (enabled) {
-      main.dataset.chzzkToolsCatchUp = "true";
-      delete main.dataset.chzzkToolsManualRate;
-    } else delete main.dataset.chzzkToolsCatchUp;
+      if (!previous) main.dataset.chzzkToolsCatchUp = "true";
+      if (main.dataset.chzzkToolsManualRate !== undefined) delete main.dataset.chzzkToolsManualRate;
+    } else if (previous) delete main.dataset.chzzkToolsCatchUp;
     if (previous !== enabled) main.dispatchEvent(new CustomEvent("chzzk-tools:catch-up-owner", { bubbles: true }));
+  }
+  function resetHealth() {
+    healthSample = null; safetyUntil = 0; safetyLevel = 0;
+    rateConflicts = []; bufferWaits = [];
+  }
+  function protectPlayback(reason) {
+    // Each video responds to its own decoder/buffer pressure. In particular, two
+    // visible streams must not keep demanding extra frames when the PC is busy.
+    safetyLevel = Math.min(safetyLevel + 1, 3);
+    safetyUntil = performance.now() + 30000 * 2 ** (safetyLevel - 1);
+    safetyReason = reason;
+    healthSample = null; rateConflicts = []; bufferWaits = [];
+    restoreRate();
+  }
+  function playbackHealthy(main, now) {
+    if (now < safetyUntil) return false;
+    if (ownedRate > 1 && Math.abs(main.playbackRate - ownedRate) > 0.001) {
+      rateConflicts = rateConflicts.filter(time => now - time < 5000);
+      rateConflicts.push(now);
+      if (rateConflicts.length >= 3) { protectPlayback("플레이어 배속 충돌"); return false; }
+    }
+    // Counters are cumulative and can reset on a source change. Use deltas,
+    // ignore long background-timer gaps, and never infer drops from page focus.
+    const previous = healthSample;
+    const elapsed = previous ? now - previous.at : 0;
+    if (previous && elapsed < 1000) return true;
+    let quality;
+    try { quality = main.getVideoPlaybackQuality?.(); } catch { /* optional API */ }
+    const sample = { at: now, progressAt: now, time: main.currentTime, total: quality?.totalVideoFrames, dropped: quality?.droppedVideoFrames };
+    if (!previous) { healthSample = sample; return true; }
+    healthSample = sample;
+    if (elapsed > 5000 || !(ownedRate > 1)) return true;
+    const frames = sample.total - previous.total, drops = sample.dropped - previous.dropped;
+    if (frames < 0 || drops < 0 || sample.time < previous.time) return true;
+    if (frames >= 10 && drops >= 3 && drops / frames >= 0.1) {
+      protectPlayback("영상 프레임 누락 감지"); return false;
+    }
+    if (sample.time - previous.time < elapsed / 1000 * 0.2) sample.progressAt = previous.progressAt;
+    if (sample.total >= previous.total && sample.total > 0 && now - sample.progressAt >= 2000) {
+      protectPlayback("영상 진행 지연 감지"); return false;
+    }
+    return true;
   }
   function suspend(reason, milliseconds = profile.recoveryDelay) {
     restoreRate();
+    healthSample = null;
     bufferRecovery = false;
     cooldown = performance.now() + milliseconds;
     status = reason;
   }
   function waiting() {
     if (adActive || !settings.catchUp || activeMain?.paused || activeMain?.seeking) return;
+    const now = performance.now();
+    // canplay means data arrived, not that accelerating is sustainable. Do not
+    // let repeated waiting/canplay pairs immediately restart the same overload.
+    if (now >= safetyUntil) {
+      bufferWaits = bufferWaits.filter(time => now - time < 15000);
+      bufferWaits.push(now);
+      if (bufferWaits.length >= 2) protectPlayback("버퍼링 반복 감지");
+    }
     suspend("버퍼 회복 중 · 여유 " + margin.toFixed(1) + "초");
     bufferRecovery = true;
   }
   function sourceChanged() {
+    resetHealth();
     suspend("영상 전환 · 재생 안정화 중", profile.startDelay);
   }
   function bind(main) {
@@ -116,6 +170,7 @@
       for (const name of ["progress", "timeupdate", "playing", "canplay", "ratechange"]) activeMain.removeEventListener(name, refreshCatchUp);
     }
     activeMain = main; margin = profile.initialMargin; lastNormal = null;
+    resetHealth();
     if (!adActive) beforeAdAudio = null;
     cooldown = performance.now() + profile.startDelay; bufferRecovery = false; lastCatchUp = -Infinity;
     if (main) {
@@ -302,12 +357,18 @@
     setCatchUpOwnership(main, true);
     const now = performance.now();
     if (main.paused || main.seeking || main.readyState < 3) {
+      healthSample = null;
       restoreRate(); announce("일시정지 / 버퍼 대기"); return;
     }
     if (now < cooldown) { announce(status); return; }
     bufferRecovery = false;
     const plan = core.planCatchUp({ time: main.currentTime, seekable: ranges(main.seekable), buffered: ranges(main.buffered), force, mode: settings.catchUpMode });
     if (plan.seek !== undefined) { main.currentTime = plan.seek; cooldown = now + profile.seekCooldown; }
+    if (!playbackHealthy(main, now)) {
+      restoreRate();
+      announce(safetyReason + ` · 안정 재생 · ${Math.ceil((safetyUntil - now) / 1000)}초 후 따라잡기 재시도`);
+      return;
+    }
     setRate(plan.rate);
     status = plan.reason + (Number.isFinite(plan.gap) ? ` · 최신 버퍼까지 ${plan.gap.toFixed(1)}초` : "");
     announce(status);
@@ -327,6 +388,7 @@
   }
   function applySettings(value) {
     const next = core.features(value);
+    if (next.catchUp !== settings.catchUp || next.catchUpMode !== settings.catchUpMode) resetHealth();
     if (next.catchUpMode !== settings.catchUpMode) {
       restoreRate();
       profile = core.catchUpProfile(next.catchUpMode);
