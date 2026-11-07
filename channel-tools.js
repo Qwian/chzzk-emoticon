@@ -153,7 +153,10 @@
     $("#catch-up").checked = settings.catchUp; $("#catch-now").disabled = !settings.catchUp;
     for (const input of playerUi.querySelectorAll('#catch-mode input')) input.checked = input.value === settings.catchUpMode;
     $("#catch-mode").disabled = !settings.catchUp;
-    $("summary").title = "자동 따라잡기 " + (settings.catchUp ? "켜짐 · " + settings.catchUpMode + "초" : "꺼짐");
+    // Keep live-player hover free of native title popups. Put state in the
+    // accessible name and avoid rewriting it on every sidebar refresh.
+    const summaryLabel = "실시간 따라잡기 설정 · 자동 따라잡기 " + (settings.catchUp ? "켜짐 · " + settings.catchUpMode + "초" : "꺼짐");
+    if ($("summary").getAttribute("aria-label") !== summaryLabel) $("summary").setAttribute("aria-label", summaryLabel);
     text($("#player-status"), playerStatus);
     const channel = currentChannel();
     const follow = channel && settings.favorites ? [...document.querySelectorAll("main button, #layout-body button")].find(button =>
