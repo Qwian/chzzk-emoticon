@@ -93,7 +93,7 @@
     }
     return false;
   }
-  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.15', enabled: enabled && !stopped,
+  globalThis.__chzzkPlayerShortcutStatus = () => ({ version: '0.10.28', enabled: enabled && !stopped,
     current: inspect('play').reason, ...spaceStatus });
   function unchanged(state) {
     return state.action === 'mute' ? state.video.muted === state.muted && state.video.volume === state.volume
@@ -124,7 +124,11 @@
       if (theaterKeyOwned && event.repeat) { event.preventDefault(); event.stopImmediatePropagation(); return; }
       if (event.repeat) return;
       const state = candidate('theater');
-      if (!state || event.composedPath().some(node => node.matches?.('button,a,[role="button"]') && !state.root.contains(node))) return;
+      if (!state) return;
+      // CHZZK's fullscreen shortcut is global, including after a sidebar/header
+      // button or link keeps focus. Own F there too; editable fields stay excluded.
+      if (state.root.id === 'webplayer' && event.composedPath().some(node =>
+        node.matches?.('button,a,[role="button"]') && !state.root.contains(node))) return;
       // SOOP binds F to fullscreen on keyup. Own both halves of this theater key.
       theaterKeyOwned = true; event.preventDefault(); event.stopImmediatePropagation();
       control(state.root, 'theater')?.click(); return;
