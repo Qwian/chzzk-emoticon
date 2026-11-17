@@ -1,0 +1,82 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>영상 확대·이동 검사</title>
+<style>
+body{margin:16px;background:#18231e;color:#eee;font:14px system-ui}#stage{position:relative;width:640px;height:360px;background:#111}
+video{width:100%;height:100%;object-fit:contain}#stage:fullscreen{width:100vw;height:100vh}
+#native-controls{position:absolute;bottom:8px;left:8px;padding:5px;background:#333}pre{white-space:pre-wrap}
+</style>
+<body data-result="pending"><h1>영상만 확대·이동</h1>
+<div id="stage"><video></video><button id="native-controls">기본 재생 버튼</button></div>
+<input id="typing" placeholder="단축키 제외 입력창"><button id="fs-player">플레이어 전체화면</button><button id="fs-video">영상 전체화면</button><button id="exit-fs">전체화면 해제</button>
+<pre id="result">pending</pre>
+<script>
+const listeners=[],storageListeners=[],sent=[],errors=[];
+window.addEventListener('error',event=>errors.push(event.message));
+window.chrome={runtime:{id:'test',sendMessage:async message=>{sent.push(message);return {ok:true}},onMessage:{addListener:fn=>listeners.push(fn),removeListener:fn=>listeners.splice(listeners.indexOf(fn),1)}},
+storage:{local:{get:async()=>({features:{}})},onChanged:{addListener:fn=>storageListeners.push(fn),removeListener:fn=>storageListeners.splice(storageListeners.indexOf(fn),1)}}};
+const video=document.querySelector('video'),stage=document.querySelector('#stage');
+const canvas=document.createElement('canvas');canvas.width=1280;canvas.height=720;
+const ctx=canvas.getContext('2d');
+for(let y=0;y<4;y++)for(let x=0;x<6;x++){ctx.fillStyle=`hsl(${(x+y*6)*15} 55% 45%)`;ctx.fillRect(x*214,y*180,214,180);ctx.fillStyle='#fff';ctx.font='40px system-ui';ctx.fillText(`${x+1},${y+1}`,x*214+50,y*180+95)}
+video.poster=canvas.toDataURL();
+const wait=()=>new Promise(resolve=>setTimeout(resolve,75));
+const command=(action,extra={})=>{let result;listeners.forEach(fn=>fn({type:'MEDIA_ZOOM_APPLY',action,...extra},{},value=>result=value));return result};
+const press=(code,target=document.body,extra={})=>{const e=new KeyboardEvent('keydown',{code,altKey:true,bubbles:true,composed:true,cancelable:true,...extra});target.dispatchEvent(e);return e};
+const root=()=>document.querySelector('#media-zoom-controls')?.shadowRoot;
+const state=()=>command('state');
+document.querySelector('#fs-player').onclick=async()=>{await stage.requestFullscreen();await wait();document.querySelector('#result').textContent=JSON.stringify(fullscreenCheck(),null,2)};
+document.querySelector('#fs-video').onclick=async()=>{await video.requestFullscreen();await wait();document.querySelector('#result').textContent=JSON.stringify(fullscreenCheck(),null,2)};
+document.querySelector('#exit-fs').onclick=()=>document.exitFullscreen();
+function fullscreenCheck(){const box=video.getBoundingClientRect(),host=document.querySelector('#media-zoom-controls');return {fullscreen:document.fullscreenElement?.tagName,scale:getComputedStyle(video).scale,zoom:state(),width:box.width,height:box.height,viewport:[innerWidth,innerHeight],controlsVisible:host.matches(':popover-open'),launcher:root().querySelector('#launcher').getBoundingClientRect().toJSON(),errors}}
+</script><script src="../media-zoom.js"></script>
+<script>
+(async()=>{
+await wait();const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)}),near=(a,b)=>Math.abs(a-b)<1;
+const initial=video.getBoundingClientRect(),native=document.querySelector('#native-controls'),nativeBox=native.getBoundingClientRect();
+check('영상 확대 조절판 생성',root()&&state().scale===1);
+check('원래 상태의 영상 CSS 유지',video.style.scale==='');
+press('Equal');await wait();check('Alt+=는 실제 영상만 125% 확대',state().scale===1.25&&near(video.getBoundingClientRect().width,initial.width*1.25));
+check('기본 플레이어 버튼 크기 유지',near(native.getBoundingClientRect().width,nativeBox.width)&&near(stage.getBoundingClientRect().width,initial.width));
+check('넘치는 영상은 원래 영역에 맞게 잘림',getComputedStyle(video).clipPath.startsWith('inset('));
+command('set',{scale:2});press('ArrowRight');press('ArrowDown');await wait();
+check('방향키로 오른쪽·아래 내용 보기',state().x>0&&state().y>0&&parseFloat(video.style.translate)<0);
+for(let n=0;n<30;n++)press('ArrowRight');check('이동은 영상 가장자리에서 제한',state().x===1);
+press('Digit0');check('Alt+0은 확대·위치·스타일 초기화',state().scale===1&&state().x===0&&video.style.scale===''&&video.style.clipPath==='');
+check('입력창의 Alt 키 제외',!press('Equal',document.querySelector('input')).defaultPrevented&&state().scale===1);
+check('IME 조합·Ctrl 키 제외',!press('Equal',document.body,{isComposing:true}).defaultPrevented&&!press('Equal',document.body,{ctrlKey:true}).defaultPrevented);
+check('다른 Alt 단축키 통과',!press('KeyX').defaultPrevented&&!press('ArrowLeft',document.body,{shiftKey:true}).defaultPrevented);
+const editHost=document.createElement('div');document.body.append(editHost);const edit=editHost.attachShadow({mode:'open'}).appendChild(document.createElement('textarea'));
+check('Shadow DOM 입력창 제외',!press('Equal',edit).defaultPrevented);
+const wheel=new WheelEvent('wheel',{altKey:true,deltaY:-100,clientX:initial.left+initial.width*.75,clientY:initial.top+initial.height*.25,bubbles:true,cancelable:true});video.dispatchEvent(wheel);await wait();
+check('Alt+휠은 포인터 위치를 기준으로 영상 확대',wheel.defaultPrevented&&state().scale===1.1&&state().x>0&&state().y<0);
+check('일반 휠은 통과',!(()=>{const e=new WheelEvent('wheel',{deltaY:100,bubbles:true,cancelable:true});video.dispatchEvent(e);return e.defaultPrevented})());
+command('set',{scale:2});command('center');
+const pointer=(type,x,y,target=video,extra={})=>target.dispatchEvent(new PointerEvent(type,{pointerId:12,button:0,buttons:type==='pointerup'?0:1,clientX:x,clientY:y,altKey:true,bubbles:true,composed:true,cancelable:true,...extra}));
+pointer('pointerdown',300,200);pointer('pointermove',380,240);pointer('pointerup',380,240);await wait();
+check('Alt+드래그는 영상을 잡아 끄는 방향으로 이동',state().x<0&&state().y<0);
+let nativeClicks=0;video.addEventListener('click',()=>nativeClicks++);video.dispatchEvent(new MouseEvent('click',{clientX:380,clientY:240,bubbles:true,composed:true,cancelable:true}));
+check('드래그 후 재생·정지 클릭 차단',nativeClicks===0);
+command('open');root().querySelector('#drag').click();await wait();const surface=root().querySelector('#surface');
+check('수정키 없이 터치·마우스로 이동할 영역 표시',!surface.hidden);
+command('center');pointer('pointerdown',300,200,surface,{altKey:false,pointerType:'touch'});pointer('pointermove',240,200,surface,{altKey:false,pointerType:'touch'});pointer('pointerup',240,200,surface,{altKey:false,pointerType:'touch'});await wait();
+check('터치 끌기로 위치 이동',state().x>0);
+root().querySelector('#center').click();root().querySelector('#right').click();check('화면 이동 버튼으로 위치 이동',state().x>0&&state().y===0);
+root().querySelector('#launcher').click();await wait();check('조절판 접기는 드래그 영역 해제',root().querySelector('#panel').hidden&&surface.hidden);
+command('set',{scale:99});check('확대 상한 500%',state().scale===5);command('set',{scale:-1});check('축소 하한 100%',state().scale===1);
+video.style.setProperty('scale','1.03','important');video.style.setProperty('translate','3px 2px');const before=video.style.cssText;
+command('set',{scale:2});command('reset');check('기존 인라인 스타일과 우선순위 복구',video.style.cssText===before);video.style.cssText='';
+const ad=document.createElement('div');ad.id='midAdPlayerWrapper';ad.innerHTML='<video style="width:1200px;height:700px"></video>';document.body.append(ad);await wait();
+command('set',{scale:2});check('큰 광고 영상을 확대 대상으로 선택하지 않음',ad.querySelector('video').style.scale===''&&video.style.scale==='2');ad.remove();
+command('pan',{x:.5,y:.5});const prior=state();stage.style.width='480px';stage.style.height='270px';await wait();
+check('플레이어 크기 변경에도 배율·위치 유지',state().scale===prior.scale&&state().x===prior.x&&near(video.getBoundingClientRect().width,960));
+storageListeners.forEach(fn=>fn({features:{newValue:{videoZoom:false}}},'local'));await wait();
+check('기능 끄기는 영상 복구·조절판 숨김·키 해제',video.style.scale===''&&getComputedStyle(document.querySelector('#media-zoom-controls')).display==='none'&&!press('Equal').defaultPrevented);
+storageListeners.forEach(fn=>fn({features:{newValue:{videoZoom:true,globalSpeed:false}}},'local'));await wait();
+press('Equal');check('전역 배속 설정과 독립 동작',state().scale===1.25);
+const replacement=document.createElement('video');replacement.poster=video.poster;video.replaceWith(replacement);await wait();
+check('SPA 영상 교체 후 이전 스타일 복구와 새 영상 연결',video.style.scale===''&&state().scale===1);
+replacement.replaceWith(video);await wait();stage.style.width='640px';stage.style.height='360px';await wait();
+command('set',{scale:2});command('open');
+check('실행 오류 없음',errors.length===0);
+document.body.dataset.result=results.every(r=>r.passed)?'pass':'fail';document.querySelector('#result').textContent=JSON.stringify({results,errors},null,2);window.zoomResults=results;
+})();
+</script>

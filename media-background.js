@@ -1,6 +1,6 @@
 const mediaTabs = new Map();
 function tabState(id) {
-  if (!mediaTabs.has(id)) mediaTabs.set(id, { rate: null, resumeRate: null, frames: new Map(), badgeQueue: Promise.resolve(), badgeText: null });
+  if (!mediaTabs.has(id)) mediaTabs.set(id, { rate: null, resumeRate: null, frames: new Map(), zoomFrames: new Map(), badgeQueue: Promise.resolve(), badgeText: null });
   return mediaTabs.get(id);
 }
 function primaryFrame(state) {
@@ -25,11 +25,44 @@ chrome.tabs.onRemoved.addListener(id => mediaTabs.delete(id));
 chrome.tabs.onUpdated.addListener((id, change) => {
   if (change.status !== "loading") return;
   const state = tabState(id);
-  state.frames.clear(); updateBadge(id, state);
+  state.frames.clear(); state.zoomFrames.clear(); updateBadge(id, state);
 });
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (sender.id !== chrome.runtime.id) return;
+  if (message.type === "MEDIA_ZOOM_COMMAND") {
+    // Only this extension's popup may name another tab. Content scripts are
+    // always restricted to their own tab, including cross-origin iframes.
+    const popup = sender.url === chrome.runtime.getURL("popup.html");
+    const tabId = popup ? message.tabId : sender.tab?.id;
+    if (!Number.isInteger(tabId) || !["state", "open", "toggle", "increase", "decrease", "set", "reset", "pan", "center"].includes(message.action)) return;
+    const command = async () => {
+      const state = tabState(tabId);
+      if (![...state.zoomFrames.values()].some(info => info.score > 0 && Date.now() - info.time < 1500)) {
+        chrome.tabs.sendMessage(tabId, { type: "MEDIA_ZOOM_DISCOVER" }).catch(() => {});
+        // A broadcast's Promise resolves with only the first frame's reply.
+        // Allow all frames to report before choosing the main video.
+        await new Promise(resolve => setTimeout(resolve, 80));
+      }
+      const frames = [...state.zoomFrames].filter(([, info]) => info.score > 0 && Date.now() - info.time < 10000).sort((a, b) => b[1].score - a[1].score);
+      for (const [frameId] of frames) {
+        const response = await Promise.race([
+          chrome.tabs.sendMessage(tabId, { type: "MEDIA_ZOOM_APPLY", action: message.action, scale: message.scale, x: message.x, y: message.y }, { frameId }).catch(() => null),
+          new Promise(resolve => setTimeout(() => resolve(null), 300))
+        ]);
+        if (response?.ok) return response;
+        state.zoomFrames.delete(frameId);
+      }
+      return { ok: false };
+    };
+    command().then(respond, () => respond({ ok: false })); return true;
+  }
   if (!Number.isInteger(sender.tab?.id) || sender.id !== chrome.runtime.id) return;
   const tabId = sender.tab.id, state = tabState(tabId);
+  if (message.type === "MEDIA_ZOOM_FRAME") {
+    state.zoomFrames.set(sender.frameId, { score: Number.isFinite(message.score) ? Math.max(0, message.score) : 0, time: Date.now() });
+    for (const [id, info] of state.zoomFrames) if (Date.now() - info.time > 10000) state.zoomFrames.delete(id);
+    respond({ ok: true }); return;
+  }
   if (message.type === "MEDIA_SPEED_NOTICE" && typeof message.text === "string") {
     chrome.tabs.sendMessage(tabId, { type: "MEDIA_SPEED_NOTICE", text: message.text.slice(0, 100) }, { frameId: 0 }).catch(() => {});
     respond({ ok: true }); return;

@@ -19,6 +19,26 @@
         </label>
       </header>
 
+      <section id="video-zoom" aria-label="방송 영상 확대·이동">
+        <strong>방송 영상 확대·이동</strong>
+        <div class="zoom-row">
+          <button type="button" data-action="decrease" aria-label="영상 축소">−</button>
+          <output aria-live="polite">100%</output>
+          <button type="button" data-action="increase" aria-label="영상 확대">＋</button>
+          <button type="button" data-action="reset">원래대로</button>
+        </div>
+        <input type="range" min="100" max="500" step="5" value="100" aria-label="영상 확대 배율">
+        <div class="zoom-row">
+          <button type="button" data-action="pan" data-x="-0.2" aria-label="영상 왼쪽 보기">←</button>
+          <button type="button" data-action="pan" data-y="-0.2" aria-label="영상 위쪽 보기">↑</button>
+          <button type="button" data-action="pan" data-y="0.2" aria-label="영상 아래쪽 보기">↓</button>
+          <button type="button" data-action="pan" data-x="0.2" aria-label="영상 오른쪽 보기">→</button>
+          <button type="button" data-action="open">화면 조절판</button>
+        </div>
+        <p role="status" class="footnote">방송 영상에 연결 중…</p>
+        <p class="footnote">Alt+휠: 확대 · Alt+드래그/방향키: 이동 · Alt+0: 초기화 · Alt+Z: 조절판</p>
+      </section>
+
       <p class="intro">
         왼쪽 키 버튼을 눌러 단축키를 지정하세요. 채팅창에 커서를 둔 뒤
         Caps Lock과 함께 사용합니다.
@@ -49,5 +69,6 @@
 
     <script src="tools-core.js"></script>
     <script src="popup.js"></script>
+    <script src="popup-zoom.js"></script>
   </body>
 </html>

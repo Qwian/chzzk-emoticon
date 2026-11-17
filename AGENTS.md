@@ -46,6 +46,7 @@ For local browser harnesses, serve the repository root and open the files under 
 - `tests/search-suggestions-harness.html` verifies immediate channel results, merged English/Korean matches, cancellation, stale-response protection, cache and failure behavior.
 - `tests/search-native-harness.html` reproduces native Enter/button handlers and a stalled parallel response.
 - `tests/media-speed-harness.html` runs the actual background script in a worker and verifies speed, measured-FPS stepping, iframe routing and editable-field exclusions.
+- `tests/media-zoom-harness.html` verifies actual video scaling, clipping, mouse/touch panning, keyboard exclusions, bounds, style restoration, resizing and SPA replacement. `tests/media-zoom-background.test.cjs` verifies tab/iframe command routing. `tests/media-zoom.browser.cjs` checks trusted fullscreen pointer input, real unpacked-extension playback and cross-origin iframe/popup controls in a temporary Edge profile that is removed on exit.
 - `tests/player-shortcuts-harness.html` verifies F11 cancellation protection and native-first play/mute fallback, including IME, blocked events, typing and lifecycle; `?soop` uses native keyup handlers.
 - `tests/player-modal-harness.html` verifies that retained hidden dialogs do not block Space, while visible modal dialogs still own the keys.
 - `tests/player-actions-harness.html` verifies platform-specific F theater controls and lifecycle; `?soop` also verifies native timeshift pause versus stop/restart, including unloaded video and delayed transitions.
@@ -64,6 +65,8 @@ Do not type or send messages in a real CHZZK chat during agent verification. Rea
 3. Confirm normal punctuation is unchanged with Caps Lock off and in non-chat text fields.
 
 ## Definition of done
+
+After verification, run `tools/package-release.py --clean` with the bundled Python to package runtime files, verify every byte and manifest reference, and retain current + the previous Git-reproducible recovery ZIP. Other archives are removed only when every byte matches the same-version Git snapshot. Unknown archives are preserved.
 
 - All JavaScript syntax checks pass and `manifest.json` parses.
 - The unpacked extension loads without a manifest error.

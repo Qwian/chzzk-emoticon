@@ -1,0 +1,13 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>실제 확장 영상 확대 검사</title>
+<style>body{margin:12px;background:#19281f;color:#fff;font:14px system-ui}#stage{position:relative;width:640px;height:360px;overflow:visible}video{width:100%;height:100%;object-fit:contain}#stage:fullscreen{width:100vw;height:100vh}#native{position:absolute;bottom:5px;left:5px}iframe{width:800px;height:520px;border:0}</style>
+<h1>실제 확장 영상 확대·이동</h1><div id="stage"><video muted autoplay playsinline></video><button id="native">기본 UI</button></div>
+<button id="fs-player">플레이어 전체화면</button><button id="fs-video">영상 전체화면</button><input placeholder="입력 제외 확인">
+<script>
+const video=document.querySelector('video'),canvas=document.createElement('canvas');canvas.width=1280;canvas.height=720;
+const ctx=canvas.getContext('2d');
+for(let y=0;y<4;y++)for(let x=0;x<6;x++){ctx.fillStyle=`hsl(${(x+y*6)*15} 55% 45%)`;ctx.fillRect(x*214,y*180,214,180);ctx.fillStyle='#fff';ctx.font='40px system-ui';ctx.fillText(`${x+1},${y+1}`,x*214+50,y*180+95)}
+video.srcObject=canvas.captureStream(15);video.play();setInterval(()=>canvas.getContext('2d').fillRect(0,0,1,1),100);
+document.querySelector('#fs-player').onclick=()=>document.querySelector('#stage').requestFullscreen();
+document.querySelector('#fs-video').onclick=()=>video.requestFullscreen();
+if(new URLSearchParams(location.search).has('iframe')){document.querySelector('#stage').style.cssText='width:160px;height:90px';const frame=document.createElement('iframe');frame.src=location.href.replace('127.0.0.1','localhost').split('?')[0];document.body.append(frame)}
+</script>

@@ -375,6 +375,7 @@ async function initializeFeatures() {
   const controls = new Map();
   const labels = {
     globalSpeed: "모든 사이트 속도·프레임 단축키",
+    videoZoom: "모든 사이트 영상 확대·위치 이동 (Alt+휠 · Alt+드래그)",
     playerShortcuts: "치지직·숲 F/Esc 극장모드 · F11 보호 · 재생·정지·음소거 복구",
     channelLiveLink: "채널 메뉴의 라이브 · 오프라인(채팅) 바로가기",
     listPreview: "치지직·숲 목록 우클릭 소리 미리보기",

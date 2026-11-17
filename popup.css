@@ -1,3 +1,10 @@
+#video-zoom { margin: 14px 0; padding: 12px; border: 1px solid #80ffd54d; border-radius: 10px; background: #101c18; color: #eafff6; }
+#video-zoom .zoom-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+#video-zoom button { min-width: 32px; min-height: 32px; padding: 5px 8px; margin: 0; }
+#video-zoom output { min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
+#video-zoom input[type=range] { width: 100%; accent-color: #00dc91; margin-top: 10px; }
+#video-zoom .footnote { margin: 8px 0 0; }
+
 :root {
   color-scheme: dark;
   font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif;
