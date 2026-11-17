@@ -107,5 +107,5 @@
     });
   }
   function channelCategory(item) { return typeof item.liveCategory === "string" ? item.liveCategory.trim() : ""; }
-  globalThis.ChzzkTools = Object.freeze({ version: "0.10.30", defaults, features, koreanFromEnglish, catchUpOptions, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup, channelCategory });
+  globalThis.ChzzkTools = Object.freeze({ version: "0.10.31", defaults, features, koreanFromEnglish, catchUpOptions, catchUpProfile, planCatchUp, channelId, orderChannels, channelGroup, channelCategory });
 })();

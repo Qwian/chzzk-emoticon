@@ -6,6 +6,9 @@
   let enabled = true, stopped = false, selected = null, host, ui, panel, dragSurface, resizeObserver;
   let expanded = false, dragging = false, layoutFrame = 0, reportTimer;
   let menuButton, menuBar, pointerUntil = 0, pointerTimer = 0, remoteUntil = 0;
+  let heldAlt = false, heldCtrl = false, heldMeta = false;
+  const modifierSource = globalThis.crypto?.randomUUID?.() || String(Math.random());
+  let modifierStamp = Date.now();
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const excluded = "#midAdPlayerWrapper,#preAdPlayerWrapper,.webplayer-internal-core-ad-ui,#chzzk-sidebar-preview,#cheese-follow-preview,[id^=chzzk-tools-preview-],[data-media-preview]";
   function connected() {
@@ -220,7 +223,15 @@
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "hidden"] }); observers.add(observer);
   }
   const editable = event => event.composedPath().some(node => node.matches?.("input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=textbox]") || node.isContentEditable);
+  function setModifiers(alt, ctrl, meta) {
+    if (heldAlt === alt && heldCtrl === ctrl && heldMeta === meta) return;
+    heldAlt = alt; heldCtrl = ctrl; heldMeta = meta; modifierStamp = Date.now();
+    if (enabled && !stopped) send({ type: "MEDIA_ZOOM_MODIFIERS", source: modifierSource, stamp: modifierStamp, alt, ctrl, meta });
+  }
+  function trackModifiers(event) { setModifiers(Boolean(event.altKey), Boolean(event.ctrlKey), Boolean(event.metaKey)); }
+  function clearModifiers() { setModifiers(false, false, false); }
   function onKey(event) {
+    trackModifiers(event);
     if (!enabled || event.defaultPrevented || event.isComposing || !event.altKey || event.ctrlKey || event.metaKey || editable(event)) return;
     const actions = { KeyZ: "toggle", Equal: "increase", NumpadAdd: "increase", Minus: "decrease", NumpadSubtract: "decrease", Digit0: "reset", Numpad0: "reset",
       ArrowLeft: "pan", ArrowRight: "pan", ArrowUp: "pan", ArrowDown: "pan" };
@@ -242,7 +253,10 @@
   }
   function onWheel(event) {
     const delta = event.deltaY || event.deltaX;
-    if (!enabled || !event.altKey || event.ctrlKey || event.metaKey || editable(event) || !delta) return;
+    // Whale 5.41 can deliver an Alt+wheel with altKey=false, while preserving
+    // the real Alt keydown/keyup. Keep that key state instead of guessing from
+    // scroll direction or changing the browser's native mouse settings.
+    if (!enabled || !(event.altKey || heldAlt) || event.ctrlKey || heldCtrl || event.metaKey || heldMeta || editable(event) || !delta) return;
     const underPointer = videoAt(event), video = underPointer || target();
     if (!video && performance.now() >= remoteUntil) return;
     event.preventDefault(); event.stopImmediatePropagation();
@@ -272,6 +286,7 @@
     gesture = null;
   }
   function onPointerDown(event) {
+    if (event.isTrusted && event.pointerType === "mouse") trackModifiers(event);
     if (!enabled || event.button !== 0 || editable(event)) return;
     const control = nativeFullscreenControl(event);
     if (control) {
@@ -293,6 +308,7 @@
     suppressClickUntil = performance.now() + 600;
   }
   function onPointerMove(event) {
+    if (event.isTrusted && event.pointerType === "mouse") trackModifiers(event);
     if (!menuBar && !gesture) {
       const video = videoAt(event);
       if (video) { pointerUntil = performance.now() + 2200; clearTimeout(pointerTimer); pointerTimer = setTimeout(scheduleLayout, 2250); scheduleLayout(); }
@@ -331,6 +347,10 @@
   }
   function onMessage(message, _sender, respond) {
     if (stopped) return;
+    if (message.type === "MEDIA_ZOOM_MODIFIERS_SYNC" && enabled && message.source !== modifierSource && message.stamp >= modifierStamp) {
+      heldAlt = message.alt === true; heldCtrl = message.ctrl === true; heldMeta = message.meta === true;
+      modifierStamp = message.stamp; return;
+    }
     if (message.type === "MEDIA_ZOOM_APPLY") respond(execute(message));
     if (message.type === "MEDIA_ZOOM_DISCOVER") { report(); respond({ ok: true }); }
     if (message.type === "MEDIA_FRAME_AVAILABLE") remoteUntil = message.available ? performance.now() + 9000 : 0;
@@ -339,6 +359,7 @@
     if (area !== "local" || !changes.features) return;
     enabled = changes.features.newValue?.videoZoom !== false;
     if (!enabled) {
+      clearModifiers();
       endGesture(); dragging = expanded = false;
       for (const [video, state] of states) { restore(video, state); state.scale = 1; state.x = state.y = state.dx = state.dy = 0; }
     }
@@ -346,7 +367,7 @@
   }
   function stop() {
     if (stopped) return; stopped = true;
-    endGesture(); clearInterval(reportTimer); clearTimeout(pointerTimer); cancelAnimationFrame(layoutFrame); resizeObserver?.disconnect();
+    clearModifiers(); endGesture(); clearInterval(reportTimer); clearTimeout(pointerTimer); cancelAnimationFrame(layoutFrame); resizeObserver?.disconnect();
     observers.forEach(observer => observer.disconnect());
     for (const [video, state] of states) restore(video, state);
     states.clear(); host?.remove();
@@ -355,7 +376,7 @@
     document.removeEventListener("fullscreenchange", onFullscreen);
     try { chrome.runtime.onMessage.removeListener(onMessage); chrome.storage.onChanged.removeListener(onStorage); } catch { /* invalid context */ }
   }
-  const events = [["keydown", onKey], ["wheel", onWheel], ["pointerdown", onPointerDown], ["pointermove", onPointerMove],
+  const events = [["keydown", onKey], ["keyup", trackModifiers], ["blur", clearModifiers], ["wheel", onWheel], ["pointerdown", onPointerDown], ["pointermove", onPointerMove],
     ["pointerup", endGesture], ["pointercancel", endGesture], ["click", onClick], ["resize", onResize], ["scroll", scheduleLayout], ["transitionend", onControlTransition]];
   if (!connected()) return;
   for (const [name, fn] of events) window.addEventListener(name, fn, { capture: true, passive: false });

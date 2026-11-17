@@ -58,6 +58,14 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   }
   if (!Number.isInteger(sender.tab?.id) || sender.id !== chrome.runtime.id) return;
   const tabId = sender.tab.id, state = tabState(tabId);
+  if (message.type === "MEDIA_ZOOM_MODIFIERS") {
+    if (typeof message.source !== "string" || message.source.length > 100 || !Number.isFinite(message.stamp)) return;
+    if (message.stamp < (state.zoomModifierStamp || 0)) { respond({ ok: true }); return; }
+    state.zoomModifierStamp = message.stamp;
+    chrome.tabs.sendMessage(tabId, { type: "MEDIA_ZOOM_MODIFIERS_SYNC", source: message.source, stamp: message.stamp,
+      alt: message.alt === true, ctrl: message.ctrl === true, meta: message.meta === true }).catch(() => {});
+    respond({ ok: true }); return;
+  }
   if (message.type === "MEDIA_ZOOM_FRAME") {
     state.zoomFrames.set(sender.frameId, { score: Number.isFinite(message.score) ? Math.max(0, message.score) : 0, time: Date.now() });
     for (const [id, info] of state.zoomFrames) if (Date.now() - info.time > 10000) state.zoomFrames.delete(id);

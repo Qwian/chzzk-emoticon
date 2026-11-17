@@ -60,3 +60,13 @@ test('failed main frame falls back within the same tab and commands preserve pan
   const count = b.calls.length; await b.request({ type: 'MEDIA_ZOOM_COMMAND', action: 'unknown' }); assert.equal(b.calls.length, count);
   b.remove(1); assert.equal((await b.request({ type: 'MEDIA_ZOOM_COMMAND', action: 'state' })).ok, false);
 });
+test('modifier state is shared only within the sender tab and older state cannot overwrite release', async () => {
+  const b = setup();
+  await b.request({type:'MEDIA_ZOOM_MODIFIERS',source:'parent',stamp:100,alt:true,ctrl:false,meta:false},b.sender(1,0));
+  assert.equal(b.calls.at(-1).tabId,1);assert.equal(b.calls.at(-1).message.alt,true);assert.equal(b.calls.at(-1).options,undefined);
+  await b.request({type:'MEDIA_ZOOM_MODIFIERS',source:'parent',stamp:102,alt:false},b.sender(1,0));
+  const count=b.calls.length;
+  await b.request({type:'MEDIA_ZOOM_MODIFIERS',source:'child',stamp:101,alt:true},b.sender(1,17));assert.equal(b.calls.length,count);
+  await b.request({type:'MEDIA_ZOOM_MODIFIERS',source:'other',stamp:103,alt:true},{id:'foreign',tab:{id:1},frameId:0});assert.equal(b.calls.length,count);
+  await b.request({type:'MEDIA_ZOOM_MODIFIERS',source:'other',stamp:100,alt:true},b.sender(2,0));assert.equal(b.calls.at(-1).tabId,2);
+});
