@@ -21,7 +21,7 @@ const editor=document.querySelector('[contenteditable]'),initialParent=editor.pa
 const captures=new WeakMap();Element.prototype.setPointerCapture=function(id){captures.set(this,id)};Element.prototype.hasPointerCapture=function(id){return captures.get(this)===id};Element.prototype.releasePointerCapture=function(){captures.delete(this)};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['pointermove',dx,dy],['pointerup',dx,dy]])element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:77,button:0,clientX:x,clientY:y}))};
-</script><script src="../free-chat.js?v=0.8.1"></script><script>
+</script><script src="../player-view-controls.js"></script><script src="../free-chat.js?v=0.10.30"></script><script>
 (async()=>{
  const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});await wait(100);
  if(params.has('legacy')){check('기존 템퍼몽키 스크립트가 먼저 있으면 확장은 중복 적용하지 않음',!document.querySelector('.ctfc-toolbar')&&document.querySelector('#sfc-style'));document.querySelector('#sfc-style').remove();await wait(100)}

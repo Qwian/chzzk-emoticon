@@ -27,7 +27,7 @@ document.querySelector('#fs-player').onclick=async()=>{await stage.requestFullsc
 document.querySelector('#fs-video').onclick=async()=>{await video.requestFullscreen();await wait();document.querySelector('#result').textContent=JSON.stringify(fullscreenCheck(),null,2)};
 document.querySelector('#exit-fs').onclick=()=>document.exitFullscreen();
 function fullscreenCheck(){const box=video.getBoundingClientRect(),host=document.querySelector('#media-zoom-controls');return {fullscreen:document.fullscreenElement?.tagName,scale:getComputedStyle(video).scale,zoom:state(),width:box.width,height:box.height,viewport:[innerWidth,innerHeight],controlsVisible:host.matches(':popover-open'),launcher:root().querySelector('#launcher').getBoundingClientRect().toJSON(),errors}}
-</script><script src="../media-zoom.js"></script>
+</script><script src="../player-view-controls.js"></script><script src="../media-zoom.js"></script>
 <script>
 (async()=>{
 await wait();const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)}),near=(a,b)=>Math.abs(a-b)<1;

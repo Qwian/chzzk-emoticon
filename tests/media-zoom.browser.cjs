@@ -24,14 +24,14 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
   await page.waitForFunction(() => ['pass','fail'].includes(document.body.dataset.result));
   const harness = JSON.parse(await page.locator('#result').textContent());
   assert.equal(await page.locator('body').getAttribute('data-result'), 'pass', JSON.stringify(harness)); results.push({ harness });
-  await page.screenshot({ path: path.join(artifacts, 'media-zoom-0.10.29.png') });
+  await page.screenshot({ path: path.join(artifacts, 'media-zoom-0.10.30.png') });
   for (const name of ['fs-player','fs-video']) {
     await page.locator('#' + name).click(); await page.waitForFunction(() => !!document.fullscreenElement);
     await page.waitForTimeout(150);
     const info = await page.evaluate(() => ({ fullscreen: document.fullscreenElement.tagName, scale: getComputedStyle(document.querySelector('video')).scale,
       width: document.querySelector('video').getBoundingClientRect().width, viewport: innerWidth, popover: document.querySelector('#media-zoom-controls').matches(':popover-open') }));
     assert.equal(info.scale, '2'); assert.ok(info.popover); assert.ok(Math.abs(info.width - info.viewport * 2) < 2, JSON.stringify(info));
-    await page.screenshot({path:path.join(artifacts,`media-zoom-${name}.png`)});
+    await page.screenshot({path:path.join(artifacts,`media-zoom-${name}-0.10.30.png`)});
     if (name === 'fs-video') {
       const button = await page.locator('#media-zoom-controls #right').boundingBox();
       await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2);
@@ -52,27 +52,40 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
     await page.evaluate(() => document.exitFullscreen());
   }
   console.log('29 browser assertions and both fullscreen pointer paths passed');
+  for (const fixture of ['player-view-controls-harness.html','player-view-controls-harness.html?soop','free-chat-harness.html','free-chat-harness.html?soop','free-chat-harness.html?legacy','free-chat-harness.html?soop&legacy','vod-chat-harness.html']) {
+    await page.goto(base + '/tests/' + fixture);
+    await page.waitForFunction(() => ['pass','fail'].includes(document.body.dataset.result));
+    const text = await page.locator('#result').textContent();
+    assert.equal(await page.locator('body').getAttribute('data-result'), 'pass', fixture + ': ' + text);
+    const parsed = JSON.parse(text); results.push({ fixture, checks: (parsed.results || parsed).length });
+  }
   await browser.close(); browser = null;
   profile = fs.mkdtempSync(path.join(artifacts, 'media-zoom-profile-'));
   context = await chromium.launchPersistentContext(profile, { channel: 'msedge', headless: true, viewport: { width: 1280, height: 900 },
     args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`] });
   context.setDefaultTimeout(10000);
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  assert.equal(await worker.evaluate(() => chrome.runtime.getManifest().version), '0.10.29');
+  assert.equal(await worker.evaluate(() => chrome.runtime.getManifest().version), '0.10.30');
   const live = await context.newPage(); live.on('pageerror', error => errors.push(error.message));
   await live.goto(base + '/tests/media-zoom-fixture.html');
-  await live.locator('#media-zoom-controls #launcher').waitFor();
+  await live.locator('#media-zoom-menu').waitFor();
   await live.waitForFunction(() => !document.querySelector('video').paused && document.querySelector('video').currentTime > 0);
   const before = await metrics(live), uiBefore = await live.locator('#native').boundingBox();
   await live.keyboard.press('Alt+Equal'); await live.waitForTimeout(60);
   assert.equal((await metrics(live)).scale, '1.25'); assert.equal((await live.locator('#native').boundingBox()).width, uiBefore.width);
+  await live.keyboard.press('Alt+0'); await live.mouse.move(300,150); await live.keyboard.down('Alt');
+  await live.mouse.wheel(0,-120); await live.waitForTimeout(100); assert.equal((await metrics(live)).scale,'1.1');
+  await live.mouse.wheel(-120,0); await live.waitForTimeout(100); assert.equal((await metrics(live)).scale,'1.2');
+  await live.mouse.move(1000,600); await live.mouse.wheel(0,-120); await live.waitForTimeout(100); assert.equal((await metrics(live)).scale,'1.3');
+  await live.keyboard.up('Alt'); results.push({ trustedVerticalAndHorizontalWheel: true, wheelOutsideVideo:true });
+  await live.keyboard.press('Alt+0'); await live.keyboard.press('Alt+Equal');
   await live.keyboard.press('Alt+ArrowRight'); assert.ok((await metrics(live)).translate.startsWith('-'));
   const handle = live.locator('#media-zoom-controls');
-  await handle.getByRole('button', { name: /영상 125%/ }).click();
+  await live.locator('#media-zoom-menu').click();
   await handle.getByRole('button', { name: '화면 끌어서 이동' }).click();
   await live.mouse.move(300, 220); await live.mouse.down(); await live.mouse.move(400, 260, { steps: 8 }); await live.mouse.up();
   assert.notEqual((await metrics(live)).translate, '0px'); assert.equal((await metrics(live)).paused, false);
-  await handle.getByRole('button', { name: '접기', exact: true }).click();
+  await live.locator('#media-zoom-menu').click();
   await live.keyboard.press('Alt+0'); assert.equal((await metrics(live)).scale, 'none');
   await live.getByPlaceholder('입력 제외 확인').focus(); await live.keyboard.press('Alt+Equal'); assert.equal((await metrics(live)).scale, 'none');
   results.push({ unpacked: true, playbackUnaffected: (await metrics(live)).time > before.time });
@@ -80,7 +93,7 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
   // owning browser tab; a normal extension-page tab would select itself.
   // Bind that one API result to the fixture while keeping real IPC/routing.
   await live.goto(base + '/tests/media-zoom-fixture.html?iframe');
-  await live.frameLocator('iframe').locator('#media-zoom-controls #launcher').waitFor();
+  await live.frameLocator('iframe').locator('#media-zoom-menu').waitFor();
   await live.bringToFront();
   const fixtureTab = await worker.evaluate(async () => (await chrome.tabs.query({active:true,currentWindow:true}))[0].id);
   const popup = await context.newPage();
@@ -99,12 +112,15 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
   await popup.locator('#video-zoom').getByRole('button', { name: '원래대로' }).click();
   await popup.locator('#video-zoom output').filter({ hasText: '100%' }).waitFor();
   results.push({ popupPage: true, owningTabBindingSimulated: true, crossOriginIframe: true });
-  await popup.screenshot({ path: path.join(artifacts, 'media-zoom-popup-0.10.29.png') });
+  await popup.screenshot({ path: path.join(artifacts, 'media-zoom-popup-0.10.30.png') });
   if (process.argv.includes('--public')) {
     const broadcast = await context.newPage(); broadcast.on('pageerror', error => errors.push(error.message));
     await broadcast.goto('https://chzzk.naver.com/video/15964028', { waitUntil: 'domcontentloaded' });
     await broadcast.locator('video.webplayer-internal-video').first().waitFor({state:'visible',timeout:45000});
-    await broadcast.locator('#media-zoom-controls #launcher').waitFor();
+    await broadcast.waitForFunction(() => { const video=document.querySelector('video.webplayer-internal-video'); return video?.readyState>=2&&!video.paused&&!document.querySelector('.pzp-pc--adbreak'); }, null, {timeout:45000});
+    const videoBox = await broadcast.locator('video.webplayer-internal-video').first().boundingBox();
+    await broadcast.mouse.move(videoBox.x+videoBox.width/2,videoBox.y+videoBox.height/2);
+    await broadcast.locator('#media-zoom-menu').waitFor();
     const native = broadcast.locator('video.webplayer-internal-video').first();
     const before = await native.boundingBox();
     await broadcast.keyboard.press('Alt+Equal');
@@ -113,13 +129,29 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
     assert.ok(Math.abs(after.width - before.width * 1.25) < 2, JSON.stringify({before,after}));
     await broadcast.keyboard.press('Alt+ArrowRight');
     const translation = await native.evaluate(video => getComputedStyle(video).translate); assert.ok(translation.startsWith('-'));
-    await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-0.10.29.png')});
+    await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-0.10.30.png')});
     await broadcast.keyboard.press('Alt+0');
     assert.ok(Math.abs((await native.boundingBox()).width - before.width) < 2);
-    results.push({ publicChzzkVod: true, loggedIn: false, beforeWidth:before.width, zoomedWidth:after.width, translation });
+    await broadcast.mouse.move(videoBox.x+100,videoBox.y+100); await broadcast.keyboard.down('Alt');
+    await broadcast.mouse.wheel(0,-120); await broadcast.waitForTimeout(100); assert.equal(await native.evaluate(v=>getComputedStyle(v).scale),'1.1');
+    await broadcast.mouse.move(1100,800); await broadcast.mouse.wheel(-120,0); await broadcast.waitForTimeout(100); assert.equal(await native.evaluate(v=>getComputedStyle(v).scale),'1.2');
+    await broadcast.keyboard.up('Alt'); await broadcast.keyboard.press('Alt+0');
+    await native.hover({position:{x:120,y:120}}); await native.hover({position:{x:140,y:140}});
+    await broadcast.locator('#media-zoom-menu').click().catch(async error => {
+      console.log('public menu diagnostic',JSON.stringify(await broadcast.locator('#media-zoom-menu').evaluate(button=>({focused:document.hasFocus(),root:button.closest('.pzp')?.className,ancestors:[button,...(()=>{const a=[];for(let n=button.parentElement;n;n=n.parentElement)a.push(n);return a})()].map(n=>({tag:n.tagName,class:n.className,display:getComputedStyle(n).display,visibility:getComputedStyle(n).visibility,opacity:getComputedStyle(n).opacity}))}))));
+      await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-menu-failure-0.10.30.png')}); throw error;
+    });
+    await broadcast.locator('#media-zoom-controls #panel').waitFor();
+    await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-menu-0.10.30.png')});
+    const panelBox=await broadcast.locator('#media-zoom-controls #panel').boundingBox();
+    for(let i=0;i<6;i++){await broadcast.mouse.move(panelBox.x+30+i*3,panelBox.y+20);await broadcast.waitForTimeout(350)}
+    assert.equal(await broadcast.locator('#media-zoom-controls #panel').isVisible(),true,'moving over the open panel must retain native controls');
+    await broadcast.mouse.move(20,850);
+    await broadcast.waitForFunction(()=>document.querySelector('#media-zoom-controls').shadowRoot.querySelector('#panel').hidden);
+    results.push({ publicChzzkVod: true, actualMainPlaying:true, loggedIn: false, beforeWidth:before.width, zoomedWidth:after.width, translation, trustedWheelInsideAndOutside:true, nativeHideWithPointerOutside:true });
   }
   assert.equal(errors.length, 0, errors.join('\n'));
-  fs.writeFileSync(path.join(artifacts, 'media-zoom-0.10.29.json'), JSON.stringify({ results, errors }, null, 2));
+  fs.writeFileSync(path.join(artifacts, 'media-zoom-0.10.30.json'), JSON.stringify({ results, errors }, null, 2));
   console.log(JSON.stringify({ checks: harness.results.length, results: results.filter(item => !item.harness), errors }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
   await browser?.close(); await context?.close(); server?.close();

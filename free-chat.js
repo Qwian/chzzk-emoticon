@@ -113,7 +113,7 @@
     section[class*="_is_large_"]:has(#player_layout)::-webkit-scrollbar {
       display: none !important; width: 0 !important; height: 0 !important;
     }
-    .ctfc-toolbar, .ctfc-handle, .ctfc-dock-handle, #ctfc-toggle { display: none !important; }
+    .ctfc-toolbar, .ctfc-handle, .ctfc-dock-handle { display: none !important; }
     body.screen_mode #webplayer.ctfc-soop-docked,
     body.screen_mode #webplayer.ctfc-soop-docked #webplayer_contents {
       --modeChatWidth: var(--ctfc-dock-w) !important;
@@ -280,14 +280,6 @@
       width: auto !important; min-width: 0 !important; box-sizing: border-box !important;
       transition-property: bottom, opacity !important;
     }
-    body.screen_mode #webplayer #ctfc-toggle, .ctfc-chzzk-wide #ctfc-toggle {
-      display: block !important; position: fixed; left: calc(12px + var(--ctfc-controls-left, 0px)); bottom: 72px; z-index: 151;
-      padding: 6px 9px; width: auto; height: auto; border: 1px solid #737985;
-      border-radius: 7px; background: #1c202bdd; color: white; font: 11px/1.3 sans-serif;
-      cursor: pointer; opacity: .35; transition: opacity .15s;
-    }
-    body.screen_mode #webplayer #ctfc-toggle:hover, body.screen_mode #webplayer #ctfc-toggle:focus-visible,
-    .ctfc-chzzk-wide #ctfc-toggle:hover, .ctfc-chzzk-wide #ctfc-toggle:focus-visible { opacity: 1; }
   `;
   document.head.append(style);
   let mount = null;
@@ -409,7 +401,10 @@
       mount.player.classList.toggle('ctfc-soop-docked', !settings.enabled && wide && chatOpen);
     }
     if (gesture?.edge !== 'dock') applyDockWidth(settings.dockWidth);
-    mount.toggle.textContent = settings.enabled ? '채팅 겹치기 켬' : '채팅 겹치기 끔';
+    globalThis.ChzzkViewControls?.place(mount.toggle, mount.player);
+    mount.toggle.hidden = !wide;
+    const toggleText = settings.enabled ? '채팅 겹치기 켬' : '채팅 겹치기 끔';
+    if (mount.toggle.textContent !== toggleText) mount.toggle.textContent = toggleText;
     mount.toggle.setAttribute('aria-pressed', String(settings.enabled));
     mount.side.style.setProperty('--ctfc-opacity', settings.opacity.toFixed(2));
     mount.alpha.value = String(Math.round(settings.opacity * 100));
@@ -516,9 +511,10 @@
       '<small>0%: 투명 · 100%: 불투명<br>위치·크기는 모니터별로 저장돼요.</small></div>';
     const toggle = document.createElement('button');
     toggle.id = 'ctfc-toggle';
+    toggle.className = 'ct-view-control';
     toggle.type = 'button';
     toggle.title = '채팅 겹치기 켜기/끄기 · Alt+Shift+C';
-    player.append(toggle);
+    globalThis.ChzzkViewControls?.place(toggle, player);
     const dockHandle = document.createElement('div');
     dockHandle.className = 'ctfc-dock-handle';
     dockHandle.title = '좌우로 드래그해서 채팅창 폭 조절';
@@ -579,7 +575,7 @@
     mount.abort.abort(); mount.observer.disconnect(); mount.geometryObserver.disconnect();
     if (gesture?.target.hasPointerCapture(gesture.id)) gesture.target.releasePointerCapture(gesture.id);
     gesture = null;
-    mount.toolbar.remove(); mount.toggle.remove(); mount.dockHandle?.remove();
+    mount.toolbar.remove(); globalThis.ChzzkViewControls?.release(mount.toggle); mount.dockHandle?.remove();
     mount.handles.forEach(handle => handle.remove());
     mount.player.classList.remove('ctfc-enabled', 'ctfc-soop-docked', 'ctfc-controls-inset', 'ctfc-chzzk-wide', 'ctfc-chzzk-active', 'ctfc-chzzk-docked');
     mount.videoMain?.classList.remove('ctfc-chzzk-main');
@@ -616,6 +612,7 @@
   });
   const treeObserver = new MutationObserver(() => {
     if (!mount?.side.isConnected || !mount?.toolbar.isConnected || !mount?.player.isConnected || (isChzzk && !mount?.videoMain.isConnected)) install();
+    else globalThis.ChzzkViewControls?.place(mount.toggle, mount.player);
   });
   treeObserver.observe(document.body, { childList: true, subtree: true });
   const modeObserver = new MutationObserver(schedule);

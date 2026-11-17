@@ -6,7 +6,7 @@ const baseline=new URLSearchParams(location.search).has('baseline');history.repl
 const store={features:{freeChat:true}},listeners=new Set();window.chrome={storage:{local:{get:async()=>structuredClone(store),set:async data=>{Object.assign(store,structuredClone(data))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
 const captures=new WeakMap();Element.prototype.setPointerCapture=function(id){captures.set(this,id)};Element.prototype.hasPointerCapture=function(id){return captures.get(this)===id};Element.prototype.releasePointerCapture=function(){captures.delete(this)};
 const wait=()=>new Promise(r=>setTimeout(r,100));const drag=(element,dx)=>{for(const[type,x]of[['pointerdown',0],['pointermove',dx],['pointerup',dx]])element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:8,button:0,clientX:x}))};
-</script><script>document.write('<script src="'+(baseline?'/artifacts/free-chat-0.10.0-scroll.js':'/free-chat.js')+'"><\/script>');</script><script>
+</script><script src="../player-view-controls.js"></script><script>document.write('<script src="'+(baseline?'/artifacts/free-chat-0.10.0-scroll.js':'/free-chat.js')+'"><\/script>');</script><script>
 (async()=>{await wait();const results=[],check=(name,passed)=>results.push({name,passed:!!passed}),side=document.querySelector('#vod-aside'),log=side.querySelector('[role=log]');
 check('다시보기 실제 중첩 구조에 도구 한 번 설치',document.querySelectorAll('.ctfc-toolbar').length===1);
 const handle=document.querySelector('.ctfc-dock-handle');check('일반 다시보기에서 폭 조절 손잡이 표시',handle&&getComputedStyle(handle).display!=='none');

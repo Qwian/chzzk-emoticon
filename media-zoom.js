@@ -5,6 +5,7 @@
   const properties = ["scale", "translate", "transform-origin", "clip-path", "transition"];
   let enabled = true, stopped = false, selected = null, host, ui, panel, dragSurface, resizeObserver;
   let expanded = false, dragging = false, layoutFrame = 0, reportTimer;
+  let menuButton, menuBar, pointerUntil = 0, pointerTimer = 0, remoteUntil = 0;
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const excluded = "#midAdPlayerWrapper,#preAdPlayerWrapper,.webplayer-internal-core-ad-ui,#chzzk-sidebar-preview,#cheese-follow-preview,[id^=chzzk-tools-preview-],[data-media-preview]";
   function connected() {
@@ -93,8 +94,8 @@
     select(video);
     const state = states.get(video);
     switch (message.action) {
-      case "increase": zoom(video, state.scale + .25); break;
-      case "decrease": zoom(video, state.scale - .25); break;
+      case "increase": zoom(video, state.scale + (Number.isFinite(message.step) ? clamp(message.step, .05, 1) : .25)); break;
+      case "decrease": zoom(video, state.scale - (Number.isFinite(message.step) ? clamp(message.step, .05, 1) : .25)); break;
       case "set": if (Number.isFinite(message.scale)) zoom(video, message.scale); break;
       case "reset": zoom(video, 1); dragging = false; break;
       case "pan":
@@ -118,8 +119,8 @@
       *{box-sizing:border-box} [hidden]{display:none!important}
       button{font:600 13px system-ui;color:#fff;background:#25352f;border:1px solid #ffffff30;border-radius:6px;min-height:32px;min-width:32px;padding:4px 8px;cursor:pointer;touch-action:manipulation}
       button:hover,button:focus-visible{background:#39604f;outline:2px solid #80ffd5;outline-offset:1px}
-      #launcher{position:absolute;right:0;top:0;pointer-events:auto;background:#12251cda;white-space:nowrap}
-      #panel{position:absolute;top:38px;right:0;width:228px;max-width:calc(100vw - 16px);background:#101c18f5;color:#eafff6;font:13px/1.4 system-ui;border:1px solid #80ffd54d;box-shadow:0 3px 16px #0008;border-radius:9px;padding:10px;pointer-events:auto}
+      #launcher{position:absolute;right:0;bottom:0;pointer-events:auto;background:#12251cda;white-space:nowrap}
+      #panel{position:absolute;bottom:38px;right:0;width:228px;max-width:calc(100vw - 16px);background:#101c18f5;color:#eafff6;font:13px/1.4 system-ui;border:1px solid #80ffd54d;box-shadow:0 3px 16px #0008;border-radius:9px;padding:10px;pointer-events:auto}
       .row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}
       input{width:100%;margin:0 0 8px;accent-color:#00dc91}
       .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:8px 0}
@@ -138,6 +139,11 @@
       <small>Alt+휠: 확대·축소<br>Alt+드래그 / Alt+방향키: 이동<br>Alt+0: 초기화 · Alt+Z: 접기</small>
     </section>`;
     panel = ui.querySelector("#panel"); dragSurface = ui.querySelector("#surface");
+    menuButton = document.createElement("button"); menuButton.id = "media-zoom-menu"; menuButton.type = "button";
+    menuButton.className = "ct-view-control"; menuButton.textContent = "영상 확대";
+    menuButton.setAttribute("aria-label", "영상 확대·이동 설정");
+    menuButton.addEventListener("pointerdown", event => { if (event.button === 0 && event.pointerType === "mouse") event.preventDefault(); });
+    menuButton.addEventListener("click", event => { event.stopPropagation(); execute({ action: "toggle" }); });
     const click = (id, action, extra = {}) => ui.querySelector(id).addEventListener("click", () => execute({ action, ...extra }));
     click("#launcher", "toggle"); click("#plus", "increase"); click("#minus", "decrease"); click("#reset", "reset"); click("#center", "center");
     click("#left", "pan", { x: -.2 }); click("#right", "pan", { x: .2 });
@@ -153,32 +159,45 @@
     if (stopped) return;
     for (const [video, state] of states) if (!video.isConnected) { restore(video, state); states.delete(video); }
     const video = enabled && target();
-    if (!video) { if (host) host.style.setProperty("display", "none", "important"); select(null); return; }
+    if (!video) { if (host) host.style.setProperty("display", "none", "important"); globalThis.ChzzkViewControls?.release(menuButton); select(null); return; }
     select(video); createUI();
     host.style.setProperty("display", "block", "important");
+    menuBar = globalThis.ChzzkViewControls?.place(menuButton, video, true);
     const fs = document.fullscreenElement, canPopover = typeof host.showPopover === "function";
-    const parent = fs && fs.tagName !== "VIDEO" && fs.tagName !== "IFRAME" ? fs : document.documentElement;
+    // Keep panel pointer activity in the native player's event path so using
+    // the panel does not look like leaving the player and hide its controls.
+    const nativePlayer = menuBar?.closest(".pzp,#webplayer,#movie_player");
+    const parent = fs ? fs.matches("video,iframe") ? document.documentElement : fs : nativePlayer || document.documentElement;
     if (host.parentNode !== parent) parent.append(host);
     if (canPopover) {
       try { host.setAttribute("popover", "manual"); if (!host.matches(":popover-open")) host.showPopover(); } catch { /* older browsers */ }
     }
     const r = baseRect(video), state = states.get(video);
-    const right = Math.min(innerWidth - 8, r.right - 8), top = Math.max(8, r.top + 8);
+    const nativeVisible = menuBar && globalThis.ChzzkViewControls.visible(menuButton);
+    const visible = menuBar ? nativeVisible : expanded || performance.now() < pointerUntil;
+    const anchor = nativeVisible ? menuButton.getBoundingClientRect() : r;
+    const right = Math.min(innerWidth - 8, anchor.right - 8), bottom = Math.min(innerHeight - 8, nativeVisible ? anchor.bottom : r.bottom - 8);
     host.style.setProperty("left", `${Math.max(8, right)}px`, "important");
-    host.style.setProperty("top", `${Math.min(innerHeight - 40, top)}px`, "important");
-    panel.hidden = !expanded;
+    host.style.setProperty("top", `${Math.max(40, bottom)}px`, "important");
+    ui.querySelector("#launcher").hidden = Boolean(menuBar) || !visible;
+    panel.hidden = !expanded || !visible;
+    panel.style.bottom = `${nativeVisible ? anchor.height + 8 : 38}px`;
     // Scroll the panel rather than clipping controls on a small player/screen.
-    panel.style.maxHeight = `${Math.max(40, innerHeight - Math.min(innerHeight - 40, top) - 46)}px`;
+    panel.style.maxHeight = `${Math.max(40, bottom - 46)}px`;
     panel.style.overflowY = "auto";
     ui.querySelector("#launcher").setAttribute("aria-expanded", String(expanded));
+    menuButton.setAttribute("aria-expanded", String(expanded));
+    const menuText = state.scale > 1 ? `영상 ${Math.round(state.scale * 100)}%` : "영상 확대";
+    if (menuButton.textContent !== menuText) menuButton.textContent = menuText;
     ui.querySelector("#launcher").textContent = expanded ? "접기" : state.scale > 1 ? `영상 ${Math.round(state.scale * 100)}%` : "영상 확대";
     ui.querySelector("#value").textContent = `${Math.round(state.scale * 100)}%`;
     ui.querySelector("#scale").value = String(Math.round(state.scale * 100));
     ui.querySelector("#drag").setAttribute("aria-pressed", String(dragging));
     dragSurface.hidden = !dragging || state.scale <= 1 || !expanded;
+    const dragBottom = menuBar ? Math.min(r.bottom, menuBar.getBoundingClientRect().top) : r.bottom;
     Object.assign(dragSurface.style, { left: `${Math.max(0, r.left)}px`, top: `${Math.max(0, r.top)}px`,
       width: `${Math.max(0, Math.min(innerWidth, r.right) - Math.max(0, r.left))}px`,
-      height: `${Math.max(0, Math.min(innerHeight, r.bottom) - Math.max(0, r.top))}px` });
+      height: `${Math.max(0, Math.min(innerHeight, dragBottom) - Math.max(0, r.top))}px` });
   }
   function scheduleLayout() { if (!stopped && !layoutFrame) layoutFrame = requestAnimationFrame(layout); }
   function register(video) {
@@ -196,9 +215,9 @@
     roots.add(root); scan(root);
     const observer = new MutationObserver(records => {
       for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1 && node !== host) scan(node);
-      scheduleLayout();
+      if (records.some(record => record.type === "childList" || record.target.contains?.(selected) || record.target.contains?.(menuButton))) scheduleLayout();
     });
-    observer.observe(root, { childList: true, subtree: true }); observers.add(observer);
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "hidden"] }); observers.add(observer);
   }
   const editable = event => event.composedPath().some(node => node.matches?.("input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=textbox]") || node.isContentEditable);
   function onKey(event) {
@@ -222,10 +241,14 @@
     });
   }
   function onWheel(event) {
-    if (!enabled || !event.altKey || event.ctrlKey || event.metaKey || editable(event) || !event.deltaY) return;
-    const video = videoAt(event); if (!video) return;
-    event.preventDefault(); event.stopImmediatePropagation(); select(video);
-    zoom(video, states.get(video).scale + (event.deltaY < 0 ? .1 : -.1), { x: event.clientX, y: event.clientY });
+    const delta = event.deltaY || event.deltaX;
+    if (!enabled || !event.altKey || event.ctrlKey || event.metaKey || editable(event) || !delta) return;
+    const underPointer = videoAt(event), video = underPointer || target();
+    if (!video && performance.now() >= remoteUntil) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    if (!video) { send({ type: "MEDIA_ZOOM_COMMAND", action: delta < 0 ? "increase" : "decrease", step: .1 }); return; }
+    select(video);
+    zoom(video, states.get(video).scale + (delta < 0 ? .1 : -.1), underPointer ? { x: event.clientX, y: event.clientY } : null);
   }
   let gesture = null, suppressClickUntil = 0;
   function nativeFullscreenControl(event) {
@@ -270,6 +293,10 @@
     suppressClickUntil = performance.now() + 600;
   }
   function onPointerMove(event) {
+    if (!menuBar && !gesture) {
+      const video = videoAt(event);
+      if (video) { pointerUntil = performance.now() + 2200; clearTimeout(pointerTimer); pointerTimer = setTimeout(scheduleLayout, 2250); scheduleLayout(); }
+    }
     if (!gesture || event.pointerId !== gesture.id) return;
     if (gesture.control) {
       event.preventDefault(); event.stopImmediatePropagation();
@@ -294,6 +321,9 @@
     try { if (host?.matches(":popover-open")) host.hidePopover(); } catch { /* unsupported */ }
     onResize();
   }
+  function onControlTransition(event) {
+    if (menuButton && event.target.contains?.(menuButton)) scheduleLayout();
+  }
   function report() {
     if (!connected()) return;
     const video = enabled && best();
@@ -303,6 +333,7 @@
     if (stopped) return;
     if (message.type === "MEDIA_ZOOM_APPLY") respond(execute(message));
     if (message.type === "MEDIA_ZOOM_DISCOVER") { report(); respond({ ok: true }); }
+    if (message.type === "MEDIA_FRAME_AVAILABLE") remoteUntil = message.available ? performance.now() + 9000 : 0;
   }
   function onStorage(changes, area) {
     if (area !== "local" || !changes.features) return;
@@ -315,16 +346,17 @@
   }
   function stop() {
     if (stopped) return; stopped = true;
-    endGesture(); clearInterval(reportTimer); cancelAnimationFrame(layoutFrame); resizeObserver?.disconnect();
+    endGesture(); clearInterval(reportTimer); clearTimeout(pointerTimer); cancelAnimationFrame(layoutFrame); resizeObserver?.disconnect();
     observers.forEach(observer => observer.disconnect());
     for (const [video, state] of states) restore(video, state);
     states.clear(); host?.remove();
+    if (menuButton) globalThis.ChzzkViewControls?.release(menuButton);
     for (const [name, fn] of events) window.removeEventListener(name, fn, true);
     document.removeEventListener("fullscreenchange", onFullscreen);
     try { chrome.runtime.onMessage.removeListener(onMessage); chrome.storage.onChanged.removeListener(onStorage); } catch { /* invalid context */ }
   }
   const events = [["keydown", onKey], ["wheel", onWheel], ["pointerdown", onPointerDown], ["pointermove", onPointerMove],
-    ["pointerup", endGesture], ["pointercancel", endGesture], ["click", onClick], ["resize", onResize], ["scroll", scheduleLayout]];
+    ["pointerup", endGesture], ["pointercancel", endGesture], ["click", onClick], ["resize", onResize], ["scroll", scheduleLayout], ["transitionend", onControlTransition]];
   if (!connected()) return;
   for (const [name, fn] of events) window.addEventListener(name, fn, { capture: true, passive: false });
   document.addEventListener("fullscreenchange", onFullscreen);

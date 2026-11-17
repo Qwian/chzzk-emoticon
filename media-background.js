@@ -37,7 +37,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (!Number.isInteger(tabId) || !["state", "open", "toggle", "increase", "decrease", "set", "reset", "pan", "center"].includes(message.action)) return;
     const command = async () => {
       const state = tabState(tabId);
-      if (![...state.zoomFrames.values()].some(info => info.score > 0 && Date.now() - info.time < 1500)) {
+      if (["state", "open"].includes(message.action) || ![...state.zoomFrames.values()].some(info => info.score > 0 && Date.now() - info.time < 1500)) {
         chrome.tabs.sendMessage(tabId, { type: "MEDIA_ZOOM_DISCOVER" }).catch(() => {});
         // A broadcast's Promise resolves with only the first frame's reply.
         // Allow all frames to report before choosing the main video.
@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const frames = [...state.zoomFrames].filter(([, info]) => info.score > 0 && Date.now() - info.time < 10000).sort((a, b) => b[1].score - a[1].score);
       for (const [frameId] of frames) {
         const response = await Promise.race([
-          chrome.tabs.sendMessage(tabId, { type: "MEDIA_ZOOM_APPLY", action: message.action, scale: message.scale, x: message.x, y: message.y }, { frameId }).catch(() => null),
+          chrome.tabs.sendMessage(tabId, { type: "MEDIA_ZOOM_APPLY", action: message.action, scale: message.scale, step: message.step, x: message.x, y: message.y }, { frameId }).catch(() => null),
           new Promise(resolve => setTimeout(() => resolve(null), 300))
         ]);
         if (response?.ok) return response;

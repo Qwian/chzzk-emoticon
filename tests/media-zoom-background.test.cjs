@@ -32,6 +32,8 @@ test('zoom commands from a parent page and the popup reach the largest video ifr
   assert.equal(b.calls.at(-1).options.frameId, 44); assert.equal(b.calls.at(-1).message.x, .2);
   await b.request({ type: 'MEDIA_ZOOM_COMMAND', action: 'state', tabId: 2 }, { ...b.sender(99), url: 'chrome-extension://test/popup.html' });
   assert.equal(b.calls.at(-1).tabId, 2);
+  await b.request({ type: 'MEDIA_ZOOM_COMMAND', action: 'increase', step: .1 });
+  assert.equal(b.calls.at(-1).message.step, .1);
 });
 test('content scripts cannot name another tab and foreign senders cannot control video', async () => {
   const b = setup(); await b.report(100, 1); await b.report(100, 2);
