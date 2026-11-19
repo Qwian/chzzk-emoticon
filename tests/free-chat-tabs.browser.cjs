@@ -1,0 +1,86 @@
+// Two browser pages share extension storage, but keep their own session storage.
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/shiny/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const http = require('node:http');
+const root = path.resolve(__dirname, '..');
+let browser, server;
+const errors = [];
+const state = page => page.locator('#ctfc-toggle').getAttribute('aria-pressed');
+const settled = () => new Promise(resolve => setTimeout(resolve, 130));
+(async () => {
+  server = http.createServer((req, res) => {
+    const file = path.resolve(root, '.' + new URL(req.url, 'http://localhost').pathname);
+    if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
+    try { res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'text/html'); res.end(fs.readFileSync(file)); }
+    catch { res.writeHead(404).end(); }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  for (const platform of ['chzzk', 'soop']) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const key = platform === 'chzzk' ? 'chzzkFreeChatLayout' : 'soopFreeChatLayout';
+    const shared = { features: { freeChat: true }, [key]: { enabled: true, width: 280, height: 300, opacity: .45 } };
+    const broadcast = async values => {
+      const changes = {};
+      for (const [name, value] of Object.entries(values)) {
+        changes[name] = { oldValue: shared[name], newValue: value };
+        shared[name] = structuredClone(value);
+      }
+      await Promise.all(context.pages().map(page => page.evaluate(changes => window.dispatchEvent(new CustomEvent('shared-storage', { detail: changes })), changes)));
+    };
+    await context.exposeBinding('readShared', () => structuredClone(shared));
+    await context.exposeBinding('writeShared', (_, values) => broadcast(values));
+    await context.addInitScript(() => {
+      const listeners = new Set();
+      window.addEventListener('shared-storage', event => listeners.forEach(fn => fn(event.detail, 'local')));
+      window.freeChatStorage = { storage: { local: { get: () => window.readShared(), set: values => window.writeShared(values) },
+        onChanged: { addListener: fn => listeners.add(fn), removeListener: fn => listeners.delete(fn) } } };
+    });
+    const open = async () => {
+      const page = await context.newPage();
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(base + '/tests/free-chat-harness.html?manual' + (platform === 'soop' ? '&soop' : ''));
+      await page.locator('#ctfc-toggle').waitFor();
+      await settled();
+      return page;
+    };
+    const first = await open(), second = await open();
+    const previous = await state(second);
+    await first.locator('#ctfc-toggle').click(); await settled();
+    assert.notEqual(await state(first), previous);
+    assert.equal(await state(second), previous, `${platform}: toggling the first tab changed the second tab`);
+    assert.equal(previous, 'false', 'new tabs ignore the old global enabled flag');
+    await first.reload(); await first.locator('#ctfc-toggle').waitFor(); await settled();
+    assert.equal(await state(first), 'true', 'refresh preserves this tab');
+    const third = await open();
+    assert.equal(await state(third), 'false', 'a later tab starts off');
+    await second.keyboard.press('Alt+Shift+C'); await settled();
+    assert.equal(await state(second), 'true'); assert.equal(await state(first), 'true'); assert.equal(await state(third), 'false');
+    await first.locator('.ctfc-disable').click(); await settled();
+    assert.equal(await state(first), 'false'); assert.equal(await state(second), 'true');
+    await broadcast({ [key]: { ...shared[key], enabled: false, width: 260, opacity: .6 } }); await settled();
+    assert.equal(await state(second), 'true', 'shared layout updates preserve local enabled state');
+    assert.equal(await state(first), 'false');
+    assert.equal(await second.locator('#ctfc-alpha').inputValue(), '60');
+    await broadcast({ features: { freeChat: false } }); await settled();
+    assert.equal(await second.locator('#ctfc-toggle').count(), 0);
+    await broadcast({ features: { freeChat: true } }); await settled();
+    assert.equal(await state(second), 'true'); assert.equal(await state(first), 'false');
+    await second.evaluate(() => { const old = chat(); old.insertAdjacentHTML('afterend', sideHTML()); old.remove(); }); await settled();
+    assert.equal(await state(second), 'true', 'replacement chat retains the tab state');
+    await second.locator('.ctfc-disable').click(); await settled();
+    assert.ok(!Object.hasOwn(shared[key], 'enabled'), 'new shared layouts omit the tab flag');
+    await second.reload(); await second.locator('#ctfc-toggle').waitFor(); await settled();
+    assert.equal(await state(second), 'false', 'off also survives refresh');
+    assert.equal(await second.locator('[contenteditable]').textContent(), '작성 중 문장');
+    console.log(platform + ': tab isolation, refresh, new tabs, shortcuts, shared layouts, feature restart and DOM replacement passed');
+    await context.close();
+  }
+  assert.deepEqual(errors, []);
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
+  await browser?.close();
+  await new Promise(resolve => server ? server.close(resolve) : resolve());
+});

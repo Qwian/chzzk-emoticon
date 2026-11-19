@@ -419,7 +419,7 @@ async function initializeFeatures() {
     if (event.target.matches('input[type="radio"]') && event.target.checked) saveFeature("catchUpMode", event.target.value);
   });
   const chatNote = document.createElement("p"); chatNote.className = "intro";
-  chatNote.textContent = "자유 배치 채팅: 치지직 생방송·다시보기의 넓은 화면과 숲 스크린모드에서 이동·크기·투명도를 조절합니다. 치지직 일반 화면과 겹치기 끔 상태에서도 채팅 왼쪽 경계로 폭을 조절합니다. 240px 최소 폭 제한은 없습니다. Alt+Shift+C로 겹치기를 전환합니다. 기존 템퍼몽키 자유 배치 스크립트가 실행 중이면 확장 쪽은 대기합니다. 대체해서 쓰려면 기존 스크립트를 끄고 탭을 새로고침하세요. 기존 배치값은 자동 이전되지 않습니다.";
+  chatNote.textContent = "자유 배치 채팅: 치지직 생방송·다시보기의 넓은 화면과 숲 스크린모드에서 이동·크기·투명도를 조절합니다. 겹치기 켬·끔은 탭별로 유지하며 새 탭은 꺼짐으로 시작합니다. 새로고침해도 해당 탭의 선택을 복원합니다. 치지직 일반 화면과 겹치기 끔 상태에서도 채팅 왼쪽 경계로 폭을 조절합니다. 240px 최소 폭 제한은 없습니다. Alt+Shift+C로 겹치기를 전환합니다. 이 설정은 모든 탭의 기능을 켜고 끕니다. 기존 템퍼몽키 자유 배치 스크립트가 실행 중이면 확장 쪽은 대기합니다. 대체해서 쓰려면 기존 스크립트를 끄고 탭을 새로고침하세요. 기존 배치값은 자동 이전되지 않습니다.";
   panel.append(chatNote);
   const wideNote = document.createElement("p"); wideNote.className = "intro";
   wideNote.textContent = "유튜브: F는 큰 극장 화면, T는 실제 전체화면입니다. 라이브 채팅은 오른쪽 경계로 폭을 조절합니다. 넥슨 라이브는 Alt+Shift+M으로 큰 화면을 전환합니다. 기존 YT Fake Fullscreen·넥슨 라이브 배치 스크립트는 끄고 탭을 새로고침하세요.";

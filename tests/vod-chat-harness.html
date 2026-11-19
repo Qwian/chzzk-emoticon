@@ -4,6 +4,7 @@
 <script>
 const baseline=new URLSearchParams(location.search).has('baseline');history.replaceState(null,'','/video/123');
 const store={features:{freeChat:true}},listeners=new Set();window.chrome={storage:{local:{get:async()=>structuredClone(store),set:async data=>{Object.assign(store,structuredClone(data))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+sessionStorage.setItem('chzzkFreeChatLayout:enabled','true');
 const captures=new WeakMap();Element.prototype.setPointerCapture=function(id){captures.set(this,id)};Element.prototype.hasPointerCapture=function(id){return captures.get(this)===id};Element.prototype.releasePointerCapture=function(){captures.delete(this)};
 const wait=()=>new Promise(r=>setTimeout(r,100));const drag=(element,dx)=>{for(const[type,x]of[['pointerdown',0],['pointermove',dx],['pointerup',dx]])element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:8,button:0,clientX:x}))};
 </script><script src="../player-view-controls.js"></script><script>document.write('<script src="'+(baseline?'/artifacts/free-chat-0.10.0-scroll.js':'/free-chat.js')+'"><\/script>');</script><script>

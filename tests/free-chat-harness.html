@@ -10,8 +10,9 @@ window.cancelAnimationFrame=clearTimeout;
 let screenWidth=1920,screenHeight=1080;
 Object.defineProperties(window.screen,{width:{get:()=>screenWidth},height:{get:()=>screenHeight}});
 const store={features:{freeChat:true},unrelated:'preserved'};
-window.chrome={storage:{local:{get:async()=>({...store}),set:async data=>{const changes={};for(const [key,value] of Object.entries(data)){changes[key]={oldValue:store[key],newValue:value};store[key]=structuredClone(value)}writes.push(data);queueMicrotask(()=>listeners.forEach(fn=>fn(changes,'local')))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+window.chrome=window.freeChatStorage||{storage:{local:{get:async()=>({...store}),set:async data=>{const changes={};for(const [key,value] of Object.entries(data)){changes[key]={oldValue:store[key],newValue:value};store[key]=structuredClone(value)}writes.push(data);queueMicrotask(()=>listeners.forEach(fn=>fn(changes,'local')))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
 const key=soop?'soopFreeChatLayout':'chzzkFreeChatLayout';
+if(!params.has('manual'))sessionStorage.setItem(`${key}:enabled`,'true');
 const chat=()=>soop?document.querySelector('.wrapping.side'):document.querySelector('#aside-chatting');
 const sideHTML=()=>soop?'<aside class="wrapping side"><div class="chatting_box"><div id="chatting_area"><div id="chatbox">모사 채팅 목록</div><div id="actionbox"><div id="chat_write"><div id="write_area" contenteditable="true">작성 중 문장</div></div></div></div></div></aside>':'<aside id="aside-chatting"><div><h2>모사 채팅</h2><div role="log">모사 채팅 목록</div><div contenteditable="true">작성 중 문장</div></div></aside>';
 document.querySelector('#fixture').innerHTML=soop?'<div id="webplayer" class="chat_open"><div id="webplayer_contents"><div id="player_area"><div id="player"><div class="player_ctrlBox">재생 컨트롤</div></div></div>'+sideHTML()+'</div></div>':'<section><main class="_is_large_test"><div id="live_player_layout"><div class="pzp-pc__bottom">재생 컨트롤</div></div></main>'+sideHTML()+'</section>';
@@ -23,6 +24,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['pointermove',dx,dy],['pointerup',dx,dy]])element.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:77,button:0,clientX:x,clientY:y}))};
 </script><script src="../player-view-controls.js"></script><script src="../free-chat.js?v=0.10.30"></script><script>
 (async()=>{
+ if(params.has('manual'))return;
  const results=[],check=(name,passed)=>results.push({name,passed:Boolean(passed)});await wait(100);
  if(params.has('legacy')){check('기존 템퍼몽키 스크립트가 먼저 있으면 확장은 중복 적용하지 않음',!document.querySelector('.ctfc-toolbar')&&document.querySelector('#sfc-style'));document.querySelector('#sfc-style').remove();await wait(100)}
  check('채팅 도구는 한 번만 설치',document.querySelectorAll('.ctfc-toolbar').length===1);
@@ -49,7 +51,7 @@ const gesture=(element,dx,dy)=>{for(const [type,x,y] of [['pointerdown',0,0],['p
  screenWidth=1920;screenHeight=1080;window.dispatchEvent(new Event('resize'));await wait(100);
  check('이전 모니터 배치 복원',Math.abs(store[key].width-priorWidth)<1);
  document.querySelector('.ctfc-disable').click();await wait(70);
- check('원래 배치 복귀',getComputedStyle(chat()).position!=='fixed'&&store[key].enabled===false);
+ check('원래 배치 복귀와 탭별 저장',getComputedStyle(chat()).position!=='fixed'&&sessionStorage.getItem(`${key}:enabled`)==='false'&&!Object.hasOwn(store[key],'enabled'));
  const dockHandle=document.querySelector('.ctfc-dock-handle');
  check('겹치기를 끄면 채팅 왼쪽 경계에 폭 조절 손잡이 표시',dockHandle&&getComputedStyle(dockHandle).display!=='none');
  if(dockHandle){

@@ -35,14 +35,14 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
   await page.waitForFunction(() => ['pass','fail'].includes(document.body.dataset.result));
   const harness = JSON.parse(await page.locator('#result').textContent());
   assert.equal(await page.locator('body').getAttribute('data-result'), 'pass', JSON.stringify(harness)); results.push({ harness });
-  await page.screenshot({ path: path.join(artifacts, 'media-zoom-0.10.31.png') });
+  await page.screenshot({ path: path.join(artifacts, 'media-zoom-0.10.32.png') });
   for (const name of ['fs-player','fs-video']) {
     await page.locator('#' + name).click(); await page.waitForFunction(() => !!document.fullscreenElement);
     await page.waitForTimeout(150);
     const info = await page.evaluate(() => ({ fullscreen: document.fullscreenElement.tagName, scale: getComputedStyle(document.querySelector('video')).scale,
       width: document.querySelector('video').getBoundingClientRect().width, viewport: innerWidth, popover: document.querySelector('#media-zoom-controls').matches(':popover-open') }));
     assert.equal(info.scale, '2'); assert.ok(info.popover); assert.ok(Math.abs(info.width - info.viewport * 2) < 2, JSON.stringify(info));
-    await page.screenshot({path:path.join(artifacts,`media-zoom-${name}-0.10.31.png`)});
+    await page.screenshot({path:path.join(artifacts,`media-zoom-${name}-0.10.32.png`)});
     if (name === 'fs-video') {
       const button = await page.locator('#media-zoom-controls #right').boundingBox();
       await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2);
@@ -76,7 +76,7 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
     args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`] });
   context.setDefaultTimeout(10000);
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-  assert.equal(await worker.evaluate(() => chrome.runtime.getManifest().version), '0.10.31');
+  assert.equal(await worker.evaluate(() => chrome.runtime.getManifest().version), JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8')).version);
   const live = await context.newPage(); live.on('pageerror', error => errors.push(error.message));
   await live.goto(base + '/tests/media-zoom-fixture.html');
   await live.locator('#media-zoom-menu').waitFor();
@@ -126,7 +126,7 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
   await popup.locator('#video-zoom').getByRole('button', { name: '원래대로' }).click();
   await popup.locator('#video-zoom output').filter({ hasText: '100%' }).waitFor();
   results.push({ popupPage: true, owningTabBindingSimulated: true, crossOriginIframe: true });
-  await popup.screenshot({ path: path.join(artifacts, 'media-zoom-popup-0.10.31.png') });
+  await popup.screenshot({ path: path.join(artifacts, 'media-zoom-popup-0.10.32.png') });
   await live.bringToFront();await live.locator('h1').click();
   const frameBox=await live.locator('iframe').boundingBox();
   await live.keyboard.down('AltLeft');await live.mouse.move(frameBox.x+100,frameBox.y+150);await live.mouse.wheel(0,-120);await live.waitForTimeout(100);
@@ -152,7 +152,7 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
     assert.ok(Math.abs(after.width - before.width * 1.25) < 2, JSON.stringify({before,after}));
     await broadcast.keyboard.press('Alt+ArrowRight');
     const translation = await native.evaluate(video => getComputedStyle(video).translate); assert.ok(translation.startsWith('-'));
-    await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-0.10.31.png')});
+    await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-0.10.32.png')});
     await broadcast.keyboard.press('Alt+0');
     assert.ok(Math.abs((await native.boundingBox()).width - before.width) < 2);
     await broadcast.mouse.move(videoBox.x+100,videoBox.y+100); await broadcast.keyboard.down('Alt');
@@ -162,10 +162,10 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
     await native.hover({position:{x:120,y:120}}); await native.hover({position:{x:140,y:140}});
     await broadcast.locator('#media-zoom-menu').click().catch(async error => {
       console.log('public menu diagnostic',JSON.stringify(await broadcast.locator('#media-zoom-menu').evaluate(button=>({focused:document.hasFocus(),root:button.closest('.pzp')?.className,ancestors:[button,...(()=>{const a=[];for(let n=button.parentElement;n;n=n.parentElement)a.push(n);return a})()].map(n=>({tag:n.tagName,class:n.className,display:getComputedStyle(n).display,visibility:getComputedStyle(n).visibility,opacity:getComputedStyle(n).opacity}))}))));
-      await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-menu-failure-0.10.31.png')}); throw error;
+      await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-menu-failure-0.10.32.png')}); throw error;
     });
     await broadcast.locator('#media-zoom-controls #panel').waitFor();
-    await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-menu-0.10.31.png')});
+    await broadcast.screenshot({path:path.join(artifacts,'media-zoom-public-menu-0.10.32.png')});
     const panelBox=await broadcast.locator('#media-zoom-controls #panel').boundingBox();
     for(let i=0;i<6;i++){await broadcast.mouse.move(panelBox.x+30+i*3,panelBox.y+20);await broadcast.waitForTimeout(350)}
     assert.equal(await broadcast.locator('#media-zoom-controls #panel').isVisible(),true,'moving over the open panel must retain native controls');
@@ -174,7 +174,7 @@ const metrics = page => page.locator('video').first().evaluate(video => ({ width
     results.push({ publicChzzkVod: true, actualMainPlaying:true, loggedIn: false, beforeWidth:before.width, zoomedWidth:after.width, translation, trustedWheelInsideAndOutside:true, nativeHideWithPointerOutside:true });
   }
   assert.equal(errors.length, 0, errors.join('\n'));
-  fs.writeFileSync(path.join(artifacts, 'media-zoom-0.10.31.json'), JSON.stringify({ engine: useWhale ? 'Whale' : 'Edge', results, errors }, null, 2));
+  fs.writeFileSync(path.join(artifacts, 'media-zoom-0.10.32.json'), JSON.stringify({ engine: useWhale ? 'Whale' : 'Edge', results, errors }, null, 2));
   console.log(JSON.stringify({ checks: harness.results.length, results: results.filter(item => !item.harness), errors }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
   await browser?.close(); await context?.close(); server?.close();

@@ -5,27 +5,41 @@
   globalThis.__chzzkFreeChat = true;
   const isChzzk = location.hostname === 'chzzk.naver.com' || !!document.querySelector('#aside-chatting,#vod-aside');
   const storageKey = isChzzk ? 'chzzkFreeChatLayout' : 'soopFreeChatLayout';
+  const tabKey = `${storageKey}:enabled`;
+  let tabEnabled = false;
+  try { tabEnabled = sessionStorage.getItem(tabKey) === 'true'; } catch { /* memory-only in restricted pages */ }
   let controller = null, enabled = false, stopped = false, saved = null, lastSaved = '';
   function failure(error) {
     if (/extension context invalidated/i.test(error?.message || '')) stop();
   }
   function persist(value) {
-    saved = value; lastSaved = JSON.stringify(value);
-    try { chrome.storage.local.set({ [storageKey]: value }).catch(failure); } catch (error) { failure(error); }
+    tabEnabled = value.enabled;
+    try { sessionStorage.setItem(tabKey, String(tabEnabled)); } catch { /* keep this page's state */ }
+    const layout = sharedLayout(value), serialized = JSON.stringify(layout);
+    if (serialized === lastSaved) return;
+    saved = layout; lastSaved = serialized;
+    try { chrome.storage.local.set({ [storageKey]: layout }).catch(failure); } catch (error) { failure(error); }
+  }
+  function sharedLayout(value) {
+    if (!value || typeof value !== 'object') return null;
+    // Old releases stored enabled in shared storage. Never import it into a tab.
+    const { enabled, ...layout } = value;
+    return layout;
   }
   function sync() {
     if (stopped) return;
     const legacy = Boolean(document.getElementById('sfc-style'));
     if (!enabled || legacy) { controller?.stop(); controller = null; }
-    else if (!controller) controller = createController(saved, persist);
+    else if (!controller) controller = createController({ ...saved, enabled: tabEnabled }, persist);
     if (legacy) document.documentElement.setAttribute('data-chzzk-free-chat', 'legacy-script');
     else document.documentElement.removeAttribute('data-chzzk-free-chat');
   }
   function onStorage(changes, area) {
     if (stopped || area !== 'local') return;
     if (changes.features) enabled = changes.features.newValue?.freeChat !== false;
-    if (changes[storageKey] && JSON.stringify(changes[storageKey].newValue) !== lastSaved) {
-      saved = changes[storageKey].newValue; lastSaved = JSON.stringify(saved);
+    const layout = changes[storageKey] && sharedLayout(changes[storageKey].newValue);
+    if (changes[storageKey] && JSON.stringify(layout) !== lastSaved) {
+      saved = layout; lastSaved = JSON.stringify(saved);
       controller?.stop(); controller = null;
     }
     sync();
@@ -40,7 +54,7 @@
     chrome.storage.onChanged.addListener(onStorage);
     chrome.storage.local.get(['features', storageKey]).then(data => {
       if (stopped) return;
-      enabled = data.features?.freeChat !== false; saved = data[storageKey]; lastSaved = JSON.stringify(saved);
+      enabled = data.features?.freeChat !== false; saved = sharedLayout(data[storageKey]); lastSaved = JSON.stringify(saved);
       legacyObserver.observe(document.documentElement, { childList: true, subtree: true }); sync();
     }).catch(error => {
       failure(error);
