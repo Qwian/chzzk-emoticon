@@ -28,7 +28,6 @@
   }
   function sync() {
     if (stopped) return;
-    if (!isChzzk) document.documentElement.toggleAttribute('data-chzzk-soop-chat-history', enabled);
     const legacy = Boolean(document.getElementById('sfc-style'));
     if (!enabled || legacy) { controller?.stop(); controller = null; }
     else if (!controller) controller = createController({ ...saved, enabled: tabEnabled }, persist);
@@ -48,7 +47,6 @@
   const legacyObserver = new MutationObserver(sync);
   function stop() {
     stopped = true; controller?.stop(); controller = null; legacyObserver.disconnect();
-    if (!isChzzk) document.documentElement.removeAttribute('data-chzzk-soop-chat-history');
     try { chrome.storage.onChanged.removeListener(onStorage); } catch { /* invalidated */ }
     document.documentElement.removeAttribute('data-chzzk-free-chat');
   }

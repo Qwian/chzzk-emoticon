@@ -16,6 +16,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts"
+# Withdrawn behavior must not become the recovery release for a rollback.
+WITHDRAWN_RELEASES = {"0.10.33"}
 
 
 def git(*args):
@@ -104,7 +106,9 @@ def main():
             except (ValueError, KeyError, zipfile.BadZipFile):
                 report["preservedUncertain"].append(file.name)
         reproducible.sort(reverse=True)
-        previous = next((file for number, file in reproducible if number < tuple(map(int, version.split(".")))), None)
+        withdrawn = {f"chzzk-emoticon-{value}.zip" for value in WITHDRAWN_RELEASES}
+        previous = next((file for number, file in reproducible
+                         if number < tuple(map(int, version.split("."))) and file.name not in withdrawn), None)
         report["retained"] = [archive.name] + ([previous.name] if previous else [])
         # Keep all old archives if the recovery release could not be verified.
         if previous:
