@@ -51,5 +51,18 @@
     }
     return true;
   }
-  globalThis.ChzzkViewControls = Object.freeze({ place, release, visible });
+  // Capture sees clicks even when a site stops bubbling. Dismissal must never
+  // consume the original click; Shadow DOM panels and separate launchers count
+  // as inside through composedPath(). Return cleanup for feature teardown.
+  function dismissOutside({ isOpen, elements, close, isInside = () => false }) {
+    const onClick = event => {
+      if (!isOpen()) return;
+      const path = event.composedPath();
+      if (elements().some(element => element && path.includes(element)) || isInside(event)) return;
+      close();
+    };
+    window.addEventListener('click', onClick, true);
+    return () => window.removeEventListener('click', onClick, true);
+  }
+  globalThis.ChzzkViewControls = Object.freeze({ place, release, visible, dismissOutside });
 })();

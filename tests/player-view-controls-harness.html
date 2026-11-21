@@ -21,6 +21,17 @@ check('따라잡기 바로 앞에 두 메뉴 배치',zoom().parentElement.nextEl
 check('우상단 확대 버튼 없음',ui().querySelector('#launcher').hidden);
 check('메뉴가 표시될 때 두 버튼 표시',ChzzkViewControls.visible(zoom())&&ChzzkViewControls.visible(chat()));
 zoom().click();await wait();check('확대 조절판은 하단 버튼 위에 열림',!ui().querySelector('#panel').hidden&&ui().querySelector('#panel').getBoundingClientRect().bottom<=zoom().getBoundingClientRect().top+2);
+ui().querySelector('#plus').click();await wait();
+check('패널 내부 클릭은 열린 상태와 배율 변경 유지',!ui().querySelector('#panel').hidden&&ui().querySelector('#value').textContent==='125%');
+let outsideClicks=0;const outside=document.createElement('button');outside.textContent='바깥 동작';outside.onclick=()=>outsideClicks++;document.body.append(outside);
+outside.click();await wait();
+check('바깥 클릭은 패널을 닫고 배율과 원래 클릭 동작 유지',ui().querySelector('#panel').hidden&&zoom().getAttribute('aria-expanded')==='false'&&ui().querySelector('#value').textContent==='125%'&&outsideClicks===1);
+zoom().click();await wait();check('바깥 클릭 후 버튼 한 번으로 다시 열림',!ui().querySelector('#panel').hidden);
+zoom().click();await wait();check('열린 패널의 실행 버튼 클릭은 닫기',ui().querySelector('#panel').hidden);
+zoom().click();await wait();
+outside.addEventListener('click',event=>event.stopImmediatePropagation());outside.click();await wait();
+check('사이트가 클릭 전파를 막아도 바깥 클릭 닫기',ui().querySelector('#panel').hidden);
+outside.remove();zoom().click();await wait();
 if(soop)player.classList.add('controls-hidden');else player.classList.remove('pzp-pc--controls');await wait();
 check('기본 메뉴가 사라지면 두 메뉴와 열린 확대 패널도 숨김',!ChzzkViewControls.visible(zoom())&&!ChzzkViewControls.visible(chat())&&ui().querySelector('#panel').hidden);
 if(soop)player.classList.remove('controls-hidden');else player.classList.add('pzp-pc--controls');await wait();

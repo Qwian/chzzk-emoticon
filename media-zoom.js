@@ -5,7 +5,7 @@
   const properties = ["scale", "translate", "transform-origin", "clip-path", "transition"];
   let enabled = true, stopped = false, selected = null, host, ui, panel, dragSurface, resizeObserver;
   let expanded = false, dragging = false, layoutFrame = 0, reportTimer;
-  let menuButton, menuBar, pointerUntil = 0, pointerTimer = 0, remoteUntil = 0;
+  let menuButton, menuBar, dismissOutside, pointerUntil = 0, pointerTimer = 0, remoteUntil = 0;
   let heldAlt = false, heldCtrl = false, heldMeta = false;
   const modifierSource = globalThis.crypto?.randomUUID?.() || String(Math.random());
   let modifierStamp = Date.now();
@@ -156,6 +156,21 @@
     // Keep extension controls out of native player shortcuts, including Space/F.
     ui.addEventListener("keydown", event => { if (!event.altKey) event.stopPropagation(); });
     ui.addEventListener("click", event => event.stopPropagation());
+    dismissOutside = globalThis.ChzzkViewControls.dismissOutside({
+      isOpen: () => enabled && !stopped && expanded,
+      elements: () => [host, menuButton],
+      isInside: event => {
+        // Video-only fullscreen retargets popover input to the video. Also
+        // retain the panel after a pan's suppressed follow-up click.
+        if (performance.now() < suppressClickUntil && videoAt(event)) return true;
+        if (document.fullscreenElement?.tagName !== "VIDEO") return false;
+        return [panel, ui.querySelector("#launcher")].some(element => {
+          const r = element.getBoundingClientRect();
+          return r.width && r.height && event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom;
+        });
+      },
+      close: () => { expanded = dragging = false; scheduleLayout(); }
+    });
   }
   function layout() {
     layoutFrame = 0;
@@ -371,6 +386,7 @@
     observers.forEach(observer => observer.disconnect());
     for (const [video, state] of states) restore(video, state);
     states.clear(); host?.remove();
+    dismissOutside?.();
     if (menuButton) globalThis.ChzzkViewControls?.release(menuButton);
     for (const [name, fn] of events) window.removeEventListener(name, fn, true);
     document.removeEventListener("fullscreenchange", onFullscreen);

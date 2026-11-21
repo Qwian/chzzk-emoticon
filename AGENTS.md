@@ -80,6 +80,7 @@ After verification, run `tools/package-release.py --clean` with the bundled Pyth
 
 ## Pitfalls
 
+- All new or changed floating settings panels and similar transient menus must close on an outside click, like catch-up and video zoom. Reuse `ChzzkViewControls.dismissOutside` where available. Count the panel, separate launcher and Shadow DOM contents as inside; preserve sliders/drag gestures and the original outside click action, and remove listeners on teardown. Verify outside close, inside interaction and one-click reopening, including relevant fullscreen modes.
 - `node` is not on PATH in this workspace; use the bundled executable above.
 - Native CHZZK emote behavior depends on the current picker DOM and cannot be fully verified while logged out.
 - `page-bridge.js` must stay in the MAIN world because CHZZK keeps emoji ID-to-image state on the page's `window` object.
