@@ -76,6 +76,23 @@ const settled = () => new Promise(resolve => setTimeout(resolve, 130));
     await second.reload(); await second.locator('#ctfc-toggle').waitFor(); await settled();
     assert.equal(await state(second), 'false', 'off also survives refresh');
     assert.equal(await second.locator('[contenteditable]').textContent(), '작성 중 문장');
+    for (const trigger of ['resize', 'pointer']) {
+      const invalidated = await open();
+      await invalidated.evaluate(trigger => {
+        chrome.storage.local.set = () => { throw Error('Extension context invalidated'); };
+        // A monitor change saves its profile synchronously. Invalidated storage
+        // tears down the controller while render/pointerDown is still running.
+        screenWidth = 2560;
+        if (trigger === 'resize') window.dispatchEvent(new Event('resize'));
+        else gesture(document.querySelector('.ctfc-dock-handle'), 0, 0);
+      }, trigger);
+      await settled();
+      assert.deepEqual(errors, [], `${platform}: ${trigger} accessed a mount after invalidation`);
+      assert.equal(await invalidated.locator('#ctfc-toggle,.ctfc-toolbar,#ctfc-style').count(), 0, `${platform}: ${trigger} resurrected stopped controls`);
+      assert.equal(await invalidated.locator('[contenteditable]').textContent(), '작성 중 문장');
+      await invalidated.close();
+    }
+    assert.deepEqual(errors, [], `${platform}: a monitor change accessed a mount after invalidation`);
     console.log(platform + ': tab isolation, refresh, new tabs, shortcuts, shared layouts, feature restart and DOM replacement passed');
     await context.close();
   }

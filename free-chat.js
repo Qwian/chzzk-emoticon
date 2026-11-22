@@ -401,8 +401,12 @@
 
   function render() {
     frame = 0;
+    if (disposed) return;
     if (!mount?.side.isConnected || !mount?.player.isConnected || (isChzzk && !mount?.videoMain.isConnected)) { install(); return; }
     syncMonitor();
+    // Saving a monitor profile can synchronously stop this controller when
+    // extension storage throws after a reload. Its mount is already gone.
+    if (disposed || !mount) return;
     const wide = isChzzk ? /(?:^|\s)_is_large_/.test(mount.videoMain.className + ' ' + mount.player.className) : document.body.classList.contains('screen_mode');
     const chatOpen = isChzzk ? !/(?:^|\s)_is_folded_/.test(mount.side.className) : mount.player.classList.contains('chat_open');
     const active = settings.enabled && wide && chatOpen;
@@ -438,8 +442,9 @@
   }
 
   function pointerDown(event, edge) {
-    if (event.button !== 0 || !mount) return;
+    if (disposed || event.button !== 0 || !mount) return;
     if (syncMonitor()) render();
+    if (disposed || !mount) return;
     const active = edge === 'dock'
       ? mount.player.classList.contains(isChzzk ? 'ctfc-chzzk-docked' : 'ctfc-soop-docked')
       : settings.enabled && (isChzzk ? mount.player.classList.contains('ctfc-chzzk-active') : document.body.classList.contains('screen_mode') && mount.player.classList.contains('chat_open'));
@@ -503,6 +508,7 @@
   }
 
   function install() {
+    if (disposed) return;
     const side = isChzzk ? document.querySelector('#aside-chatting,#vod-aside') : document.querySelector('#webplayer_contents > .wrapping.side');
     const player = isChzzk ? side?.closest('section') : document.getElementById('webplayer');
     const videoMain = isChzzk ? (side?.id === 'vod-aside'
