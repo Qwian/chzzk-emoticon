@@ -7,10 +7,11 @@ const params=new URLSearchParams(location.search),soop=params.has('soop'),listen
 // Hidden test tabs can suspend animation frames. Keep layout scheduling deterministic.
 window.requestAnimationFrame=callback=>setTimeout(()=>callback(performance.now()),0);
 window.cancelAnimationFrame=clearTimeout;
-let screenWidth=1920,screenHeight=1080;
-Object.defineProperties(window.screen,{width:{get:()=>screenWidth},height:{get:()=>screenHeight}});
+let screenWidth=1920,screenHeight=1080,screenReads=0;
+Object.defineProperties(window.screen,{width:{get:()=>params.has('invalidate-startup')&&++screenReads>1?2560:screenWidth},height:{get:()=>screenHeight}});
 const store={features:{freeChat:true},unrelated:'preserved'};
 window.chrome=window.freeChatStorage||{storage:{local:{get:async()=>({...store}),set:async data=>{const changes={};for(const [key,value] of Object.entries(data)){changes[key]={oldValue:store[key],newValue:value};store[key]=structuredClone(value)}writes.push(data);queueMicrotask(()=>listeners.forEach(fn=>fn(changes,'local')))}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}}};
+if(params.has('invalidate-startup')){window.invalidatedProfileSaves=0;chrome.storage.local.set=()=>{window.invalidatedProfileSaves++;throw Error('Extension context invalidated')}}
 const key=soop?'soopFreeChatLayout':'chzzkFreeChatLayout';
 if(!params.has('manual'))sessionStorage.setItem(`${key}:enabled`,'true');
 const chat=()=>soop?document.querySelector('.wrapping.side'):document.querySelector('#aside-chatting');

@@ -7,6 +7,7 @@ const whaleRoot = 'C:/Program Files/Naver/Naver Whale/Application';
 const whaleVersion = fs.readdirSync(whaleRoot).filter(name => /^\d+(?:\.\d+)+$/.test(name)).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true})).find(name=>fs.existsSync(path.join(whaleRoot,name,'whale.exe')));
 let context, profile;
 const errors = [], results = [];
+const publicUrl = process.argv.find(arg => arg.startsWith('https://chzzk.naver.com/live/'));
 function cleanProfile() {
   if(!profile)return;
   const resolved=path.resolve(profile);
@@ -15,21 +16,32 @@ function cleanProfile() {
 }
 (async () => {
   let version;
-  for (const platform of ['chzzk','soop']) {
+  for (const platform of [...(process.argv.includes('--public-only')?[]:['chzzk','soop']), ...(publicUrl ? ['public'] : [])]) {
   profile = fs.mkdtempSync(path.join(artifacts, 'free-chat-invalidation-profile-'));
   context = await chromium.launchPersistentContext(profile, { executablePath:path.join(whaleRoot,whaleVersion,'whale.exe'),headless:true,
     viewport:{width:1280,height:900},args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`] });
   const worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   version=await worker.evaluate(()=>chrome.runtime.getManifest().version);
   assert.equal(version,JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8')).version);
-    const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
-    const url=platform==='chzzk'?'https://chzzk.naver.com/live/00000000000000000000000000000000':'https://play.sooplive.com/freechat-fixture/1';
+    const page=await context.newPage();page.on('pageerror',error=>{if(platform!=='public'||/free-chat\.js/.test(error.stack))errors.push(error.message)});
+    const url=platform==='public'?publicUrl:platform==='chzzk'?'https://chzzk.naver.com/live/00000000000000000000000000000000':'https://play.sooplive.com/freechat-fixture/1';
     const chat='<div contenteditable="true">작성 중 문장</div>';
     const markup=platform==='chzzk'?`<section><main class="_is_large_test"><div id="live_player_layout"><div class="pzp-pc__bottom"></div></div></main><aside id="aside-chatting">${chat}</aside></section>`:
       `<div id="webplayer" class="chat_open"><div id="webplayer_contents"><div id="player_area"><div id="player"><div class="player_ctrlBox"></div></div></div><aside class="wrapping side"><div id="chatting_area">${chat}</div></aside></div></div>`;
-    await page.route(url,route=>route.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><meta charset="utf-8"><title>Free chat invalidation fixture</title><style>body{margin:0}section,#webplayer,#webplayer_contents{display:flex;width:100%;height:900px}main,#player_area{flex:1}aside{width:340px}#live_player_layout,#player{height:900px}</style><body class="screen_mode">${markup}`}));
-    await page.goto(url);await page.locator('#ctfc-toggle').waitFor();
-    await page.evaluate(()=>{window.fixtureEditor=document.querySelector('[contenteditable]')});
+    if(platform!=='public')await page.route(url,route=>route.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><meta charset="utf-8"><title>Free chat invalidation fixture</title><style>body{margin:0}section,#webplayer,#webplayer_contents{display:flex;width:100%;height:900px}main,#player_area{flex:1}aside{width:340px}#live_player_layout,#player{height:900px}</style><body class="screen_mode">${markup}`}));
+    await page.goto(url,{waitUntil:'domcontentloaded'});
+    // Public pages can show chat before the restricted/logged-out video player
+    // creates its native control bar. The toolbar proves the controller mounted.
+    try { await page.locator(platform==='public'?'.ctfc-toolbar':'#ctfc-toggle').waitFor({state:'attached',timeout:platform==='public'?15000:45000}); }
+    catch (error) {
+      const state=await page.evaluate(()=>{
+        const describe=e=>({tag:e.tagName,id:e.id,className:e.className,children:[...e.children].map(c=>({tag:c.tagName,id:c.id,className:c.className})).slice(0,8)});
+        const chain=[];let side=document.querySelector('#aside-chatting,#vod-aside');for(let e=side;e&&chain.length<5;e=e.parentElement)chain.push(describe(e));
+        return {title:document.title,chat:!!side,main:!!document.querySelector('main'),player:!!document.querySelector('#live_player_layout,#player_layout'),featureStyle:!!document.querySelector('#ctfc-style'),chain};
+      });
+      console.error(JSON.stringify({platform,state,priorResults:results}));throw error;
+    }
+    const editorPresent=await page.evaluate(()=>{window.fixtureEditor=document.querySelector('[contenteditable]');return !!window.fixtureEditor});
     const before=await page.evaluate(()=>screen.width);
     // runtime.reload invalidates the page's real chrome.storage API. Trigger
     // the monitor save only after the old service worker has closed.
@@ -43,9 +55,9 @@ function cleanProfile() {
     await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
     await page.waitForFunction(()=>!document.querySelector('#ctfc-style,#ctfc-toggle,.ctfc-toolbar'),null,{timeout:10000});
     assert.equal(await page.evaluate(()=>document.querySelector('[contenteditable]')===window.fixtureEditor),true);
-    assert.equal(await page.locator('[contenteditable]').textContent(),'작성 중 문장');
+    if(platform!=='public')assert.equal(await page.locator('[contenteditable]').textContent(),'작성 중 문장');
     assert.deepEqual(errors,[]);
-    results.push({platform,realExtensionReload:true,monitorChanged:true,controlsRemoved:true,editorPreserved:true});
+    results.push({platform,realExtensionReload:true,monitorChanged:true,controlsRemoved:true,editorPreserved:editorPresent?true:null});
     await page.close();
     // Some command-line unpacked installations are unloaded by runtime.reload;
     // each platform starts with its own fresh isolated installation.

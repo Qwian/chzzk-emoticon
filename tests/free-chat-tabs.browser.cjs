@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const root = path.resolve(__dirname, '..');
+const baseline = process.argv.includes('--baseline') ? require('node:child_process').execFileSync('git', ['show', '4c50ae9:free-chat.js'], { cwd: root }) : null;
 let browser, server;
 const errors = [];
 const state = page => page.locator('#ctfc-toggle').getAttribute('aria-pressed');
@@ -13,7 +14,7 @@ const settled = () => new Promise(resolve => setTimeout(resolve, 130));
   server = http.createServer((req, res) => {
     const file = path.resolve(root, '.' + new URL(req.url, 'http://localhost').pathname);
     if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
-    try { res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'text/html'); res.end(fs.readFileSync(file)); }
+    try { res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'text/html'); res.end(baseline && file === path.join(root,'free-chat.js') ? baseline : fs.readFileSync(file)); }
     catch { res.writeHead(404).end(); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -76,6 +77,43 @@ const settled = () => new Promise(resolve => setTimeout(resolve, 130));
     await second.reload(); await second.locator('#ctfc-toggle').waitFor(); await settled();
     assert.equal(await state(second), 'false', 'off also survives refresh');
     assert.equal(await second.locator('[contenteditable]').textContent(), '작성 중 문장');
+    const startup = await context.newPage();
+    startup.on('pageerror', error => errors.push(error.message));
+    await startup.goto(base + '/tests/free-chat-harness.html?manual&invalidate-startup' + (platform === 'soop' ? '&soop' : ''));
+    await startup.waitForFunction(() => window.invalidatedProfileSaves > 0);
+    await settled();
+    assert.equal(await startup.locator('#ctfc-toggle,.ctfc-toolbar,#ctfc-style').count(),0,`${platform}: startup invalidation left an orphaned controller`);
+    assert.equal(await startup.locator('[contenteditable]').textContent(),'작성 중 문장');
+    await startup.close();
+    for (const boundary of ['measurement', 'placement', 'release']) {
+    const interrupted = await open();
+    await interrupted.evaluate(boundary => {
+      const disable = () => window.dispatchEvent(new CustomEvent('shared-storage', { detail: { features: { newValue: { freeChat: false } } } }));
+      if (boundary !== 'measurement') {
+        const original = ChzzkViewControls, method = boundary === 'placement' ? 'place' : 'release';
+        let once = true;
+        globalThis.ChzzkViewControls = { ...original, [method](...args) {
+          const result = original[method](...args);
+          if (once) { once = false; disable(); }
+          return result;
+        } };
+        if (boundary === 'release') { disable(); return; }
+        window.dispatchEvent(new Event('resize')); return;
+      }
+      const side = chat(), measure = side.getBoundingClientRect;
+      side.getBoundingClientRect = function (...args) {
+        this.getBoundingClientRect = measure;
+        disable();
+        return measure.apply(this, args);
+      };
+      window.dispatchEvent(new Event('resize'));
+    }, boundary);
+    await settled();
+    assert.deepEqual(errors, [], `${platform}: ${boundary} continued after teardown`);
+    assert.equal(await interrupted.locator('#ctfc-toggle,.ctfc-toolbar,#ctfc-style').count(), 0);
+    assert.equal(await interrupted.locator('[contenteditable]').textContent(), '작성 중 문장');
+    await interrupted.close();
+    }
     for (const trigger of ['resize', 'pointer']) {
       const invalidated = await open();
       await invalidated.evaluate(trigger => {

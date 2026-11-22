@@ -30,7 +30,12 @@
     if (stopped) return;
     const legacy = Boolean(document.getElementById('sfc-style'));
     if (!enabled || legacy) { controller?.stop(); controller = null; }
-    else if (!controller) controller = createController({ ...saved, enabled: tabEnabled }, persist);
+    else if (!controller) {
+      const created = createController({ ...saved, enabled: tabEnabled }, persist);
+      // A synchronous storage failure can stop us before construction returns.
+      if (stopped || !enabled) created.stop();
+      else controller = created;
+    }
     if (legacy) document.documentElement.setAttribute('data-chzzk-free-chat', 'legacy-script');
     else document.documentElement.removeAttribute('data-chzzk-free-chat');
   }
@@ -46,7 +51,9 @@
   }
   const legacyObserver = new MutationObserver(sync);
   function stop() {
-    stopped = true; controller?.stop(); controller = null; legacyObserver.disconnect();
+    stopped = true;
+    const previous = controller; controller = null;
+    previous?.stop(); legacyObserver.disconnect();
     try { chrome.storage.onChanged.removeListener(onStorage); } catch { /* invalidated */ }
     document.documentElement.removeAttribute('data-chzzk-free-chat');
   }
@@ -301,6 +308,7 @@
   const lifetime = new AbortController();
   let frame = 0;
   let gesture = null;
+  const isCurrent = value => !disposed && value !== null && value === mount;
 
   function save() {
     monitors[currentMonitor.key] = profile();
@@ -346,19 +354,19 @@
     return { x: GAP + (size.width - w) * settings.xRatio, y: GAP + (size.height - h) * settings.yRatio, w, h };
   }
 
-  function applyRect(rect) {
-    if (!mount) return;
-    for (const [name, value] of Object.entries(rect)) mount.side.style.setProperty(`--ctfc-${name}`, `${value}px`);
-    updateControls(rect);
+  function applyRect(rect, current = mount) {
+    if (!isCurrent(current)) return;
+    for (const [name, value] of Object.entries(rect)) current.side.style.setProperty(`--ctfc-${name}`, `${value}px`);
+    updateControls(rect, current);
   }
 
-  function updateControls(rect) {
-    if (!mount) return;
+  function updateControls(rect, current = mount) {
+    if (!isCurrent(current)) return;
     let left = 0, right = 0;
     const active = settings.enabled && (isChzzk
-      ? mount.player.classList.contains('ctfc-chzzk-active')
-      : document.body.classList.contains('screen_mode') && mount.player.classList.contains('chat_open'));
-    const video = mount.player.querySelector(isChzzk ? '#live_player_layout,#player_layout' : '#player');
+      ? current.player.classList.contains('ctfc-chzzk-active')
+      : document.body.classList.contains('screen_mode') && current.player.classList.contains('chat_open'));
+    const video = current.player.querySelector(isChzzk ? '#live_player_layout,#player_layout' : '#player');
     if (active && rect && video) {
       const bounds = video.getBoundingClientRect();
       if (bounds.width > 0 && rect.y + rect.h > bounds.bottom - 64 && rect.y < bounds.bottom) {
@@ -369,25 +377,28 @@
         }
       }
     }
-    mount.player.style.setProperty('--ctfc-controls-left', `${left}px`);
-    mount.player.style.setProperty('--ctfc-controls-right', `${right}px`);
-    mount.player.classList.toggle('ctfc-controls-inset', left > 0 || right > 0);
+    if (!isCurrent(current)) return;
+    current.player.style.setProperty('--ctfc-controls-left', `${left}px`);
+    current.player.style.setProperty('--ctfc-controls-right', `${right}px`);
+    current.player.classList.toggle('ctfc-controls-inset', left > 0 || right > 0);
   }
 
-  function dockLimits() {
-    const available = (mount?.side.id === 'vod-aside' ? mount.side.parentElement : mount?.player)?.getBoundingClientRect().width || window.innerWidth;
+  function dockLimits(current = mount) {
+    const available = (current?.side.id === 'vod-aside' ? current.side.parentElement : current?.player)?.getBoundingClientRect().width || window.innerWidth;
     const maxWidth = Math.max(1, available - 1);
     return { minWidth: 1, maxWidth };
   }
 
-  function applyDockWidth(width) {
-    if (!mount) return;
-    const limit = dockLimits();
-    mount.player.style.setProperty('--ctfc-dock-w', `${clamp(width, limit.minWidth, limit.maxWidth)}px`);
-    const bounds = mount.side.getBoundingClientRect();
-    mount.dockHandle.style.left = `${bounds.left - 4}px`;
-    mount.dockHandle.style.top = `${bounds.top}px`;
-    mount.dockHandle.style.height = `${bounds.height}px`;
+  function applyDockWidth(width, current = mount) {
+    if (!isCurrent(current)) return;
+    const limit = dockLimits(current);
+    if (!isCurrent(current)) return;
+    current.player.style.setProperty('--ctfc-dock-w', `${clamp(width, limit.minWidth, limit.maxWidth)}px`);
+    const bounds = current.side.getBoundingClientRect();
+    if (!isCurrent(current)) return;
+    current.dockHandle.style.left = `${bounds.left - 4}px`;
+    current.dockHandle.style.top = `${bounds.top}px`;
+    current.dockHandle.style.height = `${bounds.height}px`;
   }
 
   function rememberRect(rect, edge) {
@@ -401,34 +412,37 @@
 
   function render() {
     frame = 0;
+    const current = mount;
     if (disposed) return;
-    if (!mount?.side.isConnected || !mount?.player.isConnected || (isChzzk && !mount?.videoMain.isConnected)) { install(); return; }
+    if (!current?.side.isConnected || !current?.player.isConnected || (isChzzk && !current?.videoMain.isConnected)) { install(); return; }
     syncMonitor();
     // Saving a monitor profile can synchronously stop this controller when
-    // extension storage throws after a reload. Its mount is already gone.
-    if (disposed || !mount) return;
-    const wide = isChzzk ? /(?:^|\s)_is_large_/.test(mount.videoMain.className + ' ' + mount.player.className) : document.body.classList.contains('screen_mode');
-    const chatOpen = isChzzk ? !/(?:^|\s)_is_folded_/.test(mount.side.className) : mount.player.classList.contains('chat_open');
+    // extension storage throws after a reload. Its mount has been released.
+    if (!isCurrent(current)) return;
+    const wide = isChzzk ? /(?:^|\s)_is_large_/.test(current.videoMain.className + ' ' + current.player.className) : document.body.classList.contains('screen_mode');
+    const chatOpen = isChzzk ? !/(?:^|\s)_is_folded_/.test(current.side.className) : current.player.classList.contains('chat_open');
     const active = settings.enabled && wide && chatOpen;
-    mount.player.classList.toggle('ctfc-enabled', settings.enabled);
+    current.player.classList.toggle('ctfc-enabled', settings.enabled);
     if (isChzzk) {
-      mount.player.classList.toggle('ctfc-chzzk-wide', wide);
-      mount.player.classList.toggle('ctfc-chzzk-active', active);
-      mount.player.classList.toggle('ctfc-chzzk-docked', !active && chatOpen);
+      current.player.classList.toggle('ctfc-chzzk-wide', wide);
+      current.player.classList.toggle('ctfc-chzzk-active', active);
+      current.player.classList.toggle('ctfc-chzzk-docked', !active && chatOpen);
     } else {
-      mount.player.classList.toggle('ctfc-soop-docked', !settings.enabled && wide && chatOpen);
+      current.player.classList.toggle('ctfc-soop-docked', !settings.enabled && wide && chatOpen);
     }
-    if (gesture?.edge !== 'dock') applyDockWidth(settings.dockWidth);
-    globalThis.ChzzkViewControls?.place(mount.toggle, mount.player);
-    mount.toggle.hidden = !wide;
+    if (gesture?.edge !== 'dock') applyDockWidth(settings.dockWidth, current);
+    if (!isCurrent(current)) return;
+    globalThis.ChzzkViewControls?.place(current.toggle, current.player);
+    if (!isCurrent(current)) return;
+    current.toggle.hidden = !wide;
     const toggleText = settings.enabled ? '채팅 겹치기 켬' : '채팅 겹치기 끔';
-    if (mount.toggle.textContent !== toggleText) mount.toggle.textContent = toggleText;
-    mount.toggle.setAttribute('aria-pressed', String(settings.enabled));
-    mount.side.style.setProperty('--ctfc-opacity', settings.opacity.toFixed(2));
-    mount.alpha.value = String(Math.round(settings.opacity * 100));
-    mount.output.textContent = `${Math.round(settings.opacity * 100)}%`;
-    if (!active) { hidePanel(); updateControls(null); }
-    if (!gesture) applyRect(savedRect());
+    if (current.toggle.textContent !== toggleText) current.toggle.textContent = toggleText;
+    current.toggle.setAttribute('aria-pressed', String(settings.enabled));
+    current.side.style.setProperty('--ctfc-opacity', settings.opacity.toFixed(2));
+    current.alpha.value = String(Math.round(settings.opacity * 100));
+    current.output.textContent = `${Math.round(settings.opacity * 100)}%`;
+    if (!active) { hidePanel(); updateControls(null, current); }
+    if (!gesture) applyRect(savedRect(), current);
   }
 
   function schedule() {
@@ -436,24 +450,27 @@
   }
 
   function hidePanel() {
-    if (!mount) return;
-    mount.panel.hidden = true;
-    mount.toolbar.querySelector('.ctfc-opacity').setAttribute('aria-expanded', 'false');
+    const current = mount;
+    if (!isCurrent(current)) return;
+    current.panel.hidden = true;
+    current.toolbar.querySelector('.ctfc-opacity').setAttribute('aria-expanded', 'false');
   }
 
   function pointerDown(event, edge) {
-    if (disposed || event.button !== 0 || !mount) return;
+    const current = mount;
+    if (disposed || event.button !== 0 || !current) return;
     if (syncMonitor()) render();
-    if (disposed || !mount) return;
+    if (!isCurrent(current)) return;
     const active = edge === 'dock'
-      ? mount.player.classList.contains(isChzzk ? 'ctfc-chzzk-docked' : 'ctfc-soop-docked')
-      : settings.enabled && (isChzzk ? mount.player.classList.contains('ctfc-chzzk-active') : document.body.classList.contains('screen_mode') && mount.player.classList.contains('chat_open'));
+      ? current.player.classList.contains(isChzzk ? 'ctfc-chzzk-docked' : 'ctfc-soop-docked')
+      : settings.enabled && (isChzzk ? current.player.classList.contains('ctfc-chzzk-active') : document.body.classList.contains('screen_mode') && current.player.classList.contains('chat_open'));
     if (!active) return;
     if (gesture) return;
     event.preventDefault();
     event.stopPropagation();
     hidePanel();
-    const box = mount.side.getBoundingClientRect();
+    const box = current.side.getBoundingClientRect();
+    if (!isCurrent(current)) return;
     gesture = { id: event.pointerId, target: event.currentTarget, edge, startX: event.clientX, startY: event.clientY,
       original: { x: box.x, y: box.y, w: box.width, h: box.height }, current: { x: box.x, y: box.y, w: box.width, h: box.height } };
     gesture.target.setPointerCapture(event.pointerId);
@@ -517,6 +534,7 @@
     if (!player || !side || (isChzzk ? !videoMain : !side.querySelector('#chatting_area'))) { teardownMount(); return; }
     if (mount?.side === side && mount.player === player && mount.videoMain === videoMain && mount.toolbar.isConnected) return;
     teardownMount();
+    if (disposed) return;
     if (isChzzk) videoMain.classList.add('ctfc-chzzk-main');
     gesture = null;
     const abort = new AbortController();
@@ -591,16 +609,18 @@
   }
 
   function teardownMount() {
-    if (!mount) return;
-    mount.abort.abort(); mount.observer.disconnect(); mount.geometryObserver.disconnect();
+    const previous = mount;
+    if (!previous) return;
+    // Remove ownership before abort/release/DOM callbacks can re-enter us.
+    mount = null;
+    previous.abort.abort(); previous.observer.disconnect(); previous.geometryObserver.disconnect();
     if (gesture?.target.hasPointerCapture(gesture.id)) gesture.target.releasePointerCapture(gesture.id);
     gesture = null;
-    mount.toolbar.remove(); globalThis.ChzzkViewControls?.release(mount.toggle); mount.dockHandle?.remove();
-    mount.handles.forEach(handle => handle.remove());
-    mount.player.classList.remove('ctfc-enabled', 'ctfc-soop-docked', 'ctfc-controls-inset', 'ctfc-chzzk-wide', 'ctfc-chzzk-active', 'ctfc-chzzk-docked');
-    mount.videoMain?.classList.remove('ctfc-chzzk-main');
-    for (const element of [mount.side, mount.player]) for (const name of ['x', 'y', 'w', 'h', 'opacity', 'dock-w', 'controls-left', 'controls-right']) element.style.removeProperty(`--ctfc-${name}`);
-    mount = null;
+    previous.toolbar.remove(); globalThis.ChzzkViewControls?.release(previous.toggle); previous.dockHandle?.remove();
+    previous.handles.forEach(handle => handle.remove());
+    previous.player.classList.remove('ctfc-enabled', 'ctfc-soop-docked', 'ctfc-controls-inset', 'ctfc-chzzk-wide', 'ctfc-chzzk-active', 'ctfc-chzzk-docked');
+    previous.videoMain?.classList.remove('ctfc-chzzk-main');
+    for (const element of [previous.side, previous.player]) for (const name of ['x', 'y', 'w', 'h', 'opacity', 'dock-w', 'controls-left', 'controls-right']) element.style.removeProperty(`--ctfc-${name}`);
   }
   const listen = (target, type, callback) => target.addEventListener(type, callback, { signal: lifetime.signal });
   listen(window, 'resize', () => {
