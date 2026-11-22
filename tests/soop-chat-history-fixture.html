@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>SOOP hidden chat fixture</title>
+<button id="open">채팅 열기</button><button id="close">채팅 닫기</button>
+<div id="panel" hidden><div id="messages"></div><div contenteditable="true">작성 중 문장</div></div>
+<script>
+// Reproduce the observed native receive gate, close reset and render timer.
+function makeChat() {
+  return {
+    open:false, aChatDom:[], blocked:false,
+    isChatOpen(){return this.open},
+    msg(value){if(this.isChatOpen()&&!this.blocked)this.aChatDom.push(value)},
+    ogq(value){if(this.isChatOpen()&&!this.blocked)this.aChatDom.push(value)},
+    printSystemMessage(value){if(this.isChatOpen())this.aChatDom.push(value)},
+    openChat(){this.open=true;document.querySelector('#panel').hidden=false},
+    closeChat(){this.open=false;this.aChatDom.length=0;document.querySelector('#panel').hidden=true},
+    clearChat(){this.aChatDom=[];document.querySelector('#messages').replaceChildren()}
+  };
+}
+window.liveView={controller:{chatContainer:makeChat()}};
+document.querySelector('#open').onclick=()=>liveView.controller.chatContainer.openChat();
+document.querySelector('#close').onclick=()=>liveView.controller.chatContainer.closeChat();
+setInterval(()=>{const chat=liveView.controller.chatContainer;if(chat.isChatOpen()){
+  for(const text of chat.aChatDom.splice(0,300)){const row=document.createElement('p');row.textContent=text;document.querySelector('#messages').append(row)}
+}},20);
+</script>

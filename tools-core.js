@@ -2,7 +2,7 @@
   const defaults = Object.freeze({
     koreanSearch: true, favorites: true, catchUp: true, catchUpMode: "2", followingExpanded: true, followingRefresh: true,
     adMute: true, adSpeed: 4, adMini: true, mainAudio: true, adAutoSkip: true, adblockQuality: true,
-    globalSpeed: true, videoZoom: true, playerShortcuts: true, channelLiveLink: true, listPreview: true, sidebarPreview: true, freeChat: true, youtubeWide: true, nexonWide: true, highestQuality: true, dismissAdNotice: true
+    globalSpeed: true, videoZoom: true, playerShortcuts: true, channelLiveLink: true, listPreview: true, sidebarPreview: true, freeChat: true, soopChatHistory: true, youtubeWide: true, nexonWide: true, highestQuality: true, dismissAdNotice: true
   });
   const initials = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
   const vowels = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";

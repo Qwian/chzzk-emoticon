@@ -381,6 +381,7 @@ async function initializeFeatures() {
     listPreview: "치지직·숲 목록 우클릭 소리 미리보기",
     sidebarPreview: "팔로잉·보관 채널에 마우스를 올리면 소리 재생",
     freeChat: "치지직·숲 자유 배치 채팅 (이동·크기·투명도 저장)",
+    soopChatHistory: "숲 방송 입장 후 채팅을 닫아도 최근 대화 보관",
     youtubeWide: "유튜브 큰 극장 화면 · F/T/Esc 전환 · 옆 채팅",
     nexonWide: "넥슨 라이브 큰 영상 · 옆 채팅",
     highestQuality: "치지직에서 선택 가능한 최고 화질 자동 선택",
